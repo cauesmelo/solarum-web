@@ -1,0 +1,11 @@
+{
+  "slug": "solarum",
+  "title": "Solarum \u2014 Level One",
+  "embed": {
+    "width": 960,
+    "height": 640,
+    "clickToPlay": true,
+    "fullscreenButton": true,
+    "mobileFriendly": "Test physical devices before enabling"
+  }
+}

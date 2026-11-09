@@ -1,0 +1,975 @@
+/* Solarum — "ink and starlight". Colours are sampled from the original title
+ * art; --earth is the only colour and is reserved for Earth and its memory.
+ * Type is the original Solarum face everywhere, never below 16 px. */
+@font-face {
+  font-family: Solarum;
+  src: url("./assets/solarum.ttf") format("truetype");
+  font-display: block;
+}
+:root {
+  --ink: #0c0c0f;
+  --paper: #fbfbea;
+  --hill: #cecec1;
+  --mute: #aeaea3;
+  --dim: #777771;
+  --earth: #6fa8dc;
+  --ink-soft: rgba(12, 12, 15, 0.72);
+  --stage-top: 0px;
+  --stage-h: 100%;
+  --stage-w: 100%;
+  --hud-h: 56px;
+  --wobble: url(#ink-wobble);
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+}
+body,
+button {
+  font-family: Solarum, "Trebuchet MS", sans-serif;
+  letter-spacing: 0.5px;
+}
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled {
+  cursor: wait;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.defs {
+  position: absolute;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- surface and stage ---------- */
+.solarum {
+  position: relative;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 18px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.stage {
+  position: absolute;
+  left: 0;
+  top: var(--stage-top);
+  width: 100%;
+  height: var(--stage-h);
+  overflow: hidden;
+}
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--ink);
+  outline: none;
+}
+#game:focus-visible {
+  box-shadow: inset 0 0 0 3px var(--hill);
+}
+
+/* ---------- shared marks ---------- */
+/* Star frames sit inside generous 200 px cells, so a 40 px box shows a
+ * ~28 px star. Frame 0 is hollow, frame 2 filled (original sheet). */
+.star-icon {
+  display: inline-block;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin: -6px;
+  background: url("./assets/star.png") no-repeat;
+  background-size: 160px 80px;
+  background-position: -80px 0;
+}
+.great-slots {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.slot {
+  display: inline-block;
+  width: 34px;
+  height: 34px;
+  margin: -3px;
+  background: url("./assets/star.png") no-repeat;
+  background-size: 136px 68px;
+  background-position: 0 0;
+  opacity: 0.85;
+}
+.slot.filled {
+  background-position: -68px 0;
+  opacity: 1;
+}
+.slot.pending {
+  background-position: -68px 0;
+  animation: carry 0.9s ease-in-out infinite alternate;
+}
+/* On paper a cream-filled star reads as an outline. Earlier builds put it on
+ * an ink disc, but the hand-drawn star is not centred on the disc, so it read
+ * as misaligned. Instead the original filled frame becomes an ink silhouette
+ * through a mask: same drawing, same cell, nothing to line up. Empty slots
+ * keep the original hollow frame. */
+.card .slot.filled,
+.card .star-icon {
+  background: var(--ink);
+  -webkit-mask: url("./assets/star.png") no-repeat;
+  mask: url("./assets/star.png") no-repeat;
+  -webkit-mask-size: 136px 68px;
+  mask-size: 136px 68px;
+  -webkit-mask-position: -68px 0;
+  mask-position: -68px 0;
+}
+.card .star-icon {
+  -webkit-mask-size: 160px 80px;
+  mask-size: 160px 80px;
+  -webkit-mask-position: -80px 0;
+  mask-position: -80px 0;
+}
+@keyframes carry {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
+.round-btn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+  position: relative;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.round-btn::after {
+  /* A hand-drawn inner ink ring keeps paper buttons in the art's line style. */
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  filter: var(--wobble);
+  pointer-events: none;
+}
+.round-btn:focus-visible,
+.ink-btn:focus-visible,
+.wake:focus-visible,
+.toggle:focus-visible,
+.itch-fullscreen:focus-visible {
+  outline: 3px solid var(--hill);
+  outline-offset: 3px;
+}
+.pause-btn .bars {
+  width: 14px;
+  height: 18px;
+  border-left: 4px solid var(--ink);
+  border-right: 4px solid var(--ink);
+  border-radius: 1px;
+}
+.ink-btn {
+  min-height: 48px;
+  padding: 4px 20px;
+  border: 2.5px solid var(--ink);
+  border-radius: 16px 19px 14px 18px / 18px 14px 19px 15px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.1;
+  transition: transform 0.12s ease;
+}
+.ink-btn:hover {
+  transform: translateY(-1px) rotate(-0.4deg);
+}
+.ink-btn.primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.ink-btn.small {
+  min-height: 44px;
+  font-size: 18px;
+  padding: 2px 14px;
+}
+
+/* ---------- title ---------- */
+.title-ui {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--stage-top);
+  height: var(--stage-h);
+  z-index: 6;
+  pointer-events: none;
+  text-align: center;
+}
+.title-ui .logo {
+  position: absolute;
+  left: 50%;
+  top: 13%;
+  width: min(60%, 600px);
+  height: auto;
+  transform: translateX(-50%);
+  transition:
+    transform 0.6s ease-in,
+    opacity 0.6s ease-in;
+  filter: drop-shadow(0 6px 0 rgba(119, 119, 113, 0.55));
+}
+.wake-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 47%;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  transition: opacity 0.3s ease;
+}
+.wake {
+  pointer-events: auto;
+  min-height: 48px;
+  padding: 6px 22px;
+  border: 0;
+  border-radius: 24px;
+  background: none;
+  color: var(--paper);
+  font-size: 24px;
+  text-shadow:
+    0 0 6px var(--ink),
+    0 0 2px var(--ink);
+  animation: pulse 1.2s ease-in-out infinite alternate;
+}
+.wake:disabled {
+  animation: none;
+  opacity: 0.75;
+}
+@keyframes pulse {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.keys {
+  margin: 0;
+  color: var(--mute);
+  font-size: 18px;
+  text-shadow: 0 0 4px var(--ink);
+}
+.load-error {
+  pointer-events: auto;
+  margin: 6px 0 0;
+  font-size: 18px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+.solarum:not([data-state="title"]):not([data-state="loading"]) .title-ui {
+  visibility: hidden;
+  transition: visibility 0s 0.6s;
+}
+.solarum.waking .title-ui {
+  visibility: visible;
+}
+.solarum.waking .title-ui .logo {
+  transform: translate(-50%, -48px);
+  opacity: 0;
+}
+.solarum.waking .wake-block {
+  opacity: 0;
+}
+.sound-btn.off::before {
+  content: "";
+  position: absolute;
+  width: 58%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--ink);
+  transform: rotate(-45deg);
+}
+.sound-btn {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 8;
+  font-size: 22px;
+}
+.solarum:not([data-state="title"]) .sound-btn {
+  display: none;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: var(--stage-top);
+  height: var(--hud-h);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 128px 0 14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.solarum[data-state="running"] .hud,
+.solarum[data-state="paused"] .hud,
+.solarum[data-state="dead"] .hud,
+.solarum[data-state="respawning"] .hud {
+  opacity: 1;
+}
+.hud-stars {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 170px;
+  text-shadow:
+    0 0 4px var(--ink),
+    0 0 2px var(--ink);
+}
+.hud .count {
+  font-size: 26px;
+  min-width: 2ch;
+}
+.orbit {
+  flex: none;
+  width: 264px;
+  height: 44px;
+  margin: 0 auto;
+  opacity: 0.55;
+  overflow: visible;
+  transition: opacity 0.4s ease;
+}
+.orbit.bright {
+  opacity: 1;
+}
+.orbit .arc {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 2;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+}
+.orbit .travelled {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.orbit .tick {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 1.6;
+}
+.orbit .tick.lit {
+  fill: var(--paper);
+}
+.orbit .home {
+  fill: var(--paper);
+}
+.orbit .earth-dot {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+.orbit .earth-dot.memory {
+  fill: var(--earth);
+}
+.orbit .leaf {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.2;
+}
+.orbit .label {
+  fill: var(--ink);
+  font-family: Solarum, sans-serif;
+  font-size: 16px;
+}
+.hud .pause-btn {
+  position: absolute;
+  right: 12px;
+  top: 4px;
+  pointer-events: auto;
+}
+.itch-fullscreen {
+  position: absolute;
+  z-index: 9;
+  right: 68px;
+  top: calc(var(--stage-top) + 4px);
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.itch-fullscreen svg {
+  width: 22px;
+  height: 22px;
+  stroke: var(--ink);
+  stroke-width: 2.6;
+  fill: none;
+  stroke-linecap: round;
+}
+.solarum[data-state="title"] .itch-fullscreen,
+.solarum[data-state="loading"] .itch-fullscreen {
+  top: auto;
+  right: 16px;
+  bottom: 16px;
+}
+
+/* ---------- in-world words: movement cards, story, tips ---------- */
+.movement-card {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  top: calc(var(--stage-top) + var(--stage-h) * 0.17);
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  pointer-events: none;
+  opacity: 0;
+  text-shadow: 0 0 8px var(--ink);
+}
+.movement-card .numeral {
+  font-size: 22px;
+  color: var(--mute);
+}
+.movement-card .name {
+  font-size: 42px;
+  color: var(--paper);
+}
+/* Opacity and drift are set per frame from simulation time (game.js). */
+.story-line,
+.tip-line {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  width: max-content;
+  max-width: 84%;
+  margin: 0;
+  padding: 6px 16px 7px;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 18px;
+  line-height: 1.3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  /* An ink plate keeps every line legible over cream islands. */
+  background: rgba(12, 12, 15, 0.86);
+  border-radius: 14px 18px 12px 16px;
+  box-shadow: 0 0 0 1.5px rgba(174, 174, 163, 0.35);
+}
+.story-line {
+  top: calc(var(--stage-top) + var(--stage-h) - 52px);
+  color: var(--hill);
+}
+.tip-line {
+  top: calc(var(--stage-top) + var(--hud-h) + 10px);
+  color: var(--paper);
+}
+.story-line.show,
+.tip-line.show {
+  opacity: 1;
+}
+
+/* ---------- touch ---------- */
+.controls {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  top: var(--stage-top);
+  height: var(--stage-h);
+  display: none;
+  pointer-events: none;
+}
+@media (pointer: coarse) {
+  .controls {
+    display: block;
+  }
+}
+.solarum[data-layout="portrait"] .controls {
+  display: block;
+}
+.solarum[data-state="title"] .controls > :not(.turn-hint),
+.solarum[data-state="loading"] .controls > *,
+.solarum[data-state="won"] .controls > * {
+  visibility: hidden;
+}
+.controls > * {
+  pointer-events: auto;
+  touch-action: none;
+}
+.jump-zone {
+  position: absolute;
+  left: 0;
+  top: var(--hud-h);
+  bottom: 0;
+  width: 50%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--paper);
+}
+.jump-zone .hint {
+  position: absolute;
+  left: 14px;
+  bottom: 10px;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  font-size: 40px;
+  border-radius: 22px;
+  border: 2.5px solid var(--paper);
+  opacity: 0.35;
+}
+.jump-zone.pressed .hint {
+  opacity: 1;
+}
+.swipe {
+  position: absolute;
+  left: 50%;
+  right: 0;
+  top: var(--hud-h);
+  bottom: 0;
+}
+.cape-btn,
+.dive-btn {
+  position: absolute;
+  opacity: 0.35;
+  font-size: 30px;
+  transition: opacity 0.08s linear;
+}
+/* Landscape: both thumb buttons sit low in the corner strip, under the line
+ * where landings appear, so the lower-right lookahead stays visible. */
+.cape-btn {
+  width: 62px;
+  height: 62px;
+  right: 12px;
+  bottom: 10px;
+  font-size: 30px;
+}
+.dive-btn {
+  width: 50px;
+  height: 50px;
+  right: 86px;
+  bottom: 10px;
+  font-size: 26px;
+}
+.cape-btn.pressed,
+.dive-btn.pressed {
+  opacity: 1;
+}
+.cape-btn.spent {
+  background: var(--dim);
+}
+.turn-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10px;
+  margin: 0;
+  text-align: center;
+  font-size: 16px;
+  color: var(--mute);
+  pointer-events: none;
+}
+
+/* ---------- portrait: HUD bar, letterboxed sky, control deck ---------- */
+.solarum[data-layout="portrait"] .hud {
+  top: 0;
+  height: var(--stage-top);
+  padding-right: 120px;
+  background: var(--ink);
+}
+.solarum[data-layout="portrait"] .hud .orbit {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--stage-top) + var(--stage-h) + 14px);
+  transform: translateX(-50%);
+  margin: 0;
+}
+.solarum[data-layout="portrait"] .itch-fullscreen {
+  top: 6px;
+}
+.solarum[data-layout="portrait"][data-state="title"] .itch-fullscreen {
+  top: auto;
+}
+.solarum[data-layout="portrait"] .hud .pause-btn {
+  top: 6px;
+}
+.solarum[data-layout="portrait"] .controls {
+  top: calc(var(--stage-top) + var(--stage-h));
+  height: auto;
+  bottom: 0;
+  border-top: 2px dashed rgba(174, 174, 163, 0.35);
+}
+/* Deck: orbit and story lines on top, a framed jump panel on the left, the
+ * cape / dive cluster in the right thumb's reach. Targets stay >= 44 px. */
+.solarum[data-layout="portrait"] .hud .orbit {
+  top: calc(var(--stage-top) + var(--stage-h) + 8px);
+}
+.solarum[data-layout="portrait"] .jump-zone {
+  top: 112px;
+  bottom: 12px;
+  left: 12px;
+  width: calc(50% - 18px);
+  border: 2px dashed rgba(206, 206, 193, 0.28);
+  border-radius: 26px 30px 24px 28px;
+}
+.solarum[data-layout="portrait"] .jump-zone.pressed {
+  border-color: rgba(251, 251, 234, 0.6);
+}
+.solarum[data-layout="portrait"] .swipe {
+  top: 112px;
+}
+.solarum[data-layout="portrait"] .jump-zone .hint {
+  left: 50%;
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: 88px;
+  height: 88px;
+  font-size: 48px;
+}
+.solarum[data-layout="portrait"] .cape-btn {
+  right: 24px;
+  bottom: 24px;
+  width: 88px;
+  height: 88px;
+}
+.solarum[data-layout="portrait"] .dive-btn {
+  right: 124px;
+  bottom: 100px;
+  width: 72px;
+  height: 72px;
+}
+.solarum[data-layout="portrait"] .turn-hint {
+  top: 84px;
+  bottom: auto;
+}
+/* On the portrait title the hint sits low, clear of the wake prompt. */
+.solarum[data-layout="portrait"][data-state="title"] .turn-hint {
+  top: auto;
+  bottom: 84px;
+}
+.solarum[data-layout="portrait"] .story-line {
+  top: calc(var(--stage-top) + var(--stage-h) + 56px);
+}
+.solarum[data-layout="portrait"] .tip-line {
+  top: calc(var(--stage-top) + var(--stage-h) + 82px);
+}
+/* Short decks (small phones): drop the panel top under the orbit. */
+@media (max-height: 640px) and (max-aspect-ratio: 1/1) {
+  .solarum[data-layout="portrait"] .jump-zone,
+  .solarum[data-layout="portrait"] .swipe {
+    top: 60px;
+  }
+  .solarum[data-layout="portrait"] .jump-zone .hint {
+    width: 64px;
+    height: 64px;
+    font-size: 36px;
+  }
+  .solarum[data-layout="portrait"] .cape-btn {
+    width: 76px;
+    height: 76px;
+    bottom: 14px;
+  }
+  .solarum[data-layout="portrait"] .dive-btn {
+    width: 60px;
+    height: 60px;
+    right: 108px;
+    bottom: 80px;
+  }
+  .solarum[data-layout="portrait"] .story-line,
+  .solarum[data-layout="portrait"] .tip-line,
+  .solarum[data-layout="portrait"] .turn-hint {
+    top: calc(var(--stage-top) + var(--stage-h) + 52px);
+  }
+}
+.solarum[data-layout="portrait"] .title-ui {
+  height: auto;
+  bottom: 0;
+}
+.solarum[data-layout="portrait"] .title-ui .logo {
+  top: calc(var(--stage-h) * 0.1);
+  width: 78%;
+}
+.solarum[data-layout="portrait"] .wake-block {
+  top: calc(var(--stage-h) + 48px);
+  gap: 12px;
+  padding: 0 16px;
+}
+.solarum[data-layout="portrait"] .movement-card .name {
+  font-size: 30px;
+}
+
+/* ---------- cards ---------- */
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(12, 12, 15, 0.7);
+}
+.card {
+  position: relative;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 22px 26px 20px 24px / 24px 20px 26px 22px;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.card::before {
+  /* A hand-drawn ink frame just inside the paper edge. */
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 2.5px solid var(--ink);
+  border-radius: 18px 22px 16px 20px / 20px 16px 22px 18px;
+  filter: var(--wobble);
+  pointer-events: none;
+}
+.card h2 {
+  margin: 0;
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.1;
+}
+.pause-card {
+  width: min(420px, 100%);
+  min-height: 320px;
+  max-height: 100%;
+  overflow: auto;
+  padding: 22px 28px 22px;
+  text-align: center;
+}
+.card-page {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+.orbit.big {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  margin: 0;
+  opacity: 1;
+}
+.orbit.big .arc,
+.orbit.big .travelled {
+  stroke: var(--ink);
+}
+.orbit.big .tick {
+  fill: var(--paper);
+  stroke: var(--ink);
+}
+.orbit.big .tick.lit,
+.orbit.big .home {
+  fill: var(--ink);
+}
+.orbit.big .earth-dot {
+  fill: var(--paper);
+  stroke: var(--ink);
+}
+.stack {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+.row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.kind {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ink-soft);
+  max-width: 34ch;
+}
+.toggles {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+.toggle {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  column-gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 14px 8px 10px;
+  text-align: left;
+  border: 2px solid var(--ink);
+  border-radius: 14px 18px 12px 16px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.toggle::before {
+  content: "";
+  grid-row: span 2;
+  width: 36px;
+  height: 36px;
+  margin: -4px;
+  background: url("./assets/star.png") no-repeat;
+  background-size: 144px 72px;
+  background-position: 0 0;
+}
+.toggle[aria-pressed="true"]::before {
+  background-image: url("./assets/star.png"), radial-gradient(circle, var(--ink) 0 36%, transparent 38%);
+  background-size: 144px 72px, 100% 100%;
+  background-position: -72px 0, 0 0;
+}
+.toggle b {
+  font-weight: 400;
+  font-size: 20px;
+}
+.toggle span {
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+.victory-card {
+  position: absolute;
+  z-index: 15;
+  right: 4%;
+  bottom: 7%;
+  width: min(400px, 52%);
+  padding: 20px 24px 20px;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+  animation: rise 0.6s ease both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.victory-line {
+  margin: 0;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.earth {
+  display: inline-block;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2.5px solid var(--ink);
+  background:
+    radial-gradient(circle at 34% 30%, rgba(251, 251, 234, 0.85) 0 13%, transparent 14%),
+    var(--earth);
+}
+.results {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 6px 18px;
+  align-items: center;
+}
+.results div {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.results dt {
+  font-size: 16px;
+  color: var(--ink-soft);
+  min-height: 28px;
+  display: grid;
+  place-items: center;
+}
+.results dd {
+  margin: 0;
+  font-size: 22px;
+}
+/* The slots sit in the icon row (like the star icon above its count) so all
+ * four columns share one baseline. */
+.results .great-slots {
+  min-height: 28px;
+  display: flex;
+  gap: 2px;
+}
+.solarum[data-layout="portrait"] .victory-card {
+  left: 16px;
+  right: 16px;
+  width: auto;
+  bottom: auto;
+  top: calc(var(--stage-top) + var(--stage-h) + 16px);
+}
+
+/* Short landscape screens (phones turned sideways). */
+@media (max-height: 460px) {
+  .solarum {
+    --hud-h: 50px;
+  }
+  .movement-card .name {
+    font-size: 32px;
+  }
+  .pause-card {
+    min-height: 0;
+    padding: 14px 20px;
+  }
+  .card-page {
+    gap: 8px;
+  }
+  .orbit.big {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

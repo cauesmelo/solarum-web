@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Dev-only page: excluded from the itch.io ZIP (package-itch.mjs). -->
+    <title>Solarum soundboard</title>
+    <link rel="icon" href="./assets/star.png" />
+    <style>
+      @font-face {
+        font-family: Solarum;
+        src: url("./assets/solarum.ttf") format("truetype");
+        font-display: swap;
+      }
+      :root {
+        --ink: #0c0c0f;
+        --paper: #fbfbea;
+        --hill: #cecec1;
+        --mute: #aeaea3;
+        --dim: #777771;
+        --earth: #6fa8dc;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--ink);
+        color: var(--paper);
+        font: 16px/1.45 system-ui, sans-serif;
+        padding: 24px 16px 48px;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      h1 {
+        font: 34px/1.1 Solarum, Georgia, serif;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font: 22px/1.2 Solarum, Georgia, serif;
+        margin: 28px 0 10px;
+        color: var(--hill);
+      }
+      p.lede {
+        color: var(--mute);
+        margin: 0 0 16px;
+        max-width: 70ch;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        background: var(--ink);
+        padding: 10px 0;
+        z-index: 2;
+        border-bottom: 1px solid #2a2a2e;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 10px;
+      }
+      button {
+        font: inherit;
+        color: var(--ink);
+        background: var(--paper);
+        border: 2px solid var(--paper);
+        border-radius: 10px;
+        padding: 10px 12px;
+        text-align: left;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      button:hover {
+        background: var(--hill);
+      }
+      button:focus-visible {
+        outline: 3px solid var(--earth);
+        outline-offset: 2px;
+      }
+      button.ghost {
+        background: transparent;
+        color: var(--paper);
+      }
+      button[aria-pressed="true"] {
+        background: var(--earth);
+        border-color: var(--earth);
+      }
+      .cue strong {
+        display: block;
+        font-size: 17px;
+      }
+      .cue span {
+        display: block;
+        font-size: 16px;
+        color: #3b3b40;
+      }
+      .cue code {
+        font-size: 16px;
+        color: var(--dim);
+      }
+      .cue.playing {
+        background: var(--earth);
+      }
+      .meter {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--mute);
+        font-variant-numeric: tabular-nums;
+      }
+      .meter i {
+        display: block;
+        width: 160px;
+        height: 12px;
+        border-radius: 6px;
+        background: #2a2a2e;
+        overflow: hidden;
+      }
+      .meter b {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--paper);
+      }
+      label {
+        color: var(--mute);
+      }
+      #log {
+        color: var(--mute);
+        min-height: 1.45em;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Solarum soundboard</h1>
+      <p class="lede">
+        Every effect is synthesised in <code>audio.mjs</code> in D major (the soundtrack's key). Each button plays one cue through the
+        game's own bus, compressor, reverb and music ducking; turn the music on to judge the mix. Tab and Enter / Space play everything.
+        Dev only: this page is not in the itch.io ZIP.
+      </p>
+      <div class="bar" role="toolbar" aria-label="Mix controls">
+        <button id="music" class="ghost" type="button" aria-pressed="false">♫ Music off</button>
+        <button id="pause" class="ghost" type="button" aria-pressed="false">Pause audio</button>
+        <label><input id="earth" type="checkbox" /> Earth is blue (win)</label>
+        <span class="meter" aria-live="off"><i><b id="meter-bar"></b></i><span id="meter-text">-inf dBFS</span></span>
+        <span id="log" aria-live="polite"></span>
+      </div>
+      <h2>Sequences</h2>
+      <div class="grid" id="sequences"></div>
+      <div id="groups"></div>
+    </main>
+    <script type="module" src="./soundboard.js"></script>
+  </body>
+</html>

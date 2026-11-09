@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0c0c0f" />
+    <meta
+      name="description"
+      content="Diana follows a distant signal toward Earth. A hand-drawn runner through the stars."
+    />
+    <title>Solarum — A Signal in the Dark</title>
+    <link rel="icon" href="./assets/star.png" />
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./embed.css" />
+  </head>
+  <body>
+    <!-- One game surface. Landscape: the sky fills it. Portrait: a HUD bar,
+         the letterboxed sky (never cropped below 960 logical px of width) and
+         a control deck below. Every overlay is positioned from the stage box
+         that game.js publishes as CSS variables. -->
+    <main class="solarum" id="solarum" data-state="loading" data-layout="landscape">
+      <section class="stage" id="stage" aria-label="Solarum, chapter one">
+        <canvas
+          id="game"
+          width="1012"
+          height="675"
+          tabindex="0"
+          aria-label="Diana runs on her own from left to right across floating islands. Jump, open the cape, and dive."
+        ></canvas>
+      </section>
+
+      <!-- Title: the original logo above the original title ground (canvas). -->
+      <div class="title-ui" id="title-ui">
+        <img class="logo" src="./assets/logo.png" alt="Solarum" width="1217" height="254" />
+        <div class="wake-block">
+          <button id="start" class="wake" type="button" disabled>
+            <span id="start-label">Gathering the stars…</span>
+          </button>
+          <p class="keys" id="title-keys" aria-hidden="true">↑ jump · → cape · ↓ dive</p>
+          <p class="load-error" id="load-error" hidden>
+            The stars could not be gathered.
+            <button id="reload" class="ink-btn small" type="button">Try again</button>
+          </p>
+        </div>
+      </div>
+
+      <!-- In-run HUD: stars, Great Star slots, orbit line home → Earth, pause. -->
+      <div class="hud" id="hud">
+        <div class="hud-stars">
+          <i class="star-icon" aria-hidden="true"></i>
+          <span id="stars" class="count" aria-label="Stars">0</span>
+          <span class="great-slots" id="great-slots" role="img" aria-label="Great Fallen Stars: 0 of 3">
+            <i class="slot"></i><i class="slot"></i><i class="slot"></i>
+          </span>
+        </div>
+        <svg class="orbit" id="orbit" viewBox="0 0 264 44" aria-hidden="true"></svg>
+        <button id="pause" class="round-btn pause-btn" type="button" aria-label="Pause">
+          <span class="bars" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <div class="movement-card" id="movement-card" aria-hidden="true">
+        <span class="numeral" id="movement-numeral"></span>
+        <span class="name" id="movement-name"></span>
+      </div>
+      <p class="story-line" id="story" aria-hidden="true"></p>
+      <p class="tip-line" id="tip" aria-hidden="true"></p>
+
+      <!-- Touch: the left half jumps; the right thumb opens the cape and dives.
+           In portrait the same layout becomes a control deck below the sky. -->
+      <div class="controls" id="controls">
+        <button id="touch-jump" class="zone jump-zone" type="button" aria-label="Jump; press again in the air to jump again">
+          <span class="hint" aria-hidden="true">↑</span>
+        </button>
+        <div class="swipe" id="touch-swipe" aria-hidden="true"></div>
+        <button id="touch-dive" class="round-btn dive-btn" type="button" aria-label="Dive">↓</button>
+        <button id="touch-cape" class="round-btn cape-btn" type="button" aria-label="Open the cape; hold to glide">→</button>
+        <p class="turn-hint" id="turn-hint" hidden>Turn sideways for a wider sky</p>
+      </div>
+
+      <!-- Pause: a paper card over the dimmed scene. -->
+      <div class="veil" id="pause-veil" hidden>
+        <div class="card pause-card" id="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+          <div class="card-page" id="pause-main">
+            <h2 id="pause-title">Paused</h2>
+            <svg class="orbit big" id="pause-orbit" viewBox="0 0 360 80" aria-hidden="true"></svg>
+            <div class="stack">
+              <button id="resume" class="ink-btn primary" type="button">Continue</button>
+              <button id="back-to-light" class="ink-btn" type="button">Back to last light</button>
+              <button id="restart-chapter" class="ink-btn" type="button">Restart chapter</button>
+            </div>
+            <div class="row">
+              <button id="pause-sound" class="ink-btn small" type="button" aria-pressed="true">♫ Sound</button>
+              <button id="assist-open" class="ink-btn small" type="button" aria-controls="pause-assist">Assist…</button>
+            </div>
+          </div>
+          <div class="card-page" id="pause-assist" hidden>
+            <h2>Assist</h2>
+            <p class="kind">Play the way that feels good. Nothing is locked or lost.</p>
+            <div class="toggles">
+              <button class="toggle" type="button" data-assist="gentle" aria-pressed="false">
+                <b>Gentle pace</b><span>The world moves a little slower.</span>
+              </button>
+              <button class="toggle" type="button" data-assist="endlessCape" aria-pressed="false">
+                <b>Endless cape</b><span>The cape never needs to rest.</span>
+              </button>
+              <button class="toggle" type="button" data-assist="starNet" aria-pressed="false">
+                <b>Star net</b><span>Once per light, a fall returns you to your last ground.</span>
+              </button>
+            </div>
+            <button id="assist-back" class="ink-btn primary" type="button">Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Victory: slides up beside the portal, never over it. -->
+      <div class="card victory-card" id="victory-card" role="dialog" aria-labelledby="victory-line" hidden>
+        <p class="victory-line" id="victory-line"><i class="earth" aria-hidden="true"></i>The signal is stronger now.</p>
+        <dl class="results">
+          <div><dt><i class="star-icon" aria-hidden="true"></i><span class="sr-only">Stars</span></dt><dd id="result-stars">0 / 0</dd></div>
+          <div><dt class="great-slots" id="result-great"><i class="slot"></i><i class="slot"></i><i class="slot"></i><span class="sr-only">Great Fallen Stars</span></dt><dd id="result-great-count">0 / 3</dd></div>
+          <div><dt>Time</dt><dd id="result-time">0:00</dd></div>
+          <div><dt>Falls</dt><dd id="result-falls">0</dd></div>
+        </dl>
+        <div class="row">
+          <button id="again" class="ink-btn primary" type="button">Run again</button>
+          <button id="to-title" class="ink-btn" type="button">Title</button>
+        </div>
+      </div>
+
+      <button id="sound" class="round-btn sound-btn" type="button" aria-pressed="true" aria-label="Sound">♫</button>
+      <div id="announcement" class="sr-only" aria-live="polite"></div>
+    </main>
+    <svg width="0" height="0" class="defs" aria-hidden="true" focusable="false">
+      <!-- A slight hand-drawn wobble for ink borders; its seed boils at 8 fps
+           unless reduced motion is requested. -->
+      <filter id="ink-wobble" x="-4%" y="-4%" width="108%" height="108%">
+        <feTurbulence id="ink-noise" type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" />
+        <feDisplacementMap in="SourceGraphic" scale="3" />
+      </filter>
+    </svg>
+    <script type="module" src="./embed.js"></script>
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>
