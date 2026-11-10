@@ -251,14 +251,27 @@ export function createClockMap({ slew = 0.01, jump = 0.05, deadband = 0.004 } = 
       const err = a - toAudio(t);
       drift = err;
       maxDrift = Math.max(maxDrift, Math.abs(err));
-      if (!set || Math.abs(err) > jump) {
+      if (!set) {
         this.anchor(t, a, s);
+        return "anchor";
+      }
+      if (Math.abs(err) > jump) {
+        // Re-anchor by whole sixteenths, so the grid keeps its phase against
+        // everything already scheduled (a sixteenth is skipped or held, never
+        // shifted by an odd amount); the residual is slewed below.
+        const s16 = SIXTEENTH / scale,
+          k = Math.round(err / s16);
+        audio0 += k * s16;
+        smooth = err - k * s16;
         jumps++;
         return "jump";
       }
       smooth += 0.2 * (err - smooth);
       if (Math.abs(smooth) < deadband) return "hold";
-      const max = slew * Math.max(0, dtAudio),
+      // 1% of tempo for small drift, up to the brief's 3% for a residual
+      // left by a re-anchor or a slow resume.
+      const rate = Math.abs(smooth) > 0.02 ? 0.03 : slew;
+      const max = rate * Math.max(0, dtAudio),
         step = Math.max(-max, Math.min(max, smooth));
       audio0 += step;
       smooth -= step;
@@ -273,11 +286,18 @@ export function createClockMap({ slew = 0.01, jump = 0.05, deadband = 0.004 } = 
 
 /* ---------- tuning value H ---------- */
 export const H_MIN = 0.4;
+export const MAX_FLAT = 20; // cents
+export const MAX_DETUNE = 25; // cents: flat + spread + wow at H_MIN
 /** The hidden tuning value (brief 5.6). Only visible errors lower it: a
  * fall, a broken constellation, a score note more than 70 ms off its beat.
- * Clean play raises it again. `mix()` turns it into the bed's detune (pads
- * +-(1 - H) x 30 cents plus tape wow (1 - H) x 20 cents, together never
- * above 20 cents), its lowpass and whether the choir may sing. */
+ * Clean play raises it again, but slowly: at most +0.1 per error-free bar
+ * (a beacon counts as one), so a fall is heard for about four bars.
+ * `mix()` turns it into the bed's tuning. The audio critic measured the
+ * first, symmetric detune (pads spread around true pitch) as nearly
+ * inaudible, so the whole bed now drifts flat against Diana's in-tune
+ * voice: (1 - H) x 40 cents, at most 20, plus a small spread and tape wow,
+ * at most 25 cents in all. Its lowpass closes and below H 0.7 the choir
+ * rests. */
 export function createTuning({ gentle = false } = {}) {
   let H = 1,
     gentleMode = !!gentle,
@@ -318,15 +338,14 @@ export function createTuning({ gentle = false } = {}) {
         case "loose-note":
           errors++;
           return set(H - 0.03);
+        // Clean play is what heals, one bar at a time.
         case "on-grid-note":
-          return set(H + 0.05);
         case "stable-landing":
-          return set(H + 0.03);
         case "constellation":
-          return set(H + 0.3);
+          return 0;
         case "clean-bar":
-          return set(H + 0.1);
         case "beacon":
+          return set(H + 0.1);
         case "restart":
           return set(1);
         default:
@@ -335,18 +354,16 @@ export function createTuning({ gentle = false } = {}) {
     },
     mix() {
       const out = 1 - H;
-      let pad = out * 30,
-        wow = out * 20;
-      const total = pad + wow;
-      if (total > 20) {
-        pad *= 20 / total;
-        wow *= 20 / total;
-      }
+      const flat = Math.min(MAX_FLAT, out * 40),
+        pad = Math.min(3, out * 7.5),
+        wow = Math.min(2, out * 5);
       return {
         H,
-        padCents: pad,
+        flatCents: flat, // the whole bed, flat of Diana's voice
+        padCents: pad, // +- spread between a pad's paired oscillators
         wowCents: wow,
-        totalCents: pad + wow,
+        totalCents: flat + pad + wow, // the furthest any bed partial strays
+
         lowpass: 2000 * 2 ** (3 * H), // 16 kHz in tune, 7 kHz at H = 0.6
         choir: H >= 0.7,
         shimmer: H >= 0.7 ? 0.4 : 0.15,
@@ -494,8 +511,10 @@ export function createConductor(options = {}) {
       st.barErrors = 0;
       st.lastBar = bar;
     }
-    // Sky pad (and choir) on every chord change, and on the first tick.
-    const changed = st.lastChord !== chord || st.lastTick === null;
+    // Sky pad (and choir) on every chord change, every bar line and the first
+    // tick: a held pad hands over to the next with a 1.6 s crossfade, so a
+    // chord held for several bars never decays into a gap.
+    const changed = st.lastChord !== chord || st.lastTick === null || inBar === 0;
     if (changed) {
       let midis = chord.pad;
       if (st.sus && k < st.sus.until) midis = midis.map((m) => (chord.tones[1] === pc(m) ? safeAtOrAbove(chord, m + 1) : m));
@@ -853,6 +872,10 @@ export function createConductor(options = {}) {
       return tones[Math.min(tones.length - 1, Math.floor(lift * tones.length))];
     },
     windChord: (t) => chordAtT(t),
+    /** After the engine silenced the bed (a reset), voice it again next tick. */
+    revoice() {
+      st.lastChord = null;
+    },
     get gentle() {
       return tuning.gentle;
     },

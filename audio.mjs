@@ -1367,6 +1367,10 @@ const WOW_RATE = 0.45; // Hz
  * pitch by 2 pi f D (as a ratio), and 1 cent is 1/1731 of that ratio. */
 const WOW_PER_CENT = 1 / (1731 * 2 * Math.PI * WOW_RATE);
 const MP3_FIRST_BEAT = 0.449; // s into assets/soundtrack.mp3 (RESEARCH_MUSIC 1)
+/** The bed sounds this much after its grid point: Diana's own notes arrive a
+ * frame after their event (0-17 ms), so a slightly late bed centres them on
+ * the beat instead of trailing it (audio critic, finding 7). */
+const BED_DELAY = 0.015;
 const wallNow = () => globalThis.performance?.now?.() ?? Date.now();
 const CRACKED = new Set(createLevel().platforms.filter((q) => q.type).map((q) => q.id));
 /** Pitched cues follow the score's chord at the moment they sound. */
@@ -1616,10 +1620,16 @@ export function createAudioEngine(options = {}) {
     const detDown = node("Gain");
     detDown.gain.value = -1;
     det.connect(detDown);
+    // The flat bus: every bed oscillator (and plucked buffer) follows it, so
+    // after mistakes the whole world drifts flat of Diana's in-tune voice.
+    const flat = ctx.createConstantSource();
+    nodes++;
+    flat.offset.value = 0;
+    flat.start(t());
     // Rewind notes sound while the score bus is stopped, so they bypass it.
     const rewind = node("Gain");
     rewind.connect(graph.master);
-    score = { scoreOut, tapeGain, tapeTone, tape, scoreIn, playerIn, bedIn, wowDepth, bedTone, spaceIn, fb, det, detDown, rewind };
+    score = { scoreOut, tapeGain, tapeTone, tape, scoreIn, playerIn, bedIn, wowDepth, bedTone, spaceIn, fb, det, detDown, flat, rewind };
   }
   function routeMusic() {
     if (!musicEl || musicRouted || !graph || offline) return;
@@ -1739,7 +1749,8 @@ export function createAudioEngine(options = {}) {
     if (!score || !side) return;
     (side > 0 ? score.det : score.detDown).connect(param);
   }
-  function renderLayer(L, t0, dest, list) {
+  function renderLayer(L, t0, dest, list, { bed = false } = {}) {
+    const flatInto = (param) => bed && score && score.flat.connect(param);
     const start = t0 + L.at,
       end = layerEnd(L) - L.at + start;
     const g = node("Gain");
@@ -1785,6 +1796,7 @@ export function createAudioEngine(options = {}) {
       o.type = L.wave;
       automate(o.frequency, L.freq, start);
       detuneInto(o.detune, L.detuneBus);
+      flatInto(o.detune);
       if (L.vibrato) vibratoInto([o.detune], L.vibrato, start, end, list, sources);
       o.connect(into);
       go(o);
@@ -1800,6 +1812,7 @@ export function createAudioEngine(options = {}) {
         o.frequency.setValueAtTime(midiHz(L.midi + L.cents / 100), start);
         o.detune.setValueAtTime((i - (L.count - 1) / 2) * L.spread, start);
         detuneInto(o.detune, L.detuneBus);
+        flatInto(o.detune);
         params.push(o.detune);
         o.connect(sum);
         go(o);
@@ -1823,6 +1836,8 @@ export function createAudioEngine(options = {}) {
         depth = node("Gain");
       carrier.frequency.setValueAtTime(L.hz, start);
       mod.frequency.setValueAtTime(L.hz * L.ratio, start);
+      flatInto(carrier.detune);
+      flatInto(mod.detune);
       automate(depth.gain, L.index, start, L.hz * L.ratio);
       mod.connect(depth);
       depth.connect(carrier.frequency);
@@ -1857,6 +1872,7 @@ export function createAudioEngine(options = {}) {
       const s = node("BufferSource");
       s.buffer = pluckBuffer(L);
       s.playbackRate.value = L.rate;
+      if (s.detune) flatInto(s.detune);
       s.connect(into);
       go(s);
     } else if (L.kind === "crackle") {
@@ -1928,7 +1944,7 @@ export function createAudioEngine(options = {}) {
     try {
       const now = t();
       prune(now);
-      const want = forceAt ?? clock.toAudio(n.t);
+      const want = forceAt ?? clock.toAudio(n.t) + (LAYERS[n.layer]?.bed ? BED_DELAY : 0);
       const at = Math.max(now + LOOKAHEAD, want);
       const late = at - want;
       if (late > 0.002) {
@@ -1992,7 +2008,7 @@ export function createAudioEngine(options = {}) {
         send.connect(score.spaceIn);
         list.push(send);
       }
-      const sources = [...spec.layers.flatMap((L) => renderLayer(L, at, out, list)), ...(spec.extra ?? [])];
+      const sources = [...spec.layers.flatMap((L) => renderLayer(L, at, out, list, { bed: !!spec.bed })), ...(spec.extra ?? [])];
       const v = { voice: n.voice, layer: n.layer, bed: !!spec.bed, hold: spec.hold, start: at, end: at + spec.dur, out, sources, nodes: list, stolen: false };
       // A sustained voice hands over: the previous sky (or choir) releases
       // as the next one swells, so the bed never has a gap or a click.
@@ -2097,7 +2113,10 @@ export function createAudioEngine(options = {}) {
   function runFx(list, simTime) {
     for (const fx of list) {
       if (fx.kind === "wake") {
-        clock.anchor(simTime, t() + LOOKAHEAD, sc.scale);
+        // Anchor on the first frame after the wake, not at the event: the
+        // event arrives a frame late, and anchoring early made the first
+        // frame re-anchor the grid by an odd 60-70 ms (audio critic).
+        sc.anchorPending = true;
         restoreTape(0);
         // The title song gives way to the sky over 1.5 s.
         if (musicEl && !musicEl.paused) fadeOutMusic(1.5);
@@ -2145,6 +2164,7 @@ export function createAudioEngine(options = {}) {
     try {
       // Each step settles over about 0.8 s (time constant 0.27 s).
       score.det.offset.setTargetAtTime(m.padCents, now, 0.27);
+      score.flat.offset.setTargetAtTime(-m.flatCents, now, 0.27);
       score.wowDepth.gain.setTargetAtTime(m.wowCents * WOW_PER_CENT, now, 0.27);
       score.bedTone.frequency.setTargetAtTime(Math.min(16000, m.lowpass), now, 0.27);
       score.fb.gain.setTargetAtTime(m.shimmer, now, 0.3);
@@ -2215,7 +2235,10 @@ export function createAudioEngine(options = {}) {
       const dt = sc.lastAudio == null ? 0 : now - sc.lastAudio;
       sc.lastAudio = now;
       if (r) runFx(r.fx, sc.sim);
-      if (f.status === "running") clock.follow(sc.sim, now + LOOKAHEAD, dt, sc.scale);
+      if (sc.anchorPending && f.status === "running") {
+        clock.anchor(sc.sim, now + LOOKAHEAD, sc.scale);
+        sc.anchorPending = false;
+      } else if (f.status === "running") clock.follow(sc.sim, now + LOOKAHEAD, dt, sc.scale);
       if (conductor.transport.running && f.status === "running") {
         const nowPos = conductor.transport.pos(sc.sim);
         const aheadPos = conductor.transport.pos(clock.toSim(now + SCHEDULE_AHEAD));
@@ -2437,6 +2460,7 @@ export function createAudioEngine(options = {}) {
   }
 
   function hush(fade = 0.06) {
+    conductor.revoice(); // a silenced bed is voiced again on the next tick
     if (!ctx) return;
     for (const v of voices) fadeOut(v, fade);
     for (const v of music) fadeOut(v, fade);
@@ -2645,6 +2669,7 @@ export function createAudioEngine(options = {}) {
           section: st.section,
           H: +st.H.toFixed(3),
           detuneCents: +st.totalCents.toFixed(2),
+          flatCents: +st.flatCents.toFixed(2),
           gentle: st.gentle,
           choir: st.choir,
           earth: st.earth,

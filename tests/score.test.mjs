@@ -16,6 +16,8 @@ import {
   PHRASES,
   CHORDS,
   DIATONIC,
+  MAX_DETUNE,
+  MAX_FLAT,
   LAYERS,
   quantize,
   chordAt,
@@ -127,7 +129,7 @@ test("authored constellation notes fit the chord where the main route takes each
 });
 
 /* ---------- mistakes ---------- */
-test("dissonance follows only visible errors, stays within 20 cents and heals; Gentle never detunes", () => {
+test("dissonance follows only visible errors, is clearly heard (the bed goes flat), heals one bar at a time; Gentle never detunes", () => {
   const clean = musicRun();
   assert.ok(clean.mixes.every((m) => m.totalCents === 0 && m.H === 1), "a clean main run is perfectly in tune");
   const sloppy = musicRun(SLOPPY);
@@ -139,8 +141,20 @@ test("dissonance follows only visible errors, stays within 20 cents and heals; G
   const firstError = sloppy.tuning.find((q) => q.H < 1);
   assert.ok(firstError && firstDetune.time >= firstError.time - 1e-9);
   assert.ok(errorTimes.length >= 3, `${errorTimes.length} visible errors`);
-  for (const m of sloppy.mixes) assert.ok(m.totalCents <= 20 + 1e-9 && m.padCents >= 0 && m.wowCents >= 0, `${m.totalCents} cents`);
-  assert.ok(Math.max(...sloppy.mixes.map((m) => m.totalCents)) > 5, "mistakes are audible");
+  for (const m of sloppy.mixes) assert.ok(m.totalCents <= MAX_DETUNE + 1e-9 && m.flatCents <= MAX_FLAT + 1e-9 && m.padCents >= 0 && m.wowCents >= 0, `${m.totalCents} cents`);
+  // Audible: right after a fall the whole bed sits at least 15 cents flat of
+  // Diana's voice (a symmetric spread alone was measured as nearly inaudible).
+  const death = sloppy.events.find((e) => e.name === "death");
+  const afterFall = sloppy.mixes.filter((m) => m.status === "running" && m.time >= death.time - 3 && m.H < 1);
+  assert.ok(afterFall.length && Math.max(...afterFall.map((m) => m.flatCents)) >= 15, "the bed is clearly flat after a fall");
+  // Healing is gentle: never more than +0.1 at a time, and a fall is heard
+  // for several bars of clean play.
+  for (let i = 1; i < sloppy.tuning.length; i++) {
+    const d = sloppy.tuning[i].H - sloppy.tuning[i - 1].H;
+    assert.ok(d <= 0.1 + 1e-9, `H rose ${d.toFixed(2)} at once (${sloppy.tuning[i].after})`);
+  }
+  const outOfTune = sloppy.mixes.filter((m) => m.totalCents > 0).length / 120;
+  assert.ok(outOfTune > 12, `${outOfTune.toFixed(1)} s out of tune over the sloppy run`);
   assert.equal(sloppy.mixes.at(-1).totalCents, 0, "clean play retunes the world by the door");
   // Below H 0.7 the choir rests; it returns as H heals.
   assert.ok(sloppy.mixes.some((m) => !m.choir) && sloppy.mixes.at(-1).choir);
@@ -266,6 +280,15 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
     if (!nearHitch) worst = Math.max(worst, err);
     if (at.get(ks[i]) > hitchAt + 0.4 && recovered == null && err < 0.002) recovered = at.get(ks[i]) - hitchAt;
   }
+  // Across the hitch the grid keeps its phase: ticks move by whole
+  // sixteenths, plus only the small residual being slewed.
+  for (let i = 1; i < ks.length; i++) {
+    const a = at.get(ks[i - 1]),
+      b = at.get(ks[i]);
+    if (Math.abs(b - hitchAt) > 0.4) continue;
+    const r = ((b - a) / SIXTEENTH) % 1;
+    assert.ok(Math.min(r, 1 - r) * SIXTEENTH < 0.015, `tick ${ks[i]} lands ${(Math.min(r, 1 - r) * SIXTEENTH * 1000).toFixed(1)} ms off the old grid`);
+  }
   // Movement I has no voice on every sixteenth; II and III do (the shaker).
   assert.ok(ks.length > 300, `${ks.length} sixteenths carried notes`);
   assert.ok(worst < 0.002, `grid error ${(worst * 1000).toFixed(2)} ms`);
@@ -285,6 +308,9 @@ test("the conductor is deterministic and its bed respects the layer plan", () =>
   assert.equal(at("shaker", [5]).length, 0, "the shaker belongs to II and III");
   assert.ok(at("shaker", [12]).length >= 16);
   assert.ok(at("pad", [1]).length >= 1, "the sky enters at the wake");
+  // The sky never thins out: a pad starts in every bar (a held chord is
+  // re-voiced at each bar line), so bars 1-3 of Bm no longer decay to silence.
+  for (let bar = 1; bar <= 35; bar++) assert.ok(at("pad", [bar]).length >= 1, `bar ${bar} has a sky pad`);
   for (const n of a.notes) assert.ok(LAYERS[n.layer], n.layer);
   assert.ok(a.notes.filter((n) => n.layer === "choir").length > 0, "constellations bring in the choir");
 });

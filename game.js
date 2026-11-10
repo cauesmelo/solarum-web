@@ -1424,14 +1424,15 @@ function afterReset() {
   clearWords();
   held.glide = false;
   fx.length = 0;
-  // The reset's own events (a restart's wake, a retry's respawn) skip the
-  // visual feedback, but the score must hear them: they restart the song on
-  // bar 1 or on the beacon's bar.
+  // Silence the last run first (a restart never carries the last fall's
+  // tail), then let the score hear the reset's own events (a restart's wake,
+  // a retry's respawn): they restart the song on bar 1 or the beacon's bar,
+  // and the new sky must not be hushed with the old one.
+  audio.hush(0.12);
+  audio.clearMoments();
   for (const e of state.events) if (e.serial > lastSerial) audio.event(e, { cues: false, timeScale });
   lastSerial = state.eventSerial;
   syncAudio();
-  audio.hush(0.12); // a restart never carries the last fall's tail into the new run
-  audio.clearMoments();
   resetShelfWatch();
   ui.great = "";
   ui.orbitDirty = true;
