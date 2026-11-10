@@ -57,6 +57,7 @@ test("every main route: each takeoff, landing, star, chain note, beacon and tile
     [LEVEL_ID["still-water"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID["way-down"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID["borrowed-wind"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
+    [LEVEL_ID["falling-road"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
     [LEVEL_ID.breaking]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID.door]: ["jump", "dash", "super-jump", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
   };
@@ -265,6 +266,7 @@ test("a perfect run completes each level's song; a sloppy one does not; three Gr
     [LEVEL_ID["still-water"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID["way-down"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID["borrowed-wind"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
+    [LEVEL_ID["falling-road"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID.breaking]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID.door]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
   };
@@ -379,7 +381,15 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   }
   const bar = (run, voice, b) => run.notes.filter((v) => v.voice === voice && v.event === "tick" && Math.floor(v.pos / BAR) + 1 === b).length;
   // (l2-l4: the interim levels, revision five's II-IV.)
-  const [l1, gift, still, way, brk, wind, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID["borrowed-wind"], LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  const [l1, gift, still, way, brk, wind, road, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID["borrowed-wind"], LEVEL_ID["falling-road"], LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  // VII: the clave only under the six-tile wave (bars 5-8); Diana's own
+  // touch-downs on the tiles are the stone marimba (steps), the knocks of
+  // the falling tiles the world's; no shaker (restraint).
+  assert.equal(bar(road, "marimba", 6), 3);
+  assert.equal(bar(road, "marimba", 10) + bar(road, "pulse", 10), 0, "VII rests down the dives");
+  assert.equal(bar(road, "marimba", 22), 0, "VII rests on the road home");
+  assert.equal(road.notes.filter((v) => v.voice === "shaker").length, 0);
+  assert.ok(road.notes.filter((v) => v.layer === "steps" && v.voice === "marimba").length >= 20, "her bounces on the tiles are hers");
   // VI: the clave only over the first wind and the finale; it rests in the
   // breeze, the storm and the last wind; no shaker (restraint).
   assert.equal(bar(wind, "pulse", 4) + bar(wind, "marimba", 4), 0, "VI rests in the breeze");
@@ -422,7 +432,7 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   assert.equal(bar(l4, "pulse", 5), 4);
   assert.equal(bar(l4, "marimba", 5), 8);
   // Each level its own space (RESEARCH_LEVELS 6): 5.5 s, 5.5, 3.5, 2.5.
-  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID["borrowed-wind"], LEVEL_ID.door];
-  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 4.5, 3.5, 3.5, 2.5]);
-  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 18, 20, 20]);
+  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID["borrowed-wind"], LEVEL_ID["falling-road"], LEVEL_ID.door];
+  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 4.5, 3.5, 3.5, 3, 2.5]);
+  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 18, 20, 22, 20]);
 });

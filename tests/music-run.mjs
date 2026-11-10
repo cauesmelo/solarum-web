@@ -28,6 +28,8 @@ const CHALLENGE = {
   [LEVEL_ID["borrowed-wind"]]: { bridge: [220 + 37.85 * 161, 220 + 37.85 * 164] },
   // V: the first flight of the split voids after the split beacon.
   [LEVEL_ID.breaking]: { split: [220 + 37.85 * 181, 220 + 37.85 * 184] },
+  // VII: the flight over the first missing tile after the dive beacon.
+  [LEVEL_ID["falling-road"]]: { dive: [gx(218), gx(221)] },
   [LEVEL_ID.door]: { storm: [gx(68), gx(76) + 130] },
 };
 const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJump(s)) };
@@ -40,6 +42,7 @@ export const SLOPPY_RUNS = Object.freeze({
   [LEVEL_ID["way-down"]]: { level: LEVEL_ID["way-down"], failAt: ["down"], removeStars: ["warm-song-2"], late: [[220 + 37.85 * 124 + 113.55 + 94.9 - 1, 220 + 37.85 * 124 + 113.55 + 94.9 + 1, 10]] },
   [LEVEL_ID["borrowed-wind"]]: { level: LEVEL_ID["borrowed-wind"], failAt: ["bridge"], removeStars: ["storm-song-2"], late: [[220 + 37.85 * 228 + 113.55 - 1, 220 + 37.85 * 228 + 113.55 + 1, 8]] },
   [LEVEL_ID.breaking]: { level: LEVEL_ID.breaking, failAt: ["split"], removeStars: ["crack-song-2"], late: [[220 + 37.85 * 85 - 1, 220 + 37.85 * 85 + 1, 10]] },
+  [LEVEL_ID["falling-road"]]: { level: LEVEL_ID["falling-road"], failAt: ["dive"], removeStars: ["wave-song-2"], late: [[gx(147) - 1, gx(147) + 1, 10]] },
   [LEVEL_ID.door]: { level: LEVEL_ID.door, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
 });
 export const SLOPPY = SLOPPY_RUNS[LEVEL_ID["borrowed-wind"]];

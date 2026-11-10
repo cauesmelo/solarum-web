@@ -191,6 +191,24 @@ const WIND_SECTIONS = [
   { id: "last", from: 19, to: 23, pulse: false, cycle: [...WIND_CYCLE, C.A] },
   { id: "coda", from: 24, to: Infinity },
 ];
+// VII · The Falling Road: B Aeolian, Bm G A F#m (RESEARCH_PROGRESSION 4.3).
+// Restraint: the brief's full backbeat is left out; the falling road is the
+// drum: the tiles' knocks on each beat are the world's, Diana's touch-downs
+// on them are hers (the stone marimba stepping down the chord); the clave
+// plays only under the six-tile wave (bars 6-8).
+const ROAD_CYCLE = [C.Bm, C.G, C.A, C["F#m"]];
+const ROAD_SECTIONS = [
+  { id: "wake", from: 1, to: 2, pulse: false, cycle: [C.Bm] },
+  { id: "first", from: 3, to: 4, pulse: false, cycle: [C.Bm, C.G] },
+  { id: "road", from: 5, to: 5, pulse: false, cycle: [C.Bm] },
+  { id: "wave", from: 6, to: 8, cycle: [C.G, C.A, C["F#m"]] },
+  { id: "dive", from: 9, to: 12, pulse: false, cycle: ROAD_CYCLE },
+  { id: "gap", from: 13, to: 16, pulse: false, cycle: [C.G, C.A, C["F#m"], C.Bm] },
+  { id: "wind", from: 17, to: 20, pulse: false, cycle: ROAD_CYCLE },
+  { id: "home", from: 21, to: 23, pulse: false, cycle: [C.G, C.A, C.Bm] },
+  { id: "close", from: 24, to: 24, pulse: false, cycle: [C.Bm] },
+  { id: "coda", from: 25, to: Infinity },
+];
 const L4_CYCLE = [C["Bm/F#"], C["G/F#"], C["Em/F#"], [C["F#sus4"], C["F#"]]];
 // L4's twist (the voids at 128): the pedal climbs, G/F# Em/F# then F#sus4 F#.
 const L4_SECTIONS = [
@@ -404,6 +422,34 @@ const PRESETS = {
       "storm-song": [76, 79, 81, 85, 88],
       // bars 20-21 (G/A | D/A): the last wind's float, D5 G5 B5 D6 | A5.
       "last-song": [74, 79, 83, 86, 81],
+    },
+  },
+  "falling-road": {
+    bpm: 123, bars: 26, pickup: 0,
+    // VII · The Falling Road, tense (RESEARCH_PROGRESSION 4.3): the tiles'
+    // knocks step down the chord on every beat while the road falls; the
+    // clave plays 3 of 25 bars (ROAD_SECTIONS), no shaker.
+    groove: "clave", maxFlat: 22, space: { seconds: 3, shimmer: 0.28 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
+    sections: ROAD_SECTIONS,
+    chordAt: mapOf(ROAD_SECTIONS, C.Bm),
+    // The wake, the wave (bar 5) and the missing tiles (bar 13); the theme
+    // closes from bar 23.
+    signalBars: [1, 5, 13], closeFrom: 23,
+    phrases: {
+      // bars 3-4 (Bm | G): down the first road, F#5 | D5 B4 G4.
+      "road-song": [78, 74, 71, 67],
+      // bars 6-8 (G | A | F#m): the wave falls a step a tile, B5 A5 G5 | E5 C#5 | B4.
+      "wave-song": [83, 81, 79, 76, 73, 71],
+      // bars 11-12 (A | F#m): down the dives, C#6 A5 F#5 E5 | C#5.
+      "dive-song": [85, 81, 78, 76, 73],
+      // bars 14-15 (A | F#m): rising over the missing tiles, E5 | F#5 A5 C#6.
+      "gap-song": [76, 78, 81, 85],
+      // bar 18 (G): the shore's run and the rise, B4 D5 G5 B5.
+      "spark-song": [71, 74, 79, 83],
+      // bars 18-19 (G | A): along the first flight and on the crack, D6 | C#6 A5 E5.
+      "red-song": [86, 85, 81, 76],
+      // bars 23-24 (Bm): home, F#5 E5 D5 B4.
+      "home-song": [78, 76, 74, 71],
     },
   },
   door: {
@@ -757,6 +803,10 @@ export function createConductor(options = {}) {
   const PHRASES = P.phrases;
   const path = options.path;
   const cracked = options.cracked ?? new Set();
+  // VII: the falling road is the drum (RESEARCH_PROGRESSION 4.3). Diana's
+  // own touch-down on a cascade tile is a note of hers (the stone marimba,
+  // stepping down the chord); every other crack stays outside the score.
+  const tiles = new Set((LEVELS.find((d) => d.id === P.level)?.cascades ?? []).flatMap((c) => c.tiles).filter(Boolean));
   const transport = createTransport();
   const tuning = createTuning({ gentle: options.gentle, maxFlat: P.maxFlat });
   const intended = new Map(); // star id -> baked sixteenth
@@ -781,6 +831,7 @@ export function createConductor(options = {}) {
       sus: null, // { until } broken-constellation sus4 on the pad
       melody: { step: -1, t: -9 },
       tileStep: 0,
+      roadStep: 0,
       recent: [], // last player notes, for the rewind
       filled: new Set(),
       constellations: new Set(),
@@ -1013,7 +1064,14 @@ export function createConductor(options = {}) {
       case "land": {
         // Steps: stable stone plays the chord's root in the felt bass. Cracks
         // are outside the score: no bass, only the gravel body sound.
-        if (cracked.has(e.platform)) break;
+        if (cracked.has(e.platform)) {
+          if (!tiles.has(e.platform)) break;
+          const q = quantize(pos(t), { grid: 1, cap: CAPS.landing, timeScale: st.timeScale });
+          const tones = chordTones(chordAt(q.pos), 64, 83).reverse();
+          const m = tones[st.roadStep++ % tones.length];
+          push(note({ layer: "steps", voice: "marimba", midi: m, pos: q.pos, t: transport.timeOf(q.pos), kind: q.kind, delay: q.delay, cap: CAPS.landing, dur: 0.45, gain: 0.6, pan: -0.25 }));
+          break;
+        }
         tuning.apply("stable-landing");
         const p = pos(t),
           q = quantize(p, { grid: 1, cap: CAPS.landing, timeScale: st.timeScale });
@@ -1129,6 +1187,7 @@ export function createConductor(options = {}) {
       case "cascade":
         anchor(t, e.x, "cascade");
         st.tileStep = 0;
+        st.roadStep = 0;
         break;
       case "tile-drop": {
         // A marimba knock on the beat, stepping down the chord's safe notes.
