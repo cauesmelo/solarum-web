@@ -34,7 +34,7 @@ import {
   clampCameraY,
   stepCamera,
 } from "./geometry.mjs";
-import { createAudioEngine, readSoundSetting, writeSoundSetting } from "./audio.mjs";
+import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetting, writeGentleSetting } from "./audio.mjs";
 
 /* Renderer, input and UI. All gameplay rules live in model.mjs / level.mjs;
  * this file only draws the simulation, forwards input and plays sound. */
@@ -83,15 +83,18 @@ const ui = {
   progress: -1,
 };
 
-/* ---------- sound: procedural cues (audio.mjs) and the soundtrack ----------
+/* ---------- sound: cues, the adaptive score (audio.mjs, score.mjs) and the
+ * soundtrack, which plays on the title and returns at the far door ----------
  * Sound defaults to ON unless the player turned it off (guarded storage). The
  * AudioContext is only created inside a gesture (the wake press / tap, or the
  * sound toggle); pausing the game freezes all audio in place. */
 const sound = {
   on: readSoundSetting(() => window.localStorage),
+  gentle: readGentleSetting(() => window.localStorage),
   music: new Audio(),
 };
-const audio = createAudioEngine({ enabled: sound.on });
+// Phones get a shorter space reverb (4 s instead of 5.5 s) to save CPU.
+const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, spaceSeconds: coarse ? 4 : 5.5 });
 sound.music.preload = "none";
 sound.music.loop = true;
 audio.attachMusic(sound.music, { level: 0.22 });
@@ -145,6 +148,14 @@ function syncAudio() {
   const p = state.player,
     live = state.status === "running";
   audio.setAir({ wind: live && p.inWind, glide: live && p.gliding && !p.inWind });
+  // The score follows the simulation clock (never the other way round).
+  audio.scoreFrame({ simTime: state.time, x: p.x, y: p.y, status: state.status, timeScale, inWind: p.inWind, gliding: p.gliding, fallsHere: state.fallsHere });
+}
+function setGentleMusic(on) {
+  sound.gentle = !!on;
+  writeGentleSetting(() => window.localStorage, sound.gentle);
+  audio.setGentle(sound.gentle);
+  $("gentle-music")?.setAttribute("aria-pressed", String(sound.gentle));
 }
 
 /* ---------- layout: landscape fills, portrait letterboxes above a deck ---------- */
@@ -1220,9 +1231,10 @@ function processEvents(quiet = false) {
     if (e.serial <= lastSerial) continue;
     lastSerial = e.serial;
     const loud = !quiet;
-    // Every event is voiced by audio.mjs (cuesForEvent); the switch below is
-    // visual feedback only.
-    if (loud) audio.event(e);
+    // Every event is voiced by audio.mjs (cuesForEvent and the score); a quiet
+    // QA step still tells the score, so it keeps its place in the song. The
+    // switch below is visual feedback only.
+    audio.event(e, { render: loud, timeScale });
     switch (e.name) {
       case "jump":
         if (loud) {
@@ -1331,7 +1343,8 @@ function processEvents(quiet = false) {
 function wake() {
   if (!ready || state.status !== "ready") return;
   unlockAudio();
-  audio.playMusic({ fadeIn: 1.6 }); // plays only when sound is on
+  // The score starts with the wake event (bar 1, the sky on Bm); a title
+  // song that is playing fades out under it.
   start(state);
   wakeAt = clock;
   root.classList.add("waking");
@@ -1397,6 +1410,9 @@ function backToLight() {
 }
 function restartChapter() {
   if (!ready) return;
+  // A fresh song: bar 1, in tune. The door's soundtrack gives way.
+  audio.scoreReset();
+  audio.fadeOutMusic(1);
   restart(state);
   wakeAt = clock - 1;
   afterReset();
@@ -1408,6 +1424,10 @@ function afterReset() {
   clearWords();
   held.glide = false;
   fx.length = 0;
+  // The reset's own events (a restart's wake, a retry's respawn) skip the
+  // visual feedback, but the score must hear them: they restart the song on
+  // bar 1 or on the beacon's bar.
+  for (const e of state.events) if (e.serial > lastSerial) audio.event(e, { cues: false, timeScale });
   lastSerial = state.eventSerial;
   syncAudio();
   audio.hush(0.12); // a restart never carries the last fall's tail into the new run
@@ -1430,9 +1450,11 @@ function toTitle() {
   camera.snap = true;
   ui.great = "";
   ui.orbitDirty = true;
-  audio.stopMusic();
+  audio.scoreReset();
   audio.hush(0.2);
   audio.clearMoments();
+  // The title song: keep it if the door already started it, else begin it.
+  if (!audio.stats().soundtrackPlaying) audio.playMusic({ fromStart: true, fadeIn: 1.2 });
   resetShelfWatch();
   syncAudio();
   sync();
@@ -1590,6 +1612,7 @@ for (const b of document.querySelectorAll("[data-assist]")) {
       on = b.getAttribute("aria-pressed") !== "true";
     b.setAttribute("aria-pressed", String(on));
     if (name === "gentle") timeScale = on ? 0.8 : 1;
+    else if (name === "gentleMusic") setGentleMusic(on);
     else setAssist(state, name, on);
   });
 }
@@ -1634,10 +1657,15 @@ window.__game = {
   dash: () => dash(state),
   dive: () => dive(state),
   pause,
-  setAssist: (name, on) => (name === "gentle" ? ((timeScale = on ? 0.8 : 1), true) : setAssist(state, name, on)),
+  setAssist: (name, on) =>
+    name === "gentle" ? ((timeScale = on ? 0.8 : 1), true) : name === "gentleMusic" ? (setGentleMusic(on), true) : setAssist(state, name, on),
+  // Harmony feedback: { gentle: true } removes every dissonance (no detune,
+  // a fade instead of the tape-stop). Persisted like the sound setting.
+  setMusic: ({ gentle } = {}) => (gentle != null && setGentleMusic(gentle), { gentle: sound.gentle }),
   getState: () => snapshot(state),
   // { on, unlocked, decoded, state, paused, suspended, musicPlaying, voices,
-  //   nodes, played, dropped, cues, ... } (see audio.mjs stats()).
+  //   nodes, played, dropped, cues, score: { running, bar, chord, H,
+  //   detuneCents, gentle, song, ... }, ... } (see audio.mjs stats()).
   getAudio: () => ({ ...audio.stats(), on: sound.on }),
   getRenderGeometry: () => {
     const view = viewGeometry(W);
@@ -1698,6 +1726,7 @@ async function load() {
     $("start-label").textContent = coarse ? "Tap to wake" : "Press space or tap to wake";
     if (coarse) $("title-keys").textContent = "tap left to jump · right thumb: cape, dive";
     setSound(sound.on);
+    setGentleMusic(sound.gentle);
     resize();
     sync();
     draw();

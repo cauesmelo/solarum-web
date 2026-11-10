@@ -813,8 +813,11 @@ export function createConductor(options = {}) {
   return {
     transport,
     tuning,
+    /** A fresh song (restart chapter, title): stopped, in tune, bar 1 next. */
     reset() {
       reset();
+      transport.stop();
+      tuning.apply("restart");
       rng = mulberry(options.seed ?? 7);
     },
     wake: (t) => event({ name: "wake", time: t }),

@@ -26,7 +26,10 @@ import {
   safetyCurve,
   layerEnd,
   envEnd,
+  pitchClass,
 } from "../audio.mjs";
+import { createGame, start as startGame, update, jump, releaseJump, dash, dive } from "../model.mjs";
+import { createRouteMemory, chooseAction } from "./routes.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (name) => readFile(new URL(`../${name}`, import.meta.url), "utf8");
@@ -81,6 +84,13 @@ class Param {
     this.#time(t);
     return this;
   }
+  setValueCurveAtTime(values, t, duration) {
+    for (const v of values) finite(v);
+    finite(duration);
+    if (!(duration > 0)) throw new RangeError("curve duration");
+    this.#time(t);
+    return this;
+  }
 }
 class MockNode {
   constructor(ctx, kind) {
@@ -102,6 +112,8 @@ class MockSource extends MockNode {
     finite(t, offset);
     if (this.started) throw new Error("started twice");
     this.started = t;
+    // A source started before "now" would be truncated in a browser.
+    if (t > 0 && t < this.ctx.now() - 1e-9) this.ctx.past.push({ kind: this.kind, t, now: this.ctx.now() });
   }
   stop(t = 0) {
     finite(t);
@@ -115,7 +127,12 @@ class MockContext {
     this.currentTime = 0;
     this.state = "running";
     this.created = 0;
+    this.past = [];
+    this.clock = null; // a fake engine clock, when the test drives one
     this.destination = new MockNode(this, "destination");
+  }
+  now() {
+    return this.clock ? this.clock() : this.currentTime;
   }
   #make(kind, Base, props) {
     this.created++;
@@ -148,6 +165,13 @@ class MockContext {
   }
   createAnalyser() {
     return this.#make("analyser", MockNode, { fftSize: 2048 });
+  }
+  createDelay(max = 1) {
+    finite(max);
+    return this.#make("delay", MockNode, { delayTime: new Param(0), maxDelayTime: max });
+  }
+  createConstantSource() {
+    return this.#make("constant", MockSource, { offset: new Param(1) });
   }
   createMediaElementSource(el) {
     return this.#make("media", MockNode, { mediaElement: el });
@@ -254,7 +278,8 @@ test("sound defaults to on: empty storage, missing storage and throwing storage 
 test("the game reads the default through the guarded setting and starts audio only on a gesture", async () => {
   const js = await read("game.js");
   assert.match(js, /on: readSoundSetting\(\(\) => window\.localStorage\)/);
-  assert.match(js, /createAudioEngine\(\{ enabled: sound\.on \}\)/);
+  assert.match(js, /createAudioEngine\(\{ enabled: sound\.on, gentle: sound\.gentle/);
+  assert.match(js, /gentle: readGentleSetting\(\(\) => window\.localStorage\)/, "Gentle music is read through guarded storage too");
   assert.doesNotMatch(js, /new \(window\.AudioContext/, "only audio.mjs creates the context");
   // unlock() runs from wake() and the sound toggle, never at load.
   const load = js.slice(js.indexOf("async function load()"));
@@ -283,7 +308,7 @@ test("every event name model.mjs emits maps to at least one cue", async () => {
   assert.deepEqual(cuesForEvent({ name: "refill", source: "constellation" }), []);
   assert.equal(cuesForEvent({ name: "tile-drop", platform: "tile-4" })[0].params.index, 4);
   const js = await read("game.js");
-  assert.match(js, /if \(loud\) audio\.event\(e\);/, "processEvents voices every event");
+  assert.match(js, /audio\.event\(e, \{ render: loud, timeScale \}\);/, "processEvents voices every event (and quiet steps still tell the score)");
   assert.doesNotMatch(js, /\bsfx\(/, "no pitch-shifted WAV calls remain");
   // Presentation-only cues the renderer triggers directly.
   for (const cue of ["crumble-shake", "crumble-fall", "ui-hover", "ui-select", "ui-resume"]) assert.match(js, new RegExp(`audio\\.play\\("${cue}"`), cue);
@@ -332,8 +357,10 @@ test("every recipe produces finite, bounded parameters and well-formed envelopes
 });
 test("every pitched note sits in D major; melodies stay pentatonic; plucks are tuned", () => {
   assert.equal(KEY.name, "D major");
-  for (const [name, , spec] of everySpec()) {
+  for (const [name, params, spec] of everySpec()) {
     for (const L of spec.layers.filter((l) => l.tonal)) {
+      // G# is the musical blue: only the door's Earth chord may sound it.
+      if (name === "win" && params.earth && pitchClass(L.midi) === 8) continue;
       assert.ok(inKey(L.midi), `${name}: midi ${L.midi} is outside D major`);
       if (L.midiEnd != null) assert.ok(inKey(L.midiEnd), `${name}: glide target ${L.midiEnd}`);
       // Single notes wander at most 3 cents; pad pairs detune up to 8 for chorus.
@@ -562,4 +589,89 @@ test("the itch ZIP ships audio.js but not the soundboard, WAV renders or the arc
   }
   const game = await readFile(new URL("../dist/itch/game.js", import.meta.url), "utf8");
   assert.match(game, /from "\.\/audio\.js"/);
+});
+
+/* ---------- the adaptive score through the engine ---------- */
+/** Play a route through the real engine at 60 frames per second on a fake
+ * audio clock, the way game.js drives it (events, then one scoreFrame). */
+function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true } = {}) {
+  let now = 0;
+  const r = rig({ gentle, enabled, clock: () => now });
+  const music = mockMusic();
+  r.engine.attachMusic(music);
+  const s = createGame();
+  let seen = s.eventSerial;
+  const flush = () => {
+    for (const e of s.events) if (e.serial > seen) (seen = e.serial), r.engine.event(e);
+  };
+  r.engine.unlock();
+  if (r.ctx()) r.ctx().clock = () => now;
+  startGame(s);
+  flush();
+  const m = createRouteMemory(route);
+  const dt = 1 / 60;
+  const pauses = [];
+  for (let i = 0; i < 100 / dt && s.status !== "won"; i++) {
+    if (pauseAt != null && Math.abs(s.time - pauseAt) < dt / 2) {
+      // Pause: the context suspends; the game keeps calling scoreFrame with a
+      // frozen simulation while (in this fake) wall time moves on.
+      r.engine.setPaused(true);
+      const before = { nodes: r.engine.stats().nodes, scheduled: r.engine.stats().score.scheduled, pos: r.engine.conductor.transport.pos(s.time) };
+      for (let k = 0; k < 60; k++) {
+        r.engine.scoreFrame({ simTime: s.time, x: s.player.x, y: s.player.y, status: "paused", timeScale: 1 });
+        r.engine.event({ name: "star", time: s.time, id: "x" });
+      }
+      const after = { nodes: r.engine.stats().nodes, scheduled: r.engine.stats().score.scheduled, pos: r.engine.conductor.transport.pos(s.time) };
+      pauses.push({ before, after, audio: r.engine.stats() });
+      r.engine.setPaused(false);
+    }
+    const a = chooseAction(s, m);
+    if (a) ({ jump, releaseJump, dash, dive })[a](s), flush();
+    update(s, dt, { glide: m.glide });
+    now += dt;
+    if (r.ctx()) r.ctx().currentTime = now;
+    flush();
+    r.engine.scoreFrame({ simTime: s.time, x: s.player.x, y: s.player.y, status: s.status, timeScale: 1, inWind: s.player.inWind, gliding: s.player.gliding, fallsHere: s.fallsHere });
+  }
+  return { ...r, s, pauses, stats: r.engine.stats() };
+}
+test("the score plays a whole run on the audio clock: never in the past, caps and voice budget hold, the song completes", () => {
+  const run = scoreRun();
+  assert.equal(run.s.status, "won");
+  const sc = run.stats.score;
+  assert.ok(sc.scheduled > 500, `${sc.scheduled} score notes scheduled`);
+  assert.ok(sc.peakVoices <= 28, `${sc.peakVoices} score voices at once`);
+  assert.ok(run.stats.peakVoices <= 20);
+  assert.ok(sc.maxQuantizeMs <= 140, `${sc.maxQuantizeMs} ms`);
+  assert.deepEqual(run.ctx().past, [], "no source starts before the audio clock");
+  assert.equal(sc.song.complete, true);
+  assert.equal(sc.H, 1);
+  assert.equal(sc.detuneCents, 0);
+  assert.equal(sc.tapeStops, 0);
+  for (const voice of ["pad", "signal", "pulse", "bass", "glass", "kalimba", "choir", "harmonica", "vowel", "chime", "marimba"]) assert.ok(sc.played[voice] > 0, `${voice} played`);
+  assert.ok(run.stats.decoded.includes("space"), "the space reverb was generated");
+  // The door: the soundtrack is due two bars later (a timer in the browser).
+  assert.equal(sc.door.complete, true);
+});
+test("pausing freezes the score: no scheduling, no nodes, the transport holds, and it continues in place", () => {
+  const run = scoreRun({ pauseAt: 20 });
+  assert.equal(run.pauses.length, 1);
+  const [p] = run.pauses;
+  assert.equal(p.after.nodes, p.before.nodes, "nothing new while paused");
+  assert.equal(p.after.scheduled, p.before.scheduled);
+  assert.equal(p.after.pos, p.before.pos, "the transport is frozen with the simulation");
+  assert.equal(p.audio.paused, true);
+  assert.equal(p.audio.musicPlaying, false, "neither the soundtrack nor the score plays while paused");
+  assert.equal(run.s.status, "won");
+  assert.equal(run.stats.score.song.complete, true, "the song survives a pause intact");
+});
+test("with sound off the score keeps its place without any context or node; Gentle music never moves the detune bus", () => {
+  const off = scoreRun({ enabled: false });
+  assert.equal(off.made(), 0, "no AudioContext");
+  assert.equal(off.stats.nodes, 0);
+  assert.equal(off.stats.score.song.complete, true, "the conductor still followed the run");
+  const gentle = scoreRun({ gentle: true });
+  assert.equal(gentle.stats.score.gentle, true);
+  assert.equal(gentle.stats.score.detuneCents, 0);
+  assert.equal(gentle.stats.score.H, 1);
 });

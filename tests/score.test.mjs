@@ -181,6 +181,15 @@ test("a fall tape-stops the score, plays its last notes backwards and restarts o
   const out = c.event({ name: "respawn", source: "retry", time: 9, x: beaconX("leap") });
   assert.deepEqual(out.fx.map((f) => f.kind), ["restart"]);
   assert.equal(c.tuning.H, 1);
+  assert.equal(c.transport.pos(9), Math.round(pathPos(PATH, beaconX("leap"))), "on the beacon's bar");
+  // Restart chapter: a fresh, stopped, in-tune song that the next wake starts on bar 1.
+  c.event({ name: "chain-fade", time: 10 });
+  assert.ok(c.tuning.H < 1);
+  c.reset();
+  assert.equal(c.transport.running, false);
+  assert.equal(c.tuning.H, 1);
+  c.event({ name: "wake", time: 0 });
+  assert.equal(c.transport.pos(0), 0);
 });
 
 /* ---------- the payoff ---------- */
