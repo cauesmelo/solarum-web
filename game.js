@@ -14,7 +14,8 @@ import {
   capeReady,
   RULES,
 } from "./model.mjs";
-import { LEVELS, CARD, checkpointIndex, shownPrompts, readSave, writeSave } from "./level.mjs";
+import { LEVELS, CARD, checkpointIndex, readSave, writeSave } from "./level.mjs";
+import { signsAt, refWidthOf, layoutScale, dianaBox, rectsTouch } from "./signage.mjs";
 import { characterLayers, frameForClip, footFor, clipFor } from "./animation.mjs";
 import {
   VIEW,
@@ -221,6 +222,9 @@ function resize() {
   canvas.width = Math.max(1, Math.round(fit.cssWidth * dpr));
   canvas.height = Math.max(1, Math.round(fit.cssHeight * dpr));
   pixelScale = canvas.height / H;
+  // Glyph discs keep about 20 css px of radius on small skies (a layout
+  // constant: it changes on resize only, never per frame).
+  signLayout = layoutScale(fit.cssHeight / H);
   if (layout === "portrait" && !turnHintShown && ready) {
     turnHintShown = true;
     $("turn-hint").hidden = false;
@@ -1008,43 +1012,64 @@ function glyph(x, y, kind, alpha, scale) {
   }
   ctx.restore();
 }
-function drawPrompts() {
-  const p = state.player;
-  for (const q of shownPrompts(state.prompts, p.x)) {
-    if (q.x < camera.x - 60 || q.x > camera.x + W + 60) continue;
-    const lead = (q.inputX - p.x) / WORLD().speed;
-    const alpha = Math.max(0, Math.min(1, (2.6 - lead) / 0.4)) * (q.optional ? 0.75 : 1);
-    if (alpha <= 0) continue;
-    // Glyphs keep at least ~20 css px of radius on small (portrait) skies.
-    const cssScale = canvas.clientHeight / H || 1,
-      scale = (q.optional ? 0.82 : 1) * Math.min(1.8, Math.max(1, 0.9 / cssScale));
-    const items = q.glyph,
-      spacing = 48 * scale,
-      discs = items.filter((g) => g !== "then").length;
-    let gx = q.x - ((discs - 1) * spacing) / 2;
-    const bob = reduced ? 0 : Math.sin(clock * 3) * 2;
-    // Never over Diana: on small (portrait) skies the discs grow up to 1.8x
-    // and a row of three could cover her head (playtest critic, IV). When the
-    // row would touch her (head 90 px above the feet, +-26 px), it rises
-    // until it clears her by 8 px. Drawing only: the glyph's timing window
-    // is unchanged.
-    const r = 19 * scale + 4,
-      v = viewPos();
-    let gy = q.y + bob;
-    const left = gx - r,
-      right = gx + (discs - 1) * spacing + r,
-      bottom = gy + r + (items.some((g) => g.startsWith("hold-")) ? 14 : 0);
-    if (right > v.x - 26 && left < v.x + 26 && bottom > v.y - 90 && gy - r < v.y) gy -= bottom - (v.y - 90) + 8;
-    for (const g of items) {
-      if (g === "then") {
-        diamond(gx - spacing / 2, gy, 3, PAPER, alpha);
-        continue;
-      }
-      glyph(gx, gy, g, alpha, scale);
-      gx += spacing;
-    }
+/* World signs (signage.mjs; RESEARCH_TRANSITIONS §1). Each row is a still
+ * sign of the world: its discs sit at the level data's x/y (parallax 1),
+ * drawn behind the islands, and its only change over time is its opacity in
+ * the camera's signage window. Nothing here reads Diana, a prompt's done /
+ * after, the status or the falls (owner: "background elements, purely
+ * informational"; tests/signage.test.mjs T1). */
+let signLayout = 1, // the layout constant (signage.mjs layoutScale), set on resize only
+  signsDrawn = []; // the rows drawn in the last frame (QA, Diana's keyline)
+function drawSigns() {
+  signsDrawn = [];
+  for (const row of signsAt(state.prompts, camera.x, W, refWidthOf(state.def), signLayout, coarse)) {
+    if (row.alpha <= 0) continue;
+    signsDrawn.push(row);
+    for (const t of row.thens) diamond(t.x, t.y, 3, PAPER, row.alpha);
+    for (const d of row.discs) glyph(d.x, d.y, d.kind, row.alpha, row.scale);
   }
 }
+/* Diana in front of a sign (§1.4): her cream silhouette would merge with a
+ * paper disc, so on frames where her drawn box meets a visible row she gets a
+ * 2 px ink keyline, clipped to the intersecting discs' outer circles (r + 4).
+ * Outside discs nothing changes. The frame is tinted to ink once per frame on
+ * a small offscreen canvas (source-in) and stamped in 8 directions. */
+const keyCanvas = makeCanvas(480, 400),
+  keyCtx = keyCanvas.getContext("2d");
+function keylineDiscs(x, feet) {
+  const box = dianaBox(x, feet),
+    out = [];
+  for (const row of signsDrawn) {
+    if (!rectsTouch(row.rect, box, 8)) continue;
+    for (const d of row.discs) out.push({ x: d.x, y: d.y, r: 19 * row.scale + 4 });
+  }
+  return out;
+}
+function drawKeyline(name, age, x, feet, discs, alpha = 1) {
+  keyCtx.setTransform(2, 0, 0, 2, 0, 0);
+  keyCtx.globalCompositeOperation = "source-over";
+  keyCtx.clearRect(0, 0, 240, 200);
+  drawDianaLayers(keyCtx, name, age, 120, 170);
+  keyCtx.globalCompositeOperation = "source-in";
+  keyCtx.fillStyle = INK;
+  keyCtx.fillRect(0, 0, 240, 200);
+  keyCtx.globalCompositeOperation = "source-over";
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.beginPath();
+  for (const d of discs) {
+    ctx.moveTo(d.x + d.r, d.y);
+    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+  }
+  ctx.clip();
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    ctx.drawImage(keyCanvas, 0, 0, 480, 400, x - 120 + Math.cos(a) * 2, feet - 170 + Math.sin(a) * 2, 240, 200);
+  }
+  ctx.restore();
+  keylineFrames++;
+}
+let keylineFrames = 0;
 function drawFx(dt, only = null) {
   for (let i = fx.length - 1; i >= 0; i--) {
     const q = fx[i];
@@ -1165,6 +1190,10 @@ function drawPlayer() {
   const dash = clipFor(manifest, "dash", set.name);
   if (state.dashRemaining > 0 && !reduced)
     for (let i = 3; i >= 1; i--) drawDiana(dash, anim.age, p.x - i * 22, p.y + footFor(manifest, dash, anim.age), 0.07 + (3 - i) * 0.03);
+  // Inside a sign's disc she gets the 2 px ink keyline (§1.4).
+  const feet = p.y + footFor(manifest, anim.name, anim.age),
+    keys = keylineDiscs(p.x, feet);
+  if (keys.length) drawKeyline(anim.name, anim.age, p.x, feet, keys);
   const settle = momentFor("cape");
   if (settle && set.name === "cape") {
     // II's GET: the cape settles on her. The caped clip fades in over the
@@ -2083,13 +2112,15 @@ function draw() {
     islandLook = currentLook();
     drawIslandParticles();
     drawAsteroids();
+    // Signs are information about the playfield: everything playable is in
+    // front of them, and a wind column stays under them (§1.3).
+    drawSigns();
     for (const q of state.platforms) drawPlatform(q);
     drawBeacons();
     drawPortal();
     drawScriptedBack();
     drawConstellations();
     drawStars();
-    drawPrompts();
     ctx.restore();
   }
   drawPlayer();
@@ -3231,6 +3262,10 @@ window.__game = {
   // Music / Sounds volumes (0-1, saved): setVolumes({ music: 0.5 }).
   setVolumes: (v = {}) => setVolumes(v),
   getState: () => snapshot(state),
+  // The signs drawn in the last frame, in world px (T1b): { id, x, y,
+  // alpha, scale, discs }; keylines counts frames that drew Diana's keyline.
+  getSigns: () => signsDrawn.map((r) => ({ id: r.id, x: r.x, y: r.y, alpha: r.alpha, scale: r.scale, discs: r.discs.map((d) => ({ x: d.x, y: d.y })) })),
+  keylines: () => keylineFrames,
   // { on, unlocked, decoded, state, paused, suspended, musicPlaying, voices,
   //   nodes, played, dropped, cues, score: { running, bar, chord, H,
   //   detuneCents, gentle, song, ... }, ... } (see audio.mjs stats()).

@@ -815,10 +815,11 @@ test("the map's count-in schedules one bar of felt beats; a door without the rec
   run.engine.hush(0.1);
   assert.equal(run.engine.stats().score.rest, null, "a reset ends it");
 });
-test("browser layer: glyph rows clear Diana, touch controls appear on the first real touch", async () => {
+// (Glyph rows no longer lift over Diana: they are still signs, placed clear
+// of her while she reads them; tests/signage.test.mjs T1-T2.)
+test("browser layer: touch controls appear on the first real touch", async () => {
   const js = await read("game.js"),
     css = await read("style.css");
-  assert.match(js, /if \(right > v\.x - 26 && left < v\.x \+ 26 && bottom > v\.y - 90 && gy - r < v\.y\) gy -= bottom - \(v\.y - 90\) \+ 8;/);
   assert.match(js, /e\.pointerType !== "touch" \|\| root\.classList\.contains\("touch"\)/);
   assert.match(css, /\.solarum\.touch \.controls \{\n  display: block;/);
   assert.match(js, /if \(!reduced\) audio\.countIn\(\{ bpm: LEVELS\[next - 1\]\.bpm \* pace, delay: 0\.35 \}\);/);

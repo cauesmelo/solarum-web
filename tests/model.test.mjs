@@ -1381,17 +1381,8 @@ test("following each glyph at its first valid moment succeeds (required ones als
       }
     }
 });
-test("the wind's glyphs never show more than one at once (VI)", () => {
-  const d = levelDef(LEVEL_ID["borrowed-wind"]);
-  const prompts = createLevel(d).prompts;
-  // On screen (from just behind Diana to the view's far edge).
-  for (let x = d.level.startX; x <= d.level.finishX; x += 5) {
-    const shown = shownPrompts(prompts, x).filter((q) => q.x > x - 200 && q.x < x + 900);
-    assert.ok(shown.length <= 1, `${x}: ${shown.map((q) => q.id)}`);
-  }
-  // The optional breeze glyph waits while a required one is due.
-  assert.ok(prompts.some((q) => q.optional && q.id === "p-breeze"));
-});
+// (VI's "never more than one glyph at once" is now G2 for every level:
+// tests/signage.test.mjs T4.)
 test("every star is reachable (some pilot collects it) and none sits inside an island, every level", () => {
   for (const n of IDS) {
     const got = new Set();
