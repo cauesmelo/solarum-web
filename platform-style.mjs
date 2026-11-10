@@ -230,6 +230,18 @@ export function meteorRock(q, { look = null, world = {} } = {}) {
   const rock = { q, look, kind, cracked, x, y, w, depth, inset, room, seed, verts: pts, curves, points: chainPoints(curves) };
   rock.bottom = Math.max(...rock.points.map((v) => v.y));
   rock.keelX = rock.points.find((v) => v.y === rock.bottom).x;
+  // The rim shadow's line, 2.5 px inside the underside along its inward
+  // normal (so it needs no clip), on the part under MARK_TOP.
+  rock.rim = rock.points
+    .map((v, i, a) => {
+      const p0 = a[Math.max(0, i - 1)],
+        p1 = a[Math.min(a.length - 1, i + 1)],
+        tx = p1.x - p0.x,
+        ty = p1.y - p0.y,
+        l = Math.hypot(tx, ty) || 1;
+      return { x: v.x - (ty / l) * 2.5, y: v.y + (tx / l) * 2.5 };
+    })
+    .filter((v) => v.y >= y + MARK_TOP + 2);
   rock.details = cracked ? seamsOf(rock, R) : detailsOf(rock, L, R);
   rock.drift = driftOf(rock, L, R);
   rock.ring = L.ring && kind !== "hop" && !cracked ? ringOf(rock) : null;
@@ -392,9 +404,37 @@ export function driftAt(rock, t, reduced = false) {
 function ringOf(rock) {
   const rx = rock.w / 2 + 12,
     ry = clamp((rock.bottom - rock.y) * 0.16, 5, 11),
-    cy = Math.max(rock.y + ROCK.lipBand + 8 + ry, rock.y + (rock.bottom - rock.y) * 0.55);
+    cy = Math.max(rock.y + ROCK.lipBand + 8 + ry, rock.y + (rock.bottom - rock.y) * 0.55),
+    cx = rock.x + rock.w / 2;
   if (cy + ry > rock.bottom + 8) return null;
-  return { cx: rock.x + rock.w / 2, cy, rx, ry };
+  // Dashes precomputed as segments, each marked as over the rock (drawn in
+  // ink) or over the sky (paper), so painting needs no clip or line dash.
+  const inRock = (px, py) => px > rock.x + 1 && px < rock.x + rock.w - 1 && py > rock.y + 12 && py < bottomAt(rock, px) - 1;
+  const dashes = (from, to, near) => {
+    const out = [],
+      n = Math.max(16, Math.round((Math.PI * rx) / 9));
+    for (let i = 0; i < n; i += 2) {
+      const a0 = from + ((to - from) * i) / n,
+        a1 = from + ((to - from) * (i + 1.1)) / n,
+        A = [cx + rx * Math.cos(a0), cy + ry * Math.sin(a0)],
+        B = [cx + rx * Math.cos(a1), cy + ry * Math.sin(a1)];
+      out.push({ A, B, ink: near && inRock((A[0] + B[0]) / 2, (A[1] + B[1]) / 2) });
+    }
+    return out;
+  };
+  const near = dashes(0, Math.PI, true);
+  return { cx, cy, rx, ry, far: dashes(Math.PI, 2 * Math.PI, false), nearInk: near.filter((d) => d.ink), nearSky: near.filter((d) => !d.ink) };
+}
+function strokeDashes(g, list, style, width) {
+  if (!list.length) return;
+  g.strokeStyle = style;
+  g.lineWidth = width;
+  g.beginPath();
+  for (const { A, B } of list) {
+    g.moveTo(A[0], A[1]);
+    g.lineTo(B[0], B[1]);
+  }
+  g.stroke();
 }
 
 /* ---------- painters ---------- */
@@ -417,15 +457,7 @@ export function paintDrift(g, rock, { t = 0, reduced = false } = {}) {
     polygonPath(g, d.x, d.y, d.size, d.angle, d.verts);
     g.fill();
   }
-  if (rock.ring) {
-    const { cx, cy, rx, ry } = rock.ring;
-    g.strokeStyle = rgba("paper", 0.28);
-    g.lineWidth = 1.2;
-    g.setLineDash([5, 4]);
-    g.beginPath();
-    g.ellipse(cx, cy, rx, ry, 0, Math.PI, Math.PI * 2);
-    g.stroke();
-  }
+  if (rock.ring) strokeDashes(g, rock.ring.far, rgba("paper", 0.28), 1.2);
   g.restore();
   return list.length;
 }
@@ -437,17 +469,15 @@ export function paintRock(g, rock, { dx = 0, dy = 0 } = {}) {
   const { x, y, w } = rock;
   g.save();
   g.translate(dx, dy);
-  // Rim shadow: a soft band inside the underside, kept off the top.
-  g.save();
-  traceRock(g, rock);
-  g.clip();
-  const low = rock.points.filter((v) => v.y >= y + MARK_TOP + 2);
-  if (low.length > 1) {
+  // Rim shadow: a soft band just inside the underside, kept off the top.
+  // (Drawn without a clip: clipping every rock to its own path was the
+  // style's largest raster cost on software-rendered canvases.)
+  if (rock.rim.length > 1) {
     g.strokeStyle = rgba("ink", 0.18);
-    g.lineWidth = 9;
+    g.lineWidth = 5;
     g.lineJoin = "round";
     g.beginPath();
-    low.forEach((v, i) => (i ? g.lineTo(v.x, v.y) : g.moveTo(v.x, v.y)));
+    rock.rim.forEach((v, i) => (i ? g.lineTo(v.x, v.y) : g.moveTo(v.x, v.y)));
     g.stroke();
   }
   // The top face's front edge (the GDD's boulders): a hairline 9-14 px
@@ -477,7 +507,6 @@ export function paintRock(g, rock, { dx = 0, dy = 0 } = {}) {
     g.stroke();
   }
   paintDetails(g, rock);
-  g.restore();
   // The ink outline: invisible on the sky, it separates overlapping rocks
   // and rocks in front of the paper bodies and rings behind them.
   g.strokeStyle = rgba("ink", 1);
@@ -487,27 +516,8 @@ export function paintRock(g, rock, { dx = 0, dy = 0 } = {}) {
   g.stroke();
   if (rock.ring) {
     // Saturn's near half: ink dashes over the rock, paper dashes over the sky.
-    const { cx, cy, rx, ry } = rock.ring;
-    g.setLineDash([5, 4]);
-    g.lineWidth = 1.1;
-    g.save();
-    traceRock(g, rock);
-    g.clip();
-    g.strokeStyle = rgba("ink", 0.32);
-    g.beginPath();
-    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI);
-    g.stroke();
-    g.restore();
-    g.save();
-    g.beginPath();
-    g.rect(cx - rx - 6, cy - ry - 4, 2 * rx + 12, 2 * ry + 8);
-    traceRock(g, rock, 0, 0, false);
-    g.clip("evenodd");
-    g.strokeStyle = rgba("paper", 0.3);
-    g.beginPath();
-    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI);
-    g.stroke();
-    g.restore();
+    strokeDashes(g, rock.ring.nearInk, rgba("ink", 0.32), 1.1);
+    strokeDashes(g, rock.ring.nearSky, rgba("paper", 0.3), 1.1);
   }
   g.restore();
 }
