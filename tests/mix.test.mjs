@@ -178,7 +178,7 @@ test("the measured mix holds every rule on every level, and the measurement is f
       t.diagnostic(`level ${d.id} (${d.key}) is not in tests/mix-measured.json yet`);
       continue;
     }
-    for (const [name, ok] of rules(row.after)) assert.ok(ok, `L${d.id} ${d.key}: ${name} (${JSON.stringify(row.after)})`);
+    for (const [name, ok] of rules(row.after, row)) assert.ok(ok, `L${d.id} ${d.key}: ${name} (${JSON.stringify(row.after)})`);
     // Before / after: the sky fell, the constant wash shortened.
     assert.ok(row.after.sky <= row.before.sky - 10, `L${d.id}: the sky is at least 10 dB softer than the saws were`);
     assert.ok(row.before.skyPartials > 20 && row.after.skyPartials <= 2, "a reedy tone before, air after");

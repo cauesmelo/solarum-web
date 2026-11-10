@@ -332,6 +332,40 @@ const shimmer = (o = {}) =>
     at: o.at,
   });
 
+/* Revision nine: a celestial palette in Solarum's own synthesis. The owner
+ * asked for some of the essence of Bard (League of Legends): mystical and
+ * cosmic. What is documented about Bard's sound (README, "Revision nine"):
+ * a wordless voice made of melody, kit sounds built from tiny brass bells,
+ * singing bowls, chimes and bowed metal, an overtone series cycling under
+ * it, and League's convention of wind chimes for restoring. Principles taken,
+ * no sound copied: small bright metal for light touches (quiet, high,
+ * tuned to the chord), bowls for weight instead of thumps, wind chimes for
+ * refills, a chirp for the little helpers, and everything still on the
+ * chord's safe notes. */
+/** A tiny brass bell: FM at an inharmonic 3.5 ratio whose index falls fast,
+ * a 5 ms touch (soft at this height and level) and a short ring. */
+const tinyBell = (midi, rng, o = {}) =>
+  fm(midi, { ratio: o.ratio ?? 3.5, index: [[0, o.index ?? 0.55], [Math.max(0.05, (o.decay ?? 0.5) * 0.4), 0.03, "exp"]], env: [[0, 0], [o.attack ?? 0.005, 1, "lin"], [o.decay ?? 0.5, Z, "exp"]], gain: o.gain ?? 0.03, at: o.at, pan: o.pan, cents: spread(rng, 2) });
+/** Wind chimes: `count` tiny bells on the chord's tones in [lo, hi], at
+ * irregular times over `span` seconds, softer as they go. */
+const windChimes = (chord, rng, o = {}) => {
+  const tones = chordTones(chord, o.lo ?? 84, o.hi ?? 100);
+  if (!tones.length) return [];
+  return Array.from({ length: o.count ?? 5 }, (_, i) => {
+    const u = (i + rng() * 0.8) / (o.count ?? 5);
+    return tinyBell(tones[Math.floor(rng() * tones.length)], rng, { at: (o.at ?? 0) + u * (o.span ?? 0.6), gain: (o.gain ?? 0.02) * (1 - 0.5 * u), decay: 0.35 + rng() * 0.4, pan: spread(rng, 0.6) });
+  });
+};
+/** A helper's chirp ("meep"): a sine that leaps up to the next safe tone in
+ * 40 ms and fades, with a whisper of FM; two of them, the second higher. */
+const meep = (midi, to, rng, o = {}) =>
+  ({ ...tone(midi, { glideTo: to, glide: 0.04, env: [[0, 0], [0.008, 1, "lin"], [0.05, 0.5, "lin"], [0.11, Z, "exp"]], gain: o.gain ?? 0.03, at: o.at, pan: o.pan, cents: spread(rng, 3) }) });
+/** A singing bowl: a tuned carrier with the bowl's inharmonic 2.76 partial
+ * barely in it, a 16 ms felt-soft touch and a long ring. Weight without a
+ * thump. */
+const bowl = (midi, rng, o = {}) =>
+  fm(midi, { ratio: 2.76, index: [[0, o.index ?? 0.35], [o.decay ?? 1.4, 0.02, "exp"]], env: [[0, 0], [o.attack ?? 0.016, 1, "lin"], [o.decay ?? 1.4, Z, "exp"]], gain: o.gain ?? 0.1, at: o.at, pan: o.pan, cents: o.cents ?? 0 });
+
 /** The chord a pitched body follows (the engine passes the score's current
  * chord; alone, on the soundboard, D). */
 const chordOf = (p) => p?.chord ?? CHORDS.D;
@@ -385,7 +419,7 @@ export const CUES = {
   jump: {
     group: "move",
     label: "Jump",
-    about: "An airy upward breath with a whisper of cloth, no thump (the score adds a glass harmonica gliding root to fifth)",
+    about: "An airy upward breath, nothing under 450 Hz, no thump (the score adds a glass chime on the root gliding to the fifth)",
     limit: 3,
     minGap: 0.03,
     short: true,
@@ -394,17 +428,17 @@ export const CUES = {
     // 3 ms felt thump is gone. Every layer swells in over 18-30 ms and is
     // low-passed air, so the body is felt rather than heard as a hit, about
     // 6 dB under the old peak and far under Diana's voice (README, Sound).
+    // Revision nine (the owner: still "too hard"): the deep brown-noise
+    // weight under 260 Hz read as a thud; it is gone. The breath now starts
+    // at 650 Hz and opens upward over a 35 ms swell; the score's chime is
+    // the pitch.
     build: (rng) =>
       voice({
-        gain: 0.4,
+        gain: 0.3,
         send: 0.2,
         layers: [
-          // The breath rises with her: a soft band of pink noise opening upward.
-          noise({ filter: { type: "bandpass", freq: [[0, 420 * (1 + spread(rng, 0.06))], [0.22, 1150, "exp"]], q: 0.7 }, env: env.perc(0.03, 0.2), gain: 0.3 }),
-          // Cloth lifting: brighter air, low-passed under 2.4 kHz.
-          noise({ filter: { type: "lowpass", freq: 2400, q: 0.5 }, highpass: 700, env: env.perc(0.024, 0.12), gain: 0.06 }),
-          // Felt weight leaving the ground: deep, slow air instead of a sine.
-          noise({ color: "brown", filter: { type: "lowpass", freq: 260, q: 0.5 }, env: env.perc(0.026, 0.12), gain: 0.16 }),
+          noise({ filter: { type: "bandpass", freq: [[0, 650 * (1 + spread(rng, 0.06))], [0.24, 1800, "exp"]], q: 0.9 }, highpass: 450, env: [[0, 0], [0.035, 1, "lin"], [0.1, 0.45, "lin"], [0.26, Z, "exp"]], gain: 0.3 }),
+          noise({ filter: { type: "bandpass", freq: 2600, q: 1 }, env: [[0, 0], [0.03, 1, "lin"], [0.14, Z, "exp"]], gain: 0.04 }),
         ],
       }),
   },
@@ -421,9 +455,9 @@ export const CUES = {
         gain: 0.46,
         send: 0.3,
         layers: [
-          noise({ filter: { type: "bandpass", freq: [[0, 800 * (1 + spread(rng, 0.06))], [0.18, 1900, "exp"]], q: 0.8 }, env: env.perc(0.024, 0.16), gain: 0.24 }),
-          // Where a 1 ms white tick was: air sparkling in over 16 ms.
-          noise({ filter: { type: "bandpass", freq: 4200, q: 1.2 }, env: env.perc(0.02, 0.1), gain: 0.035, at: 0.01 }),
+          noise({ filter: { type: "bandpass", freq: [[0, 800 * (1 + spread(rng, 0.06))], [0.18, 1900, "exp"]], q: 0.8 }, highpass: 450, env: [[0, 0], [0.032, 1, "lin"], [0.09, 0.45, "lin"], [0.22, Z, "exp"]], gain: 0.2 }),
+          // Where a 1 ms white tick was: air sparkling in over 30 ms.
+          noise({ filter: { type: "bandpass", freq: 4200, q: 1.2 }, env: [[0, 0], [0.03, 1, "lin"], [0.13, Z, "exp"]], gain: 0.03, at: 0.01 }),
         ],
       }),
   },
@@ -494,7 +528,7 @@ export const CUES = {
   "land-soft": {
     group: "move",
     label: "Land (soft)",
-    about: "Feet settling into soft ground: a short hush of air and cloth, felt rather than heard",
+    about: "Feet settling into soft ground: a short hush of air falling from 1.1 kHz, nothing under 350 Hz (the score touches a singing bowl on the root)",
     limit: 2,
     minGap: 0.06,
     short: true,
@@ -505,20 +539,21 @@ export const CUES = {
     // of its energy in the first 10 ms (an 18 ms ramp into an 80 dB-per-100 ms
     // fall); it now rises over 38 ms, holds a little and settles over 160 ms,
     // 9.5 dB lower so its energy stays the same (peak 2-3 dB lower).
+    // Revision nine (the owner: the landings still sounded "too hard"): the
+    // brown-noise layer under 240 Hz and the low-pass body down to 150 Hz
+    // were a thud however slowly they rose; the landing is now a hush of air
+    // that falls as she settles, high-passed at 350 Hz.
     build: (rng) =>
       voice({
-        gain: 0.125,
-        send: 0.08,
-        layers: [
-          noise({ filter: { type: "lowpass", freq: 900 * (1 + spread(rng, 0.08)), q: 0.5 }, highpass: 150, env: [[0, 0], [0.038, 1, "lin"], [0.07, 0.6, "lin"], [0.2, Z, "exp"]], gain: 0.2 }),
-          noise({ color: "brown", filter: { type: "lowpass", freq: 240, q: 0.5 }, env: [[0, 0], [0.042, 1, "lin"], [0.075, 0.6, "lin"], [0.2, Z, "exp"]], gain: 0.2 }),
-        ],
+        gain: 0.22,
+        send: 0.1,
+        layers: [noise({ filter: { type: "bandpass", freq: [[0, 1100 * (1 + spread(rng, 0.08))], [0.2, 650, "exp"]], q: 0.8 }, highpass: 350, env: [[0, 0], [0.04, 1, "lin"], [0.085, 0.45, "lin"], [0.23, Z, "exp"]], gain: 0.2 })],
       }),
   },
   "land-hard": {
     group: "move",
     label: "Land (hard)",
-    about: "A deeper, longer settle with a little dust in the air, only after big falls or dives",
+    about: "A longer settle of air with a little dust in it, only after big falls or dives; nothing under 350 Hz",
     limit: 2,
     minGap: 0.06,
     short: true,
@@ -530,9 +565,9 @@ export const CUES = {
         gain: 0.26,
         send: 0.12,
         layers: [
-          noise({ color: "brown", filter: { type: "lowpass", freq: 300, q: 0.5 }, env: env.perc(0.022, 0.2), gain: 0.34 }),
-          noise({ filter: { type: "lowpass", freq: 1100 * (1 + spread(rng, 0.08)), q: 0.5 }, highpass: 140, env: env.perc(0.02, 0.14), gain: 0.18 }),
-          noise({ filter: { type: "bandpass", freq: 1700, q: 0.7 }, env: env.perc(0.025, 0.22), gain: 0.035, at: 0.02 }),
+          // (Revision nine: the brown-noise weight under 300 Hz is gone.)
+          noise({ filter: { type: "bandpass", freq: [[0, 950 * (1 + spread(rng, 0.08))], [0.3, 520, "exp"]], q: 0.8 }, highpass: 350, env: [[0, 0], [0.045, 1, "lin"], [0.12, 0.5, "lin"], [0.34, Z, "exp"]], gain: 0.22 }),
+          noise({ filter: { type: "bandpass", freq: 1700, q: 0.7 }, env: [[0, 0], [0.04, 1, "lin"], [0.28, Z, "exp"]], gain: 0.03, at: 0.02 }),
         ],
       }),
   },
@@ -549,7 +584,8 @@ export const CUES = {
         gain: 0.56,
         send: 0.12,
         layers: [
-          noise({ filter: { type: "bandpass", freq: [[0, 700], [0.09, 1300, "exp"]], q: 0.8 }, env: env.perc(0.02, 0.075), gain: 0.12 }),
+          // (Revision nine: a little softer, 3 dB and a 30 ms swell.)
+          noise({ filter: { type: "bandpass", freq: [[0, 750], [0.1, 1300, "exp"]], q: 0.8 }, highpass: 450, env: [[0, 0], [0.03, 1, "lin"], [0.13, Z, "exp"]], gain: 0.085 }),
         ],
       }),
   },
@@ -682,8 +718,10 @@ export const CUES = {
         send: 0.28,
         pan: spread(rng, 0.15),
         layers: [
-          noise({ color: "white", filter: { type: "bandpass", freq: 6200 * (1 + spread(rng, 0.08)), q: 2.5 }, env: env.perc(0.001, 0.003 + rng() * 0.002), gain: 0.16 }),
-          crackle({ dur: 0.09, from: 260, to: 60, rise: [1, 0.15], band: 7000, q: 1.2, grain: 0.0015, gain: 0.05, seed: rng() * 1e9 }),
+          // (Revision nine: the 1 ms white tick touches in over 4 ms and the
+          // grains are fewer; the score's note now carries a tiny bell.)
+          noise({ color: "white", filter: { type: "bandpass", freq: 6200 * (1 + spread(rng, 0.08)), q: 2.5 }, env: env.perc(0.004, 0.006 + rng() * 0.003), gain: 0.11 }),
+          crackle({ dur: 0.08, from: 160, to: 40, rise: [1, 0.15], band: 7000, q: 1.2, grain: 0.0025, gain: 0.035, seed: rng() * 1e9 }),
           noise({ filter: { type: "bandpass", freq: 3600, q: 0.8 }, env: env.perc(0.01, 0.12), gain: 0.025 }),
         ],
       }),
@@ -711,18 +749,20 @@ export const CUES = {
   constellation: {
     group: "stars",
     label: "Constellation",
-    about: "Ink lines drawn in light: a rising airy shimmer (the score blooms the chord and the choir enters)",
+    about: "Ink lines drawn in light: a rising airy shimmer and a run of wind chimes on the chord (params.chord; the score blooms the chord and the choir enters)",
     limit: 1,
     minGap: 0.3,
     duck: [5, 0.12, 1, 1],
     maxTail: 5,
-    build: () =>
+    build: (rng, p = {}) =>
       voice({
         gain: 0.47,
         send: 0.45,
         layers: [
           noise({ filter: { type: "bandpass", freq: [[0, 1200], [0.6, 4200, "exp"]], q: 0.9 }, env: env.swell(0.25, 0.15, 1.1), gain: 0.05 }),
-          shimmer({ at: 0.15, env: env.swell(0.3, 0.1, 1.3), gain: 0.02 }),
+          shimmer({ at: 0.15, env: env.swell(0.3, 0.1, 1.3), gain: 0.014 }),
+          // Revision nine: the lines ring as wind chimes, rising through the chord.
+          ...windChimes(chordOf(p), rng, { count: 6, at: 0.08, span: 0.7, lo: 86, hi: 100, gain: 0.045 }),
         ],
       }),
   },
@@ -758,6 +798,30 @@ export const CUES = {
         ],
       }),
   },
+  "refill-star": {
+    group: "air",
+    label: "Refill star",
+    about: "A refill star answers: two little chirps leaping up the chord, the second higher, over three wind-chime grains (params.chord)",
+    limit: 1,
+    minGap: 0.12,
+    maxTail: 2,
+    build: (rng, p = {}) => {
+      const c = chordOf(p),
+        t = chordTones(c, 86, 100);
+      const a = t[0] ?? 86,
+        b = t[1] ?? a + 5,
+        d = t[2] ?? b + 4;
+      return voice({
+        gain: 0.8,
+        send: 0.3,
+        layers: [
+          meep(a, b, rng, { gain: 0.03, pan: -0.15 }),
+          meep(b, d, rng, { at: 0.075, gain: 0.026, pan: 0.15 }),
+          ...windChimes(c, rng, { count: 3, at: 0.1, span: 0.35, lo: 88, hi: 100, gain: 0.02 }),
+        ],
+      });
+    },
+  },
   relic: {
     group: "stars",
     label: "Relic",
@@ -778,6 +842,10 @@ export const CUES = {
           bell(tones[0], rng, { at: 0.04, attack: 0.012, gain: 0.08, decay: 1.1, ratio: 2, index: 0.35, pan: -0.2 }),
           bell(tones[1] ?? tones[0], rng, { at: 0.16, attack: 0.012, gain: 0.07, decay: 1.2, ratio: 2, index: 0.35, pan: 0.05 }),
           bell(top, rng, { at: 0.3, attack: 0.012, gain: 0.07, decay: 1.5, ratio: 2, index: 0.3, pan: 0.25 }),
+          // Revision nine: a cosmic swell under the bells, a bowl on the
+          // chord's root and wind chimes trailing off the last bell.
+          { ...bowl(rootIn(c, 57), rng, { attack: 0.25, decay: 2.2, gain: 0.06, index: 0.25 }), env: [[0, 0], [0.25, 1, "lin"], [0.6, 0.7, "lin"], [2.2, Z, "exp"]] },
+          ...windChimes(c, rng, { count: 4, at: 0.45, span: 0.6, lo: 88, hi: 100, gain: 0.03 }),
         ],
       });
     },
@@ -983,6 +1051,201 @@ export const CUES = {
       }),
   },
 };
+/** Revision eight's bodies and sparkles as they were before revision nine
+ * (the owner: the jump and the landings still sounded "too hard"), kept only
+ * for the soundboard's A/B (createAudioEngine({ mix: "rev8" })). The game
+ * never plays them. */
+export const BODY_REV8 = Object.freeze({
+  jump: {
+    group: "move",
+    label: "Jump",
+    about: "An airy upward breath with a whisper of cloth, no thump (the score adds a glass harmonica gliding root to fifth)",
+    limit: 3,
+    minGap: 0.03,
+    short: true,
+    maxTail: 1.6,
+    // Revision seven (user: "too hard, it clashes with the atmosphere"): the
+    // 3 ms felt thump is gone. Every layer swells in over 18-30 ms and is
+    // low-passed air, so the body is felt rather than heard as a hit, about
+    // 6 dB under the old peak and far under Diana's voice (README, Sound).
+    build: (rng) =>
+      voice({
+        gain: 0.4,
+        send: 0.2,
+        layers: [
+          // The breath rises with her: a soft band of pink noise opening upward.
+          noise({ filter: { type: "bandpass", freq: [[0, 420 * (1 + spread(rng, 0.06))], [0.22, 1150, "exp"]], q: 0.7 }, env: env.perc(0.03, 0.2), gain: 0.3 }),
+          // Cloth lifting: brighter air, low-passed under 2.4 kHz.
+          noise({ filter: { type: "lowpass", freq: 2400, q: 0.5 }, highpass: 700, env: env.perc(0.024, 0.12), gain: 0.06 }),
+          // Felt weight leaving the ground: deep, slow air instead of a sine.
+          noise({ color: "brown", filter: { type: "lowpass", freq: 260, q: 0.5 }, env: env.perc(0.026, 0.12), gain: 0.16 }),
+        ],
+      }),
+  },
+  "double-jump": {
+    group: "move",
+    label: "Double jump",
+    about: "Higher and lighter: a thinner rising breath with a soft airy shimmer, no tick (the score glides fifth to ninth)",
+    limit: 3,
+    minGap: 0.03,
+    short: true,
+    maxTail: 1.8,
+    build: (rng) =>
+      voice({
+        gain: 0.46,
+        send: 0.3,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 800 * (1 + spread(rng, 0.06))], [0.18, 1900, "exp"]], q: 0.8 }, env: env.perc(0.024, 0.16), gain: 0.24 }),
+          // Where a 1 ms white tick was: air sparkling in over 16 ms.
+          noise({ filter: { type: "bandpass", freq: 4200, q: 1.2 }, env: env.perc(0.02, 0.1), gain: 0.035, at: 0.01 }),
+        ],
+      }),
+  },
+  "land-soft": {
+    group: "move",
+    label: "Land (soft)",
+    about: "Feet settling into soft ground: a short hush of air and cloth, felt rather than heard",
+    limit: 2,
+    minGap: 0.06,
+    short: true,
+    maxTail: 1,
+    // The thump (a 2 ms sine sweep) is gone: the landing's note is the felt
+    // bass the score plays on the grid; the body only settles under it.
+    // Revision eight: the critic measured this body's attack at 9 ms with 58%
+    // of its energy in the first 10 ms (an 18 ms ramp into an 80 dB-per-100 ms
+    // fall); it now rises over 38 ms, holds a little and settles over 160 ms,
+    // 9.5 dB lower so its energy stays the same (peak 2-3 dB lower).
+    build: (rng) =>
+      voice({
+        gain: 0.125,
+        send: 0.08,
+        layers: [
+          noise({ filter: { type: "lowpass", freq: 900 * (1 + spread(rng, 0.08)), q: 0.5 }, highpass: 150, env: [[0, 0], [0.038, 1, "lin"], [0.07, 0.6, "lin"], [0.2, Z, "exp"]], gain: 0.2 }),
+          noise({ color: "brown", filter: { type: "lowpass", freq: 240, q: 0.5 }, env: [[0, 0], [0.042, 1, "lin"], [0.075, 0.6, "lin"], [0.2, Z, "exp"]], gain: 0.2 }),
+        ],
+      }),
+  },
+  "land-hard": {
+    group: "move",
+    label: "Land (hard)",
+    about: "A deeper, longer settle with a little dust in the air, only after big falls or dives",
+    limit: 2,
+    minGap: 0.06,
+    short: true,
+    maxTail: 1.2,
+    // No sine and no stone grains: weight is slow low air, the "gravel" a
+    // soft band of dust that swells in over 25 ms.
+    build: (rng) =>
+      voice({
+        gain: 0.26,
+        send: 0.12,
+        layers: [
+          noise({ color: "brown", filter: { type: "lowpass", freq: 300, q: 0.5 }, env: env.perc(0.022, 0.2), gain: 0.34 }),
+          noise({ filter: { type: "lowpass", freq: 1100 * (1 + spread(rng, 0.08)), q: 0.5 }, highpass: 140, env: env.perc(0.02, 0.14), gain: 0.18 }),
+          noise({ filter: { type: "bandpass", freq: 1700, q: 0.7 }, env: env.perc(0.025, 0.22), gain: 0.035, at: 0.02 }),
+        ],
+      }),
+  },
+  "lip-catch": {
+    group: "move",
+    label: "Ledge catch",
+    about: "A soft brush of cloth when a near miss or a step-up lifts her onto the lip (the score scoops into the chord's third)",
+    limit: 1,
+    minGap: 0.1,
+    short: true,
+    maxTail: 1,
+    build: () =>
+      voice({
+        gain: 0.56,
+        send: 0.12,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 700], [0.09, 1300, "exp"]], q: 0.8 }, env: env.perc(0.02, 0.075), gain: 0.12 }),
+        ],
+      }),
+  },
+  star: {
+    group: "stars",
+    label: "Star",
+    about: "The touch of a star: a 3 ms glass sparkle with a breath of air (the score plays its melody note on the grid)",
+    limit: 4,
+    minGap: 0.045,
+    short: true,
+    maxTail: 2.2,
+    build: (rng) =>
+      voice({
+        gain: 1.0,
+        send: 0.28,
+        pan: spread(rng, 0.15),
+        layers: [
+          noise({ color: "white", filter: { type: "bandpass", freq: 6200 * (1 + spread(rng, 0.08)), q: 2.5 }, env: env.perc(0.001, 0.003 + rng() * 0.002), gain: 0.16 }),
+          crackle({ dur: 0.09, from: 260, to: 60, rise: [1, 0.15], band: 7000, q: 1.2, grain: 0.0015, gain: 0.05, seed: rng() * 1e9 }),
+          noise({ filter: { type: "bandpass", freq: 3600, q: 0.8 }, env: env.perc(0.01, 0.12), gain: 0.025 }),
+        ],
+      }),
+  },
+  "chain-note": {
+    group: "stars",
+    label: "Constellation star",
+    about: "A warmer sparkle with a faint ink stroke (the score plays the constellation's authored note)",
+    limit: 4,
+    minGap: 0.04,
+    short: true,
+    maxTail: 2.6,
+    build: (rng) =>
+      voice({
+        gain: 0.9,
+        send: 0.32,
+        pan: spread(rng, 0.15),
+        layers: [
+          noise({ color: "white", filter: { type: "bandpass", freq: 5600 * (1 + spread(rng, 0.08)), q: 2 }, env: env.perc(0.001, 0.004), gain: 0.15 }),
+          crackle({ dur: 0.12, from: 200, to: 40, rise: [1, 0.2], band: 6000, q: 1.1, grain: 0.0015, gain: 0.05, seed: rng() * 1e9 }),
+          noise({ filter: { type: "bandpass", freq: [[0, 1800], [0.15, 3200, "exp"]], q: 1.2 }, env: env.perc(0.02, 0.16), gain: 0.03 }),
+        ],
+      }),
+  },
+  constellation: {
+    group: "stars",
+    label: "Constellation",
+    about: "Ink lines drawn in light: a rising airy shimmer (the score blooms the chord and the choir enters)",
+    limit: 1,
+    minGap: 0.3,
+    duck: [5, 0.12, 1, 1],
+    maxTail: 5,
+    build: () =>
+      voice({
+        gain: 0.47,
+        send: 0.45,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 1200], [0.6, 4200, "exp"]], q: 0.9 }, env: env.swell(0.25, 0.15, 1.1), gain: 0.05 }),
+          shimmer({ at: 0.15, env: env.swell(0.3, 0.1, 1.3), gain: 0.02 }),
+        ],
+      }),
+  },
+  relic: {
+    group: "stars",
+    label: "Relic",
+    about: "A relic's banner (an ability taken as a pickup): a soft breath and three small bells climbing the chord (params.chord), the third a step higher for a later verb (params.verb)",
+    limit: 1,
+    minGap: 0.5,
+    maxTail: 4,
+    build: (rng, p = {}) => {
+      const c = chordOf(p),
+        tones = chordTones(c, 81, 95),
+        lift = Math.max(0, ["double", "cape", "glide", "dive", "super"].indexOf(p.verb ?? "double"));
+      const top = tones[Math.min(tones.length - 1, 2 + (lift >> 1))] ?? tones.at(-1);
+      return voice({
+        gain: 0.42,
+        send: 0.45,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 900], [0.35, 2600, "exp"]], q: 0.9 }, env: env.swell(0.12, 0.08, 0.6), gain: 0.03 }),
+          bell(tones[0], rng, { at: 0.04, attack: 0.012, gain: 0.08, decay: 1.1, ratio: 2, index: 0.35, pan: -0.2 }),
+          bell(tones[1] ?? tones[0], rng, { at: 0.16, attack: 0.012, gain: 0.07, decay: 1.2, ratio: 2, index: 0.35, pan: 0.05 }),
+          bell(top, rng, { at: 0.3, attack: 0.012, gain: 0.07, decay: 1.5, ratio: 2, index: 0.3, pan: 0.25 }),
+        ],
+      });
+    },
+  },
+});
 export const CUE_NAMES = Object.freeze(Object.keys(CUES));
 /** The movement bodies as they were before revision seven (a 2-3 ms felt
  * thump under the jump and landings, 1-2 ms ticks and pats, a crackle trail
@@ -1258,7 +1521,7 @@ export const TUNE_VOICES = {
   harp: {
     group: "tune",
     label: "Soundtrack harp",
-    about: "The harmony the sky used to hold: a dark nylon pluck (Karplus-Strong, brightness 0.16) with a little sine body",
+    about: "The harmony the sky used to hold: a dark nylon pluck (Karplus-Strong, brightness 0.16) with a little sine body and, since revision nine, a faint celestial bell an octave up",
     build: (rng, n = {}) => {
       const m = n.midi ?? 66,
         c = spread(rng, 2);
@@ -1267,7 +1530,7 @@ export const TUNE_VOICES = {
         send: 0.25,
         pan: n.pan,
         tune: "rest",
-        layers: [pluck(m, { t60: 0.85, bright: 0.16, gain: 0.22, cents: c }), tone(m, { env: env.perc(0.006, 0.45), gain: 0.05, cents: c })],
+        layers: [pluck(m, { t60: 0.85, bright: 0.16, gain: 0.22, cents: c }), tone(m, { env: env.perc(0.006, 0.45), gain: 0.05, cents: c }), bell(m + 12, rng, { ratio: 2, index: 0.35, attack: 0.006, decay: 0.7, gain: 0.022 })],
       });
     },
   },
@@ -1409,9 +1672,31 @@ export const VOICES = {
   },
   harmonica: {
     group: "player",
-    label: "Glass harmonica",
-    about: "Diana's breath made glass: jumps glide root to fifth, doubles fifth to ninth, dives an octave down, wind runs rise",
-    build: (rng, n = {}) => voice({ gain: 1.0 * (n.gain ?? 1), send: n.send ?? 0.35, pan: n.pan, layers: harmonicaLayers(n, rng) }),
+    label: "Glass chime",
+    about: "Diana's breath made glass, since revision nine a chime: a soft glass bell on the note (jumps on the root, doubles on the fifth, dives on the octave, the wind's runs one each), a smaller bell where the glide arrives, and the glass glide itself 8 dB under them",
+    // Revision nine (Bard's tuned chimes, README): the onset is a bell, not
+    // a swelling tone; the glide that drew the gesture stays, quieter.
+    build: (rng, n = {}) => {
+      const m = n.midi ?? 74,
+        c = (n.blur ?? 0) + spread(rng, 2),
+        // A short grace (the ledge catch's 60 ms scoop) gets no second bell.
+        arrive = n.glideTo != null && (n.glide ?? 0.3) >= 0.15 ? (n.glide ?? 0.3) * 0.75 : null;
+      // The glide carries the level (a smooth swell), the bells the colour:
+      // they touch in over 15 ms so the voice never peaks above revision
+      // eight's glide (measured: README, "Revision nine").
+      const glide = harmonicaLayers(n, rng, { gain: 0.12 * dbToGain(-4) });
+      return voice({
+        gain: 1.0 * (n.gain ?? 1),
+        send: n.send ?? 0.35,
+        pan: n.pan,
+        layers: [
+          bell(m, rng, { ratio: 2, index: 0.55, attack: 0.015, decay: 0.9, gain: 0.085 }),
+          tinyBell(m + 12, rng, { gain: 0.01, decay: 0.35, attack: 0.01 }),
+          ...(arrive != null ? [bell(n.glideTo, rng, { at: arrive, ratio: 2, index: 0.45, attack: 0.015, decay: 0.8, gain: 0.06 })] : []),
+          ...glide,
+        ].map((L) => (L.kind === "fm" ? { ...L, cents: (L.cents ?? 0) + c, hz: midiHz(L.midi + ((L.cents ?? 0) + c) / 100) } : L)),
+      });
+    },
   },
   vowel: {
     group: "player",
@@ -1440,6 +1725,8 @@ export const VOICES = {
         layers: [
           fm(m, { ratio: 4, index: [[0, 0.7], [0.08, 0.1, "exp"]], env: env.perc(0.002, 1.1), gain: 0.16, cents: c + spread(rng, 2) }),
           fm(m + 12, { ratio: 1.4, index: [[0, 0.3], [0.3, 0.05, "exp"]], env: env.perc(0.004, 0.5), gain: 0.025, cents: c }),
+          // Revision nine: a tiny brass bell two octaves up, the sparkle of a star caught.
+          tinyBell(m + 24, rng, { gain: 0.012, decay: 0.3 }),
         ],
       });
     },
@@ -1483,8 +1770,27 @@ export const VOICES = {
   },
   bass: {
     group: "player",
-    label: "Felt bass",
-    about: "Steps: every stable landing plays the chord's root, a felt mallet on a sine under 400 Hz",
+    label: "Singing bowl (steps)",
+    about: "Steps: every stable landing touches the chord's root on a small singing bowl two octaves above the old felt bass (D4-B4; no mallet click); the soundtrack's bass holds the low end",
+    // Revision nine (the owner: the landings were "too hard"): the felt
+    // bass was a 73-123 Hz sine with an 8 ms mallet and a 1 ms click under
+    // every landing, a thump; the landing's note is now a bowl.
+    build: (rng, n = {}) => {
+      // (Two octaves up, 294-494 Hz: an octave up still measured 99% of its
+      // energy under 300 Hz, a low note under every landing.)
+      const m = (n.midi ?? 38) + 24;
+      return voice({
+        gain: 1.0 * (n.gain ?? 1),
+        send: 0.3,
+        pan: n.pan ?? -0.25,
+        layers: [bowl(m, rng, { attack: 0.018, decay: 1.2, gain: 0.15, index: 0.3, cents: n.blur ?? 0 }), tinyBell(m + 24, rng, { gain: 0.01, decay: 0.3, at: 0.004 })],
+      });
+    },
+  },
+  feltBass: {
+    group: "player",
+    label: "Felt bass (revision eight)",
+    about: "The landing's note until revision nine: a felt mallet on a sine under 400 Hz (the soundboard's A/B)",
     build: (rng, n = {}) => {
       const m = n.midi ?? 38;
       return voice({
@@ -1525,6 +1831,68 @@ export const VOICES = {
       }),
   },
 };
+/** Revision eight's voices for Diana's jumps, stars and landings and the
+ * soundtrack's harp, kept for the same A/B. */
+export const VOICES_REV8 = Object.freeze({
+  harmonica: {
+    group: "player",
+    label: "Glass harmonica",
+    about: "Diana's breath made glass: jumps glide root to fifth, doubles fifth to ninth, dives an octave down, wind runs rise",
+    build: (rng, n = {}) => voice({ gain: 1.0 * (n.gain ?? 1), send: n.send ?? 0.35, pan: n.pan, layers: harmonicaLayers(n, rng) }),
+  },
+  glass: {
+    group: "player",
+    label: "Star glass",
+    about: "A loose star's melody note: music-box glass with a soft celestial partial, climbing the chord",
+    build: (rng, n = {}) => {
+      const m = n.midi ?? 74,
+        c = n.blur ?? 0;
+      return voice({
+        gain: 1.0 * (n.gain ?? 1),
+        send: n.send ?? 0.4,
+        pan: spread(rng, 0.15),
+        layers: [
+          fm(m, { ratio: 4, index: [[0, 0.7], [0.08, 0.1, "exp"]], env: env.perc(0.002, 1.1), gain: 0.16, cents: c + spread(rng, 2) }),
+          fm(m + 12, { ratio: 1.4, index: [[0, 0.3], [0.3, 0.05, "exp"]], env: env.perc(0.004, 0.5), gain: 0.025, cents: c }),
+        ],
+      });
+    },
+  },
+  bass: {
+    group: "player",
+    label: "Felt bass",
+    about: "Steps: every stable landing plays the chord's root, a felt mallet on a sine under 400 Hz",
+    build: (rng, n = {}) => {
+      const m = n.midi ?? 38;
+      return voice({
+        gain: 1.0 * (n.gain ?? 1),
+        send: 0.12,
+        pan: n.pan ?? -0.25,
+        layers: [
+          tone(m, { env: env.perc(0.015, 0.6), gain: 0.34, filter: { type: "lowpass", freq: 400, q: 0.7 } }),
+          tone(m + 12, { partial: true, env: env.perc(0.01, 0.25), gain: 0.05 }),
+          noise({ color: "pink", filter: { type: "lowpass", freq: 1200, q: 0.5 }, env: env.perc(0.001, 0.008), gain: 0.08 }),
+        ],
+      });
+    },
+  },
+  harp: {
+    group: "tune",
+    label: "Soundtrack harp",
+    about: "The harmony the sky used to hold: a dark nylon pluck (Karplus-Strong, brightness 0.16) with a little sine body",
+    build: (rng, n = {}) => {
+      const m = n.midi ?? 66,
+        c = spread(rng, 2);
+      return voice({
+        gain: 1.5 * (n.gain ?? 1),
+        send: 0.25,
+        pan: n.pan,
+        tune: "rest",
+        layers: [pluck(m, { t60: 0.85, bright: 0.16, gain: 0.22, cents: c }), tone(m, { env: env.perc(0.006, 0.45), gain: 0.05, cents: c })],
+      });
+    },
+  },
+});
 export const VOICE_NAMES = Object.freeze(Object.keys(VOICES));
 /** The continuous air bed (updraft swell, glide flutter) is not a one-shot
  * cue; these pseudo-cues render it for the soundboard and offline tests. */
@@ -1569,9 +1937,9 @@ export function cuesForEvent(e) {
     // its own cue; a second sound there would only blur it.
     // (A cape star's refill is voiced by its own refill-star event.)
     case "refill": return e.source === "beacon" || e.source === "constellation" || e.source === "cape-star" ? [] : [{ cue: "refill" }];
-    // RESEARCH_REFILLS: a refill star that acts glints (the cape's A6 glint
-    // for both until the leaf gets its glass tick).
-    case "refill-star": return [{ cue: "refill" }];
+    // RESEARCH_REFILLS: a refill star that acts answers with its own chirps
+    // and wind chimes (revision nine; it borrowed the cape's A6 glint before).
+    case "refill-star": return [{ cue: "refill-star", params: { kind: e.kind } }];
     // A relic's pickup (RESEARCH_REFILLS 2: { type: 'relic', verb }): its banner chime.
     case "relic": return [{ cue: "relic", params: { verb: e.verb } }];
     case "great-star": return [{ cue: "great-star" }];
@@ -1762,10 +2130,20 @@ export const MIX = Object.freeze({
   tuneWet: -4, // dB on its space sends (the reverb, not the shimmer)
   leadDuck: 5, // dB the soundtrack's lead gives way while one of Diana's notes sounds
   door: -4, // dB on the far door's bloom (it stood 3-5 LU over the level)
+  // Revision nine (the owner: "the SFX are a little too loud against the
+  // music"): the bodies (every cue, their room reverb, the air) 4 dB down;
+  // Diana's notes are music, they stay on the score bus at their level: the
+  // softer bowl and chimes alone bring her notes as a whole 2-3 dB down,
+  // still 3 dB or more over the soundtrack (README, "Revision nine").
+  sfx: -4, // dB on every body cue and the air bed
+  player: 0, // dB on Diana's notes and their space sends (a lever kept for the A/B)
+  palette: "bard", // "rev8": the bodies and voices before revision nine (the A/B)
 });
+/** Revision eight as the owner heard it (the soundboard's A/B: mix "rev8"). */
+export const MIX_REV8 = Object.freeze({ ...MIX, sfx: 0, player: 0, palette: "rev8" });
 /** Revision seven's mix as it was before the wind bed and the soundtrack (the
  * soundboard's "old bed" A/B: createAudioEngine({ mix: "rev7" })). */
-export const MIX_REV7 = Object.freeze({ ...MIX, layers: Object.freeze({ ...MIX.layers, choir: -3 }), sky: "saws", shimmer: 1, shimmerOut: 0, whistle: Object.freeze({ tone: 0.045, air: 0, q: 14 }), sing: Object.freeze({ gain: 9, q: 28 }), tune: null, door: 0, air: null, skyBefore: true });
+export const MIX_REV7 = Object.freeze({ ...MIX, sfx: 0, player: 0, palette: "rev8", layers: Object.freeze({ ...MIX.layers, choir: -3 }), sky: "saws", shimmer: 1, shimmerOut: 0, whistle: Object.freeze({ tone: 0.045, air: 0, q: 14 }), sing: Object.freeze({ gain: 9, q: 28 }), tune: null, door: 0, air: null, skyBefore: true });
 /** The revision-six mix, kept only for the soundboard's before / after A/B
  * (createAudioEngine({ mix: "before" })): the bed as loud as Diana's notes,
  * open to 16 kHz, the presence lift on everything, no bed voice cap, and the
@@ -1774,7 +2152,7 @@ export const MIX_BEFORE = Object.freeze({ ...MIX_REV7, bed: 0, bedWet: 0, bedLow
 /** The mix an engine uses: "before" (revision six), "rev7" (before the wind
  * bed and the soundtrack), an object laid over MIX (the soundboard's A/Bs), or
  * MIX. */
-const mixOf = (m) => (m === "before" ? MIX_BEFORE : m === "rev7" ? MIX_REV7 : m && typeof m === "object" ? { ...MIX, ...m } : MIX);
+const mixOf = (m) => (m === "before" ? MIX_BEFORE : m === "rev7" ? MIX_REV7 : m === "rev8" ? MIX_REV8 : m && typeof m === "object" ? { ...MIX, ...m } : MIX);
 /** Player volume settings: Music (the bed and the soundtrack) and Sounds
  * (Diana's bodies and notes, stars, beacons, the interface), each 0-1, 1 by
  * default = the mix above. Guarded storage like the sound setting. */
@@ -1835,7 +2213,7 @@ const wallNow = () => globalThis.performance?.now?.() ?? Date.now();
 // cracked in one level and stable in another).
 const CRACKED = new Set(LEVELS.flatMap((d) => createLevel(d).platforms.filter((q) => q.type).map((q) => q.id)));
 /** Pitched cues follow the score's chord at the moment they sound. */
-const CHORDED = new Set(["cascade", "wind-catch", "great-banked", "movement", "respawn", "relic"]);
+const CHORDED = new Set(["cascade", "wind-catch", "great-banked", "movement", "respawn", "relic", "constellation", "refill-star"]);
 
 /**
  * options: enabled (default true), context (an existing / Offline context),
@@ -1886,7 +2264,7 @@ export function createAudioEngine(options = {}) {
   const mix = mixOf(options.mix);
   // A cue book override (the soundboard's before / after A/B); the game
   // always plays CUES.
-  const book = options.cues ? { ...CUES, ...options.cues } : CUES;
+  const book = options.cues ? { ...CUES, ...options.cues } : mix.palette === "rev8" ? { ...CUES, ...BODY_REV8, "refill-star": CUES.refill } : CUES;
   const makeConductor = (n, gentle) => createConductor({ level: n, path: PATHS[n], cracked: CRACKED, seed: seed ^ 0x51, gentle });
   let conductor = makeConductor(level, !!options.gentle);
   // The soundtrack (tune.mjs) on the conductor's transport; mix.tune null: none.
@@ -1977,6 +2355,11 @@ export function createAudioEngine(options = {}) {
     sfx.connect(comp);
     comp.connect(master);
     verbIn.connect(verb);
+    // The body cues' reverb sends come through the Sounds setting too
+    // (revision nine: at Sounds 0 their room tails used to remain).
+    const sfxSend = node("Gain");
+    sfxSend.gain.value = vol.sounds;
+    sfxSend.connect(verbIn);
     verb.connect(verbTone);
     verbTone.connect(verbOut);
     verbOut.connect(master);
@@ -1995,7 +2378,7 @@ export function createAudioEngine(options = {}) {
     for (const color of ["white", "pink", "brown"]) {
       buffers[color] = makeBuffer([pre.noise[color]]);
     }
-    graph = { sfx, comp, master, output, verbIn, music: musicGain, musicTone, musicVol, out: last };
+    graph = { sfx, comp, master, output, verbIn, sfxSend, music: musicGain, musicTone, musicVol, out: last };
     // A browser without delay lines or constant sources still gets every cue;
     // only the score stays silent.
     try {
@@ -2072,7 +2455,7 @@ export function createAudioEngine(options = {}) {
     presence.Q.value = mix.presence.q;
     presence.gain.value = mix.presence.gain;
     const playerVol = node("Gain");
-    playerVol.gain.value = vol.sounds;
+    playerVol.gain.value = vol.sounds * dbToGain(mix.player ?? 0);
     playerIn.connect(presence);
     presence.connect(playerVol);
     playerVol.connect(scoreIn);
@@ -2124,7 +2507,7 @@ export function createAudioEngine(options = {}) {
     const bedSend = node("Gain"),
       playerSend = node("Gain");
     bedSend.gain.value = dbToGain(mix.bed + mix.bedWet) * vol.music;
-    playerSend.gain.value = vol.sounds;
+    playerSend.gain.value = vol.sounds * dbToGain(mix.player ?? 0);
     bedSend.connect(spaceIn);
     playerSend.connect(spaceIn);
     const space = node("Convolver");
@@ -2516,7 +2899,9 @@ export function createAudioEngine(options = {}) {
       const out = node("Gain");
       list.push(out);
       // +-1 dB of life; the far door's bloom sits mix.door under its old level.
-      out.gain.value = spec.gain * dbToGain(spread(rng, 1) + (name === "win" ? mix.door ?? 0 : 0));
+      // The door's bloom is the level's cadence, music rather than SFX: it
+      // keeps mix.door and skips mix.sfx (with both it sat 2-4 LU under the run).
+      out.gain.value = spec.gain * dbToGain(spread(rng, 1) + (name === "win" ? mix.door ?? 0 : mix.sfx ?? 0));
       let head = out;
       if (spec.pan && ctx.createStereoPanner) {
         const p = node("StereoPanner");
@@ -2530,7 +2915,7 @@ export function createAudioEngine(options = {}) {
         const send = node("Gain");
         send.gain.value = spec.send;
         head.connect(send);
-        send.connect(graph.verbIn);
+        send.connect(graph.sfxSend);
         list.push(send);
       }
       const sources = spec.layers.flatMap((L) => renderLayer(L, t0, out, list));
@@ -2550,7 +2935,7 @@ export function createAudioEngine(options = {}) {
   /** Render one score note at its grid time on the audio clock (never in the
    * past: a note whose grid point has just gone by sounds at once). */
   function renderMusic(n, { at: forceAt } = {}) {
-    const recipe = n.voice === "pad" && mix.sky === "saws" ? SKY_SAWS : VOICES[n.voice];
+    const recipe = n.voice === "pad" && mix.sky === "saws" ? SKY_SAWS : (mix.palette === "rev8" && VOICES_REV8[n.voice]) || VOICES[n.voice];
     if (!recipe || !canPlay() || !score) return null;
     // Stems: a layer, or one part of the soundtrack ("tune:lead").
     if (only && !only.has(n.layer) && !(n.part && only.has(`${n.layer}:${n.part}`))) return null;
@@ -3216,7 +3601,7 @@ export function createAudioEngine(options = {}) {
     am.connect(out);
     out.connect(graph.sfx);
     out.connect(send);
-    send.connect(graph.verbIn);
+    send.connect(graph.sfxSend);
     // The singing wind: three narrow band-passes on the chord's tones (Q 28)
     // sing out of the same noise while Diana is inside a column.
     const sing = node("Gain");
@@ -3279,7 +3664,7 @@ export function createAudioEngine(options = {}) {
     if (paused) return; // a frozen context keeps the bed exactly where it was
     if (only && !only.has("air")) return; // a stem without the air
     const air = mix.air ?? AIR;
-    const target = canPlay() ? (wind ? air.wind : glide ? air.glide : 0) : 0;
+    const target = (canPlay() ? (wind ? air.wind : glide ? air.glide : 0) : 0) * dbToGain(mix.sfx ?? 0);
     if (!bed) {
       if (target <= 0) return;
       try {
@@ -3379,12 +3764,13 @@ export function createAudioEngine(options = {}) {
         const to = (param, v) => (param.cancelScheduledValues(at), param.setValueAtTime(param.value, at), param.linearRampToValueAtTime(v, at + 0.08));
         to(graph.musicVol.gain, vol.music);
         to(graph.sfx.gain, SFX_LEVEL * vol.sounds);
+        to(graph.sfxSend.gain, vol.sounds);
         if (score) {
           to(score.bedVol.gain, dbToGain(mix.bed) * vol.music);
           to(score.bedSend.gain, dbToGain(mix.bed + mix.bedWet) * vol.music);
           to(score.rewind.gain, vol.music);
-          to(score.playerVol.gain, vol.sounds);
-          to(score.playerSend.gain, vol.sounds);
+          to(score.playerVol.gain, vol.sounds * dbToGain(mix.player ?? 0));
+          to(score.playerSend.gain, vol.sounds * dbToGain(mix.player ?? 0));
           if (mix.tune != null) {
             to(score.tuneVol.gain, dbToGain(mix.tune) * vol.music);
             to(score.tuneSend.gain, dbToGain(mix.tune + (mix.tuneWet ?? 0)) * vol.music);
@@ -3420,7 +3806,8 @@ export function createAudioEngine(options = {}) {
       const out = [];
       if (timeScale) sc.scale = timeScale;
       const r = conductor.event(e, { timeScale: sc.scale });
-      if (render && cues && !only) {
+      // (A stem plays the body cues only when it names "cues".)
+      if (render && cues && (!only || only.has("cues"))) {
         for (const c of cuesForEvent(e)) {
           const params = { ...(c.params ?? {}) };
           if (c.cue === "star") {
@@ -3674,17 +4061,21 @@ export function createAudioEngine(options = {}) {
 }
 
 /** Render one cue (or a bed) offline: used by the soundboard and browser QA. */
-export async function renderCueOffline(name, { OfflineContext = globalThis.OfflineAudioContext, sampleRate = 48000, params = {}, seed = 1, safety = true, tail = 2.6, cues = null } = {}) {
+export async function renderCueOffline(name, { OfflineContext = globalThis.OfflineAudioContext, sampleRate = 48000, params = {}, seed = 1, safety = true, tail = 2.6, cues = null, mix = null, voice = null } = {}) {
   const bedDef = BEDS[name];
-  const spec = bedDef ? null : (cues?.[name] ?? CUES[name]).build(mulberry32(seed), params);
-  const seconds = (bedDef ? bedDef.seconds + 0.6 : spec.dur) + tail + 0.05;
+  const book = cues ?? (mix === "rev8" || mix === "rev7" ? { ...CUES, ...BODY_REV8 } : CUES);
+  const spec = bedDef ? null : (book[name] ?? CUES[name]).build(mulberry32(seed), params);
+  const seconds = (bedDef ? bedDef.seconds + 0.6 : spec.dur) + tail + 0.05 + (voice ? 1.5 : 0);
   const ctx = new OfflineContext(2, Math.ceil(seconds * sampleRate), sampleRate);
-  const engine = createAudioEngine({ context: ctx, seed, safety, cues });
+  const engine = createAudioEngine({ context: ctx, seed, safety, cues, mix });
   engine.unlock();
   if (bedDef) {
     engine.setAir(bedDef.air, 0.01);
     engine.setAir({}, bedDef.seconds);
   } else engine.play(name, params);
+  // `voice`: Diana's note on the same instant (a body with its score voice:
+  // { name, note }), as the game plays them on the grid.
+  if (voice) engine.voice(voice.name, voice.note ?? {});
   const buffer = await ctx.startRendering();
   return { buffer, stats: engine.stats() };
 }

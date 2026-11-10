@@ -1,12 +1,12 @@
 {
- "signature": "5d921629ad49ac7f",
- "measured": "2026-11-10T16:38:23.558Z",
+ "signature": "325429db4c551f36",
+ "measured": "2026-11-10T18:38:57.599Z",
  "chrome": "157.0.8103.50",
  "method": "OfflineAudioContext 48 kHz, full chain, seed 3, each level's perfect main run to the door (+3 s for the door); BS.1770-4 integrated LUFS; gaps = 100 ms blocks with Diana's dry notes under -45 LUFS",
  "levels": {
   "1": {
    "key": "waking",
-   "after": {
+   "rev8": {
     "full": -20.6,
     "peak": -2.8,
     "door": -18.4,
@@ -15,7 +15,7 @@
     "dianaDry": -22.1,
     "tune": -27.8,
     "sky": -42.5,
-    "bed": -37.6,
+    "bed": -37.7,
     "whistle": null,
     "air": null,
     "skySounding": 0.61,
@@ -24,14 +24,19 @@
     "gapsSeconds": 15,
     "skyInGaps": -43.5,
     "washInGaps": -33.7,
-    "washLongest": 17.3,
+    "washLongest": 12.7,
     "tuneInGaps": -27.5,
     "tunePlayed": {
      "harp": 144,
      "bass": 38,
      "lead": 26
     },
-    "tuneLate": 0
+    "tuneLate": 0,
+    "sfx": -24.1,
+    "score": -21.7,
+    "world": -27.4,
+    "sfxOverScore": -2.4,
+    "sfxOverWorld": 3.3
    },
    "before": {
     "full": -20.3,
@@ -53,11 +58,43 @@
     "washInGaps": -26.8,
     "washLongest": 47.5,
     "tuneInGaps": null
+   },
+   "after": {
+    "full": -21.9,
+    "peak": -4.8,
+    "door": -19.8,
+    "doorOverRun": 2.1,
+    "diana": -23.2,
+    "dianaDry": -23.5,
+    "tune": -27.7,
+    "sky": -42.5,
+    "bed": -37.7,
+    "whistle": null,
+    "air": null,
+    "skySounding": 0.61,
+    "skyPartials": 0,
+    "skyCentroid": 522,
+    "gapsSeconds": 14,
+    "skyInGaps": -43.2,
+    "washInGaps": -33.4,
+    "washLongest": 9,
+    "tuneInGaps": -27.6,
+    "tunePlayed": {
+     "harp": 144,
+     "bass": 38,
+     "lead": 26
+    },
+    "tuneLate": 0,
+    "sfx": -27.4,
+    "score": -22.4,
+    "world": -27.3,
+    "sfxOverScore": -5,
+    "sfxOverWorld": -0.1
    }
   },
   "2": {
    "key": "gift",
-   "after": {
+   "rev8": {
     "full": -19.8,
     "peak": -4.9,
     "door": -18.8,
@@ -74,7 +111,7 @@
     "skyCentroid": 528,
     "gapsSeconds": 9.9,
     "skyInGaps": -42.6,
-    "washInGaps": -36.2,
+    "washInGaps": -36.4,
     "washLongest": 19.1,
     "tuneInGaps": -29.9,
     "tunePlayed": {
@@ -83,7 +120,12 @@
      "lead": 21,
      "kit": 26
     },
-    "tuneLate": 0
+    "tuneLate": 0,
+    "sfx": -22.4,
+    "score": -21,
+    "world": -28.5,
+    "sfxOverScore": -1.4,
+    "sfxOverWorld": 6.1
    },
    "before": {
     "full": -19,
@@ -105,11 +147,44 @@
     "washInGaps": -30.5,
     "washLongest": 24.2,
     "tuneInGaps": null
+   },
+   "after": {
+    "full": -20.9,
+    "peak": -5.1,
+    "door": -19.7,
+    "doorOverRun": 1.2,
+    "diana": -21.8,
+    "dianaDry": -22.6,
+    "tune": -29.2,
+    "sky": -42.6,
+    "bed": -36.6,
+    "whistle": null,
+    "air": null,
+    "skySounding": 0.66,
+    "skyPartials": 0,
+    "skyCentroid": 528,
+    "gapsSeconds": 9.3,
+    "skyInGaps": -42.7,
+    "washInGaps": -36.1,
+    "washLongest": 19.7,
+    "tuneInGaps": -29.9,
+    "tunePlayed": {
+     "harp": 76,
+     "bass": 45,
+     "lead": 21,
+     "kit": 26
+    },
+    "tuneLate": 0,
+    "sfx": -26.2,
+    "score": -21.4,
+    "world": -28.5,
+    "sfxOverScore": -4.8,
+    "sfxOverWorld": 2.3
    }
   },
   "3": {
    "key": "still-water",
-   "after": {
+   "rev8": {
     "full": -19.5,
     "peak": -2.9,
     "door": -19.9,
@@ -119,8 +194,8 @@
     "tune": -28.6,
     "sky": -42.4,
     "bed": -35.4,
-    "whistle": -37.4,
-    "air": -34.8,
+    "whistle": null,
+    "air": null,
     "skySounding": 0.74,
     "skyPartials": 0,
     "skyCentroid": 520,
@@ -135,7 +210,12 @@
      "lead": 31,
      "kit": 144
     },
-    "tuneLate": 0
+    "tuneLate": 0,
+    "sfx": -23.6,
+    "score": -20.6,
+    "world": -27.9,
+    "sfxOverScore": -3,
+    "sfxOverWorld": 4.3
    },
    "before": {
     "full": -18.4,
@@ -157,28 +237,61 @@
     "washInGaps": -29.5,
     "washLongest": 45.1,
     "tuneInGaps": null
+   },
+   "after": {
+    "full": -20.4,
+    "peak": -4.2,
+    "door": -19.4,
+    "doorOverRun": 1,
+    "diana": -21.4,
+    "dianaDry": -22.2,
+    "tune": -28.5,
+    "sky": -42.4,
+    "bed": -35.4,
+    "whistle": -37.4,
+    "air": -38.8,
+    "skySounding": 0.74,
+    "skyPartials": 0,
+    "skyCentroid": 520,
+    "gapsSeconds": 8.1,
+    "skyInGaps": -43.1,
+    "washInGaps": -34.1,
+    "washLongest": 13.9,
+    "tuneInGaps": -27.1,
+    "tunePlayed": {
+     "harp": 136,
+     "bass": 66,
+     "lead": 31,
+     "kit": 144
+    },
+    "tuneLate": 0,
+    "sfx": -26.9,
+    "score": -21,
+    "world": -27.8,
+    "sfxOverScore": -5.9,
+    "sfxOverWorld": 0.9
    }
   },
   "4": {
    "key": "way-down",
-   "after": {
-    "full": -18.9,
+   "rev8": {
+    "full": -19,
     "peak": -1.5,
     "door": -18.9,
-    "doorOverRun": 0,
+    "doorOverRun": 0.1,
     "diana": -20.6,
     "dianaDry": -21.2,
     "tune": -29.2,
     "sky": -42.5,
     "bed": -35.6,
-    "whistle": -37.1,
-    "air": -34.8,
+    "whistle": null,
+    "air": null,
     "skySounding": 0.83,
     "skyPartials": 0,
     "skyCentroid": 509,
     "gapsSeconds": 8.5,
     "skyInGaps": -41.9,
-    "washInGaps": -33.6,
+    "washInGaps": -33.9,
     "washLongest": 21.5,
     "tuneInGaps": -27.8,
     "tunePlayed": {
@@ -187,7 +300,12 @@
      "lead": 15,
      "kit": 117
     },
-    "tuneLate": 0
+    "tuneLate": 0,
+    "sfx": -21.9,
+    "score": -20.5,
+    "world": -28.3,
+    "sfxOverScore": -1.4,
+    "sfxOverWorld": 6.4
    },
    "before": {
     "full": -18.4,
@@ -209,11 +327,44 @@
     "washInGaps": -28.2,
     "washLongest": 43.6,
     "tuneInGaps": null
+   },
+   "after": {
+    "full": -20.1,
+    "peak": -1.7,
+    "door": -20.2,
+    "doorOverRun": -0.1,
+    "diana": -21.5,
+    "dianaDry": -22.1,
+    "tune": -29.1,
+    "sky": -42.5,
+    "bed": -35.6,
+    "whistle": -37.1,
+    "air": -38.8,
+    "skySounding": 0.83,
+    "skyPartials": 0,
+    "skyCentroid": 509,
+    "gapsSeconds": 7.7,
+    "skyInGaps": -41.9,
+    "washInGaps": -33.7,
+    "washLongest": 31.6,
+    "tuneInGaps": -27.7,
+    "tunePlayed": {
+     "harp": 101,
+     "bass": 54,
+     "lead": 15,
+     "kit": 117
+    },
+    "tuneLate": 0,
+    "sfx": -25.5,
+    "score": -20.9,
+    "world": -28.3,
+    "sfxOverScore": -4.6,
+    "sfxOverWorld": 2.8
    }
   },
   "5": {
    "key": "breaking",
-   "after": {
+   "rev8": {
     "full": -19,
     "peak": -1.5,
     "door": -18.9,
@@ -231,7 +382,7 @@
     "gapsSeconds": 4.1,
     "skyInGaps": -42.6,
     "washInGaps": -35.9,
-    "washLongest": 23,
+    "washLongest": 22.7,
     "tuneInGaps": -29.8,
     "tunePlayed": {
      "harp": 86,
@@ -239,7 +390,12 @@
      "lead": 16,
      "kit": 28
     },
-    "tuneLate": 0
+    "tuneLate": 0,
+    "sfx": -25,
+    "score": -19.7,
+    "world": -28.7,
+    "sfxOverScore": -5.3,
+    "sfxOverWorld": 3.7
    },
    "before": {
     "full": -18.5,
@@ -261,13 +417,46 @@
     "washInGaps": -30.9,
     "washLongest": 45.9,
     "tuneInGaps": null
+   },
+   "after": {
+    "full": -20.1,
+    "peak": -2.6,
+    "door": -18.9,
+    "doorOverRun": 1.2,
+    "diana": -20.8,
+    "dianaDry": -21.6,
+    "tune": -29.6,
+    "sky": -42.1,
+    "bed": -35.9,
+    "whistle": null,
+    "air": null,
+    "skySounding": 0.75,
+    "skyPartials": 0,
+    "skyCentroid": 526,
+    "gapsSeconds": 4.4,
+    "skyInGaps": -42.5,
+    "washInGaps": -35.7,
+    "washLongest": 15.4,
+    "tuneInGaps": -29.6,
+    "tunePlayed": {
+     "harp": 86,
+     "bass": 69,
+     "lead": 16,
+     "kit": 28
+    },
+    "tuneLate": 0,
+    "sfx": -28.2,
+    "score": -20.4,
+    "world": -28.6,
+    "sfxOverScore": -7.8,
+    "sfxOverWorld": 0.4
    }
   },
   "6": {
    "key": "borrowed-wind",
-   "after": {
+   "rev8": {
     "full": -18.5,
-    "peak": -2.8,
+    "peak": -2.7,
     "door": -19.8,
     "doorOverRun": -1.3,
     "diana": -19.6,
@@ -275,8 +464,8 @@
     "tune": -28.1,
     "sky": -42.2,
     "bed": -35.7,
-    "whistle": -36.9,
-    "air": -26.4,
+    "whistle": null,
+    "air": null,
     "skySounding": 0.79,
     "skyPartials": 0,
     "skyCentroid": 524,
@@ -291,7 +480,12 @@
      "lead": 36,
      "kit": 112
     },
-    "tuneLate": 0
+    "tuneLate": 0,
+    "sfx": -25.4,
+    "score": -19.3,
+    "world": -27.5,
+    "sfxOverScore": -6.1,
+    "sfxOverWorld": 2.1
    },
    "before": {
     "full": -17.2,
@@ -313,11 +507,44 @@
     "washInGaps": -30.6,
     "washLongest": 43.5,
     "tuneInGaps": null
+   },
+   "after": {
+    "full": -20,
+    "peak": -2.6,
+    "door": -18.7,
+    "doorOverRun": 1.3,
+    "diana": -20.7,
+    "dianaDry": -21.7,
+    "tune": -28,
+    "sky": -42.2,
+    "bed": -35.7,
+    "whistle": -36.8,
+    "air": -30.4,
+    "skySounding": 0.79,
+    "skyPartials": 0,
+    "skyCentroid": 524,
+    "gapsSeconds": 4.9,
+    "skyInGaps": -43.1,
+    "washInGaps": -36.3,
+    "washLongest": 38.7,
+    "tuneInGaps": -27.9,
+    "tunePlayed": {
+     "harp": 156,
+     "bass": 104,
+     "lead": 36,
+     "kit": 112
+    },
+    "tuneLate": 0,
+    "sfx": -28.9,
+    "score": -20.3,
+    "world": -27.4,
+    "sfxOverScore": -8.6,
+    "sfxOverWorld": -1.5
    }
   },
   "7": {
    "key": "falling-road",
-   "after": {
+   "rev8": {
     "full": -17.7,
     "peak": -1.5,
     "door": -18.4,
@@ -327,8 +554,8 @@
     "tune": -29,
     "sky": -42.1,
     "bed": -35.8,
-    "whistle": -36.1,
-    "air": -26.9,
+    "whistle": null,
+    "air": null,
     "skySounding": 0.8,
     "skyPartials": 0,
     "skyCentroid": 520,
@@ -343,7 +570,12 @@
      "lead": 26,
      "kit": 27
     },
-    "tuneLate": 0
+    "tuneLate": 0,
+    "sfx": -22.6,
+    "score": -19,
+    "world": -28.2,
+    "sfxOverScore": -3.6,
+    "sfxOverWorld": 5.6
    },
    "before": {
     "full": -16.9,
@@ -365,57 +597,126 @@
     "washInGaps": -33.1,
     "washLongest": 45.7,
     "tuneInGaps": null
+   },
+   "after": {
+    "full": -19.3,
+    "peak": -2.3,
+    "door": -18.5,
+    "doorOverRun": 0.8,
+    "diana": -20.3,
+    "dianaDry": -21.3,
+    "tune": -28.9,
+    "sky": -42.1,
+    "bed": -35.8,
+    "whistle": -36.1,
+    "air": -30.9,
+    "skySounding": 0.8,
+    "skyPartials": 0,
+    "skyCentroid": 520,
+    "gapsSeconds": 3.2,
+    "skyInGaps": -42.5,
+    "washInGaps": -40.4,
+    "washLongest": 21.4,
+    "tuneInGaps": -29.2,
+    "tunePlayed": {
+     "harp": 157,
+     "bass": 121,
+     "lead": 26,
+     "kit": 27
+    },
+    "tuneLate": 0,
+    "sfx": -26.5,
+    "score": -19.9,
+    "world": -28.1,
+    "sfxOverScore": -6.6,
+    "sfxOverWorld": 1.6
    }
   },
   "8": {
    "key": "door",
    "after": {
-    "full": -19.4,
-    "peak": -1.7,
-    "door": -19.6,
-    "doorOverRun": -0.2,
-    "diana": -21.1,
-    "dianaDry": -21.7,
-    "tune": -26.9,
-    "sky": -42.3,
-    "bed": -34.4,
+    "full": -18.5,
+    "peak": -2.1,
+    "door": -18.8,
+    "doorOverRun": -0.3,
+    "diana": -19.3,
+    "dianaDry": -20.4,
+    "tune": -29.3,
+    "sky": -42.5,
+    "bed": -36.5,
     "whistle": null,
-    "air": -26.5,
-    "skySounding": 0.86,
+    "air": -31.3,
+    "skySounding": 0.88,
     "skyPartials": 0,
-    "skyCentroid": 510,
-    "gapsSeconds": 10,
-    "skyInGaps": -42.4,
-    "washInGaps": -37.8,
-    "washLongest": 9.4,
-    "tuneInGaps": -26.6,
+    "skyCentroid": 516,
+    "gapsSeconds": 3.8,
+    "skyInGaps": -42.7,
+    "washInGaps": -40.2,
+    "washLongest": 19.1,
+    "tuneInGaps": -28.9,
     "tunePlayed": {
-     "harp": 192,
+     "harp": 144,
      "bass": 75,
-     "kit": 391,
-     "lead": 62
+     "lead": 28
     },
-    "tuneLate": 0
+    "tuneLate": 0,
+    "sfx": -26.3,
+    "score": -19.1,
+    "world": -28.5,
+    "sfxOverScore": -7.2,
+    "sfxOverWorld": 2.2
+   },
+   "rev8": {
+    "full": -17.1,
+    "peak": -1.7,
+    "door": -19,
+    "doorOverRun": -1.9,
+    "diana": -18.4,
+    "dianaDry": -19.4,
+    "tune": -29.3,
+    "sky": -42.5,
+    "bed": -36.4,
+    "whistle": null,
+    "air": null,
+    "skySounding": 0.88,
+    "skyPartials": 0,
+    "skyCentroid": 516,
+    "gapsSeconds": 3.8,
+    "skyInGaps": -42.7,
+    "washInGaps": -39.9,
+    "washLongest": 24.5,
+    "tuneInGaps": -28.9,
+    "tunePlayed": {
+     "harp": 144,
+     "bass": 75,
+     "lead": 28
+    },
+    "tuneLate": 0,
+    "sfx": -22.5,
+    "score": -18.2,
+    "world": -28.5,
+    "sfxOverScore": -4.3,
+    "sfxOverWorld": 6
    },
    "before": {
-    "full": -19.2,
+    "full": -16.4,
     "peak": -1.7,
-    "door": -15.4,
-    "doorOverRun": 3.8,
-    "diana": -20.7,
-    "dianaDry": -21.7,
+    "door": -15.9,
+    "doorOverRun": 0.5,
+    "diana": -17.8,
+    "dianaDry": -19.4,
     "tune": null,
-    "sky": -32.2,
-    "bed": -29.3,
+    "sky": -32.3,
+    "bed": -29.9,
     "whistle": null,
     "air": null,
     "skySounding": 0.99,
-    "skyPartials": 49,
-    "skyCentroid": 445,
-    "gapsSeconds": 10,
+    "skyPartials": 50,
+    "skyCentroid": 476,
+    "gapsSeconds": 3.8,
     "skyInGaps": -31.8,
-    "washInGaps": -31.3,
-    "washLongest": 20.9,
+    "washInGaps": -32.2,
+    "washLongest": 43.3,
     "tuneInGaps": null
    }
   }
