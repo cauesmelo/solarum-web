@@ -149,7 +149,8 @@
       <h1>Solarum soundboard</h1>
       <p class="lede">
         The adaptive score and every body sound, synthesised in <code>audio.mjs</code> and <code>score.mjs</code> in the soundtrack's
-        D major at 107 BPM. Runs and stems are rendered offline from the real model and pilots (a few seconds), then played through
+        D major, one preset per level (96 / 107 / 118 / 128 BPM; pick the level for runs, stems and A/B; the Groove cards play each).
+        Runs and stems are rendered offline from the real model and pilots (a few seconds), then played through
         this page. Score voices play over the chord you pick. Tab and Enter / Space play everything. Dev only: this page is not in the
         itch.io ZIP.
       </p>
@@ -158,6 +159,7 @@
         <button id="pause" class="ghost" type="button" aria-pressed="false">Pause audio</button>
         <button id="stop" class="ghost" type="button">Stop</button>
         <label>Chord <select id="chord"></select></label>
+        <label>Level <select id="level"></select></label>
         <label><input id="earth" type="checkbox" /> Earth is blue (door)</label>
         <label>Tuning H <input id="tuning" type="range" min="0.4" max="1" step="0.05" value="1" /> <output id="tuning-out">1.00 · 0 ¢</output></label>
         <button id="hear-h" class="ghost" type="button">Hear H</button>

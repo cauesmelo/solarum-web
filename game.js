@@ -1145,7 +1145,8 @@ function draw() {
   drawPlayer();
   drawFx(dt);
   ctx.restore();
-  const sinceWake = clock - wakeAt;
+  // Wall time since waking, or simulation time when QA steps ahead of it.
+  const sinceWake = Math.max(clock - wakeAt, state.time / (state.clock ?? 1));
   if (state.status === "ready") titleGround(1);
   else if (sinceWake < 0.7) titleGround(1 - sinceWake / 0.6);
   drawIris();

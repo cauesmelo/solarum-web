@@ -5,7 +5,9 @@
  * export WAVs and measure them. */
 import { CUES, CUE_NAMES, BEDS, VOICES, VOICE_NAMES, createAudioEngine, renderCueOffline, renderRunOffline, MUSIC_LEVEL } from "./audio.mjs";
 import { CHORDS, BEAT, chordTones, rootIn, safeAtOrAbove, LAYERS } from "./score.mjs";
-import { recordFrames, SLOPPY } from "./tests/music-run.mjs";
+import { recordFrames, SLOPPY_RUNS } from "./tests/music-run.mjs";
+import { LEVELS } from "./level.mjs";
+import { SCORES } from "./score.mjs";
 
 const $ = (id) => document.getElementById(id);
 const engine = createAudioEngine({ enabled: true, seed: (Date.now() & 0xffff) + 1 });
@@ -124,16 +126,32 @@ for (const name of VOICE_NAMES) {
 }
 
 /* ---------- runs and stems, rendered offline from the real model ---------- */
-const frameCache = new Map();
-function frames(kind) {
-  if (!frameCache.has(kind)) {
-    const opts = { main: { route: "main" }, upper: { route: "upper" }, sloppy: { route: "main", ...SLOPPY } }[kind === "gentle" ? "sloppy" : kind];
-    frameCache.set(kind, recordFrames(opts));
-  }
-  return frameCache.get(kind).frames;
+// Runs, stems and A/B play the level picked here (RESEARCH_LEVELS 6: each
+// level has its own groove, harmony, space and falls).
+let runLevel = 2;
+const levelSelect = $("level");
+for (const d of LEVELS) {
+  const o = document.createElement("option");
+  o.value = String(d.id);
+  o.textContent = `${d.numeral} · ${d.title} (${d.bpm} BPM, ${SCORES[d.id].groove})`;
+  levelSelect.append(o);
 }
-async function renderRun({ kind = "main", from = 0, seconds = 20, only = null, cues = true, safety = true } = {}) {
-  return renderRunOffline({ frames: frames(kind), from, seconds, only, cues, safety, gentle: kind === "gentle", seed: 3 });
+levelSelect.value = String(runLevel);
+levelSelect.addEventListener("change", () => (runLevel = Number(levelSelect.value)));
+const frameCache = new Map();
+function frames(kind, level = runLevel) {
+  const key = `${level}:${kind}`;
+  if (!frameCache.has(key)) {
+    const opts = { main: { route: "main" }, upper: { route: "upper" }, sloppy: { route: "main", ...SLOPPY_RUNS[level] } }[kind === "gentle" ? "sloppy" : kind];
+    frameCache.set(key, recordFrames({ ...opts, level }));
+  }
+  return frameCache.get(key).frames;
+}
+async function renderRun({ kind = "main", from = 0, seconds = 20, only = null, cues = true, safety = true, level = runLevel } = {}) {
+  const f = frames(kind, level);
+  if (from === "fall") from = Math.max(0, (f.find((q) => q.status === "dead")?.wall ?? 3) - 3);
+  else if (from < 0) from = Math.max(0, f.at(-1).wall + from);
+  return renderRunOffline({ frames: f, from, seconds, only, cues, safety, gentle: kind === "gentle", seed: 3, level });
 }
 /** ITU-R BS.1770-4 integrated loudness (K-weighting at 48 kHz, 400 ms blocks,
  * absolute and relative gates) and true sample peak of a rendered buffer. */
@@ -190,16 +208,22 @@ async function playBuffer(buffer) {
   playing.push(src);
   src.onended = () => (playing = playing.filter((s) => s !== src));
 }
+// Excerpts in wall seconds since waking; a negative `from` counts back from
+// the door, "fall" starts 3 s before the sloppy run's fall.
 const RUNS = [
-  ["Perfect run, bars 1-12", "The main route, every star on its beat: waking, the hops (the motif's head), the leap, the climb, Movement II begins", { kind: "main", from: 0, seconds: 27 }],
-  ["Sloppy run, bars 1-12", "Same stretch with a broken constellation, late hops and a fall at the leap: the world drifts out of tune, then heals", { kind: "sloppy", from: 0, seconds: 30 }],
+  ["Perfect run, first 27 s", "The main route, every star on its beat: the level's opening, its motif and first challenge", { kind: "main", from: 0, seconds: 27 }],
+  ["Sloppy run, first 30 s", "Same stretch with a broken constellation, late jumps and a fall: the world drifts out of tune, then heals", { kind: "sloppy", from: 0, seconds: 30 }],
   ["Gentle music, sloppy run", "The same mistakes with Gentle music: rests and a fade, never a detune", { kind: "gentle", from: 0, seconds: 30 }],
-  ["Fall and tape-stop", "The leap without a second jump: tape-stop, the last notes backwards, the respawn, the score back on the beacon's bar", { kind: "sloppy", from: 9, seconds: 9 }],
-  ["Perfect run, Movement III", "Flights hold their vowels, the required constellation, the solar wind's rising runs (bars 25-31)", { kind: "main", from: 54, seconds: 16 }],
-  ["Perfect door", "The finale, the Signal's whole theme and the completed song resolving at the door", { kind: "main", from: 70, seconds: 13 }],
-  ["Mastery door, Earth is blue", "Three Great Stars: the Earth chord, the chapter's only sustained G#", { kind: "upper", from: 70, seconds: 13 }],
-  ["Score only, bars 1-12", "The perfect run without any body sound: the music the player drew", { kind: "main", from: 0, seconds: 27, cues: false }],
+  ["Fall and tape-stop", "The blocked challenge: tape-stop (L1 short, then backwards; L4's groove rests), the respawn, the score back on the beacon's bar", { kind: "sloppy", from: "fall", seconds: 9 }],
+  ["Perfect door", "The level's close: the Signal's theme and the completed song resolving at the door (L4: the recording)", { kind: "main", from: -13, seconds: 13 }],
+  ["Mastery door, Earth is blue", "Three Great Stars: the Earth chord, the only sustained G#", { kind: "upper", from: -13, seconds: 13 }],
+  ["Score only, first 27 s", "The perfect run without any body sound: the music the player drew", { kind: "main", from: 0, seconds: 27, cues: false }],
 ];
+// Each level's groove in context: two bars of its bed from bar 3, no body sounds.
+for (const d of LEVELS) {
+  const bar = (4 * 60) / d.bpm;
+  RUNS.push([`Groove ${d.numeral}: ${d.title}`, `${SCORES[d.id].groove}: ${d.bpm} BPM, ${SCORES[d.id].space.seconds} s space, detune cap ${SCORES[d.id].maxFlat} cents`, { kind: "main", from: 2 * bar, seconds: 3 * bar, level: d.id, only: ["sky", "signal", "pulse"], cues: false }]);
+}
 for (const [title, about, opts] of RUNS)
   card($("runs"), title, about, null, async () => {
     log(`Rendering ${title}...`);
@@ -212,12 +236,12 @@ for (const [title, about, opts] of RUNS)
 const STEMS = [
   ["sky", "Sky pad: the bed, never lost; only H detunes it", { kind: "main", from: 0, seconds: 20 }],
   ["signal", "The Signal: the motif's head every cycle, far right and nearer with progress", { kind: "main", from: 0, seconds: 20 }],
-  ["pulse", "Heartbeat on 1 and 3, the shaker in II, the cascade's marimba", { kind: "main", from: 38, seconds: 12 }],
+  ["pulse", "The level's groove: none in L1, heartbeat and shaker in L2, backbeat and tresillo in L3, four on the floor in L4", { kind: "main", from: 6, seconds: 12 }],
   ["steps", "Steps: every stable landing plays the root", { kind: "main", from: 0, seconds: 20 }],
   ["stars", "Stars: loose stars climb the chord, constellations play their phrases and bloom", { kind: "main", from: 3, seconds: 18 }],
   ["choir", "Choir: four bars after each completed constellation", { kind: "main", from: 6, seconds: 14 }],
-  ["strings", "Strings: jumps, doubles, dives, cape vowels and the wind's runs", { kind: "main", from: 54, seconds: 14 }],
-  ["glass", "Glass: the celesta arpeggio the lid smash earns (mastery line, II)", { kind: "upper", from: 38, seconds: 12 }],
+  ["strings", "Strings: jumps, doubles, dives, cape vowels and the wind's runs", { kind: "main", from: 4, seconds: 14 }],
+  ["glass", "Glass: the celesta arpeggio a lid smash earns (L3)", { kind: "main", from: 12, seconds: 12, level: 3 }],
   ["earth", "Earth: star dust and G# after a Great Star (mastery line)", { kind: "upper", from: 12, seconds: 10 }],
 ];
 for (const [layer, about, opts] of STEMS)
