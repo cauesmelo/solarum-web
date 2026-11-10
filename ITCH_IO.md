@@ -1,15 +1,62 @@
-# Solarum itch.io build
+# Solarum on itch.io
 
-This project exports independently. Run `npm run build:itch` here, then upload `dist/solarum-itch.zip` as an HTML Game on its own itch.io page. There is no shared launcher or server runtime in the ZIP.
+This project exports independently. Run `npm run build:itch` here, then upload `dist/solarum-itch.zip` as an HTML game on its own itch.io page. There is no shared launcher or server runtime in the ZIP.
 
-The entry is root `index.html`. All art, audio (the soundtrack for the title and the far door; every effect and the in-level adaptive score are synthesised in `audio.js` and `score.js`, with the baked path clock in `score-path.js`), the font, scripts and renderer dependencies are local. It holds all four levels (progress is kept with guarded localStorage writes; without storage every session opens on level I). The current export (revision seven, 2026-11-10) has 47 files, 9.33 MiB; `assets/jump-landing.png` (an unreferenced duplicate), the archived original WAVs in `assets/sfx/`, the dev-only soundboard, tests and scripts are deliberately left out. The exporter normalizes runtime module extensions to `.js`, preserves asset bytes, and writes the unpacked site to `dist/itch/` plus a hash/size report to `dist/build-report.json`.
+**Status (2026-11-10): v1.0 release candidate. Nothing is uploaded and `v1.0.0` is not tagged.** The owner approves the page and the draft before either happens. Everything under "Draft page copy" is a draft for the owner to edit.
 
-Standalone index.html is a plain green page with only the actual game centered. The same game fills its iframe, with its HUD and controls inside the game surface; no surrounding website or shared launcher is included. Narrow or portrait frames letterbox the sky (never below 720 logical px wide, 2.05 s of lookahead; 775 and 840 px in the faster levels III and IV, which also keep a 970 / 1050 px minimum in landscape so the 960×640 embed letterboxes thinly there) and put the touch controls in a deck underneath.
+## The export
 
-Use Click to Play, an initial 960×640 embed and fullscreen support. Embedded mode is detected automatically; `index.html?embed=1` lets you inspect it directly. Test the uploaded draft preview before publishing. Do not enable Mobile Friendly solely on the basis of desktop touch emulation.
+- **Entry:** root `index.html`. Every path is relative; `.mjs` runtime modules become `.js`. All art, the soundtrack recording (title and the far door only), the font, scripts and the renderer's code are local: no CDN, account, API key, backend, Node process or cross-origin isolation.
+- **Contents:** the game, its art and audio, and **player documents only**: `README.md`, `CHANGELOG.md` and any licence file. The design briefs, research, audits, `ITCH_IO.md`, the dev-only soundboard, the archived original WAVs (`assets/sfx/`), the unreferenced `assets/jump-landing.png`, tests and scripts stay out (`package-itch.mjs`, tested in `tests/release.test.mjs`). The current export is 59 files, 10.55 MiB; `dist/itch/` holds the unpacked site and `dist/build-report.json` the hashes and sizes.
+- **Embed (`itch.json`):** 960×640 viewport (the game's own surface), click to play, fullscreen button on, **mobile friendly on, landscape**. Embedded mode is detected automatically; `index.html?embed=1` shows it directly. Test the uploaded draft before publishing.
+- **Mobile friendly is a decision the owner can reverse.** Touch play was proven in emulated phones (Chrome, 844×390 landscape and 390×844 portrait): a tap wakes Diana, every control is on screen, reachable at its centre and at least 44 px, level I is won with a finger through the jump zone (taps of 55 ms and held jumps), the transition runs into II, the cape is earned and flown with the cape button, and pause, resume, Main menu and Credits work by tap (root QA, "touch play end to end"). **No physical phone has been used**, and nobody has judged the thumb ergonomics. If a real phone disagrees, set `mobileFriendly` to `false` in `itch.json` (the gate only needs a boolean).
+- **Audio:** sound is on by default and starts with the wake gesture (click, tap or key). That is a gesture inside the iframe, which satisfies autoplay (itch's click-to-play click lands on the parent page). Pausing, blurring or hiding the tab suspends all audio and resumes in place. Music and Sounds sliders are in the pause card.
+- **Saves:** one versioned save (`solarum.levels`, version 3) plus three small settings (`solarum.sound`, `solarum.music`, `solarum.volume`), all behind guarded storage. The game boots and plays with storage blocked (the release gate probes this) and keeps progress for the visit. A version-1 or version-2 save migrates; unknown or damaged data is ignored. itch serves games from a shared CDN origin, so every key is prefixed `solarum.`.
+- **Rebuild after edits:** the ZIP does not update by itself.
 
-The runtime has no CDN, account, API key, backend, Node process or cross-origin isolation requirement. Sound is on by default and starts with the wake gesture (click, tap or key), which satisfies browser autoplay rules; the on/off and Gentle music choices are stored with guarded localStorage writes and play continues (with sound on) if storage is blocked. Pausing suspends all audio, the score included, and resumes it in place.
+Official upload reference: https://itch.io/docs/creators/html5. Release plan and the shared gate: `../common/docs/V1_RELEASE_PLAN.md`, `cd ../common && npm run release:gate`.
 
-The package excludes local development servers, tests, Node dependencies and build tools. Keep those development files outside the upload. Rebuild the ZIP after edits; editing source does not update a previously generated/uploaded archive.
+## Draft page copy (for the owner)
 
-The full workspace contains detailed deployment rationale in `../common/docs/ITCH_IO.md`, validation evidence in `../common/docs/VALIDATION.md`, and shared continuity in `../common/SHARED_MEMORY.md`. These documents are optional when copying this project elsewhere. Official upload reference: https://itch.io/docs/creators/html5
+*Everything in this section is a draft.*
+
+- **Title:** Solarum
+- **Tagline (short description):** A hand-drawn runner through the stars. Diana follows a faint signal home to Earth, and the cleaner you run, the more the music sings.
+- **Description:**
+
+  > Diana runs on her own; you choose when she leaps.
+  >
+  > Follow a faint signal across eight small worlds, from the Moon's dust toward Earth. Each level brings one new idea and a little more speed: the double jump, the cape, the glide, the dive, cracked stone, the solar wind, a falling road and, at the far door, the super jump. Abilities are earned in the world, not explained in text.
+  >
+  > The music is the map. Run the intended line and Diana's own notes sing in harmony with the level's song; stumble and the world drifts out of tune until you find the line again (there is a Gentle music option that never detunes). Three Great Fallen Stars wait in every level and none is ever required.
+  >
+  > Original hand-drawn black-and-white art and soundtrack by the Solarum team, rebuilt for the browser. Sound on, please.
+- **Controls:** (also in the README)
+  - **Space, ↑ or W:** jump (tap for a hop, hold for height; again in the air for the double jump).
+  - **D or →:** cape (once per breath; hold to glide).
+  - **S or ↓:** dive, and break cracked stone.
+  - **Jump during a cape flight:** super jump (level VIII).
+  - **P or Esc:** pause (Music and Sounds sliders, assists). **R:** back to the last light. **Shift+R:** restart the level.
+  - **Touch (landscape):** left half jumps; cape and dive buttons bottom right; the II button pauses.
+- **Genre:** Platformer
+- **Tags (10):** runner, 2d, hand-drawn, atmospheric, space, black-and-white, relaxing, singleplayer, short, music
+- **Kind of project:** HTML. **Release status:** Released (after the owner's yes). **Pricing:** no payments (donations optional, owner's call). **Visibility:** Restricted first, then Public.
+- **AI disclosure (owner decision):** the plan recommends answering yes and ticking **Code** and **Text & Dialog**; **not** Graphics (every picture is the original hand-drawn art, plus shapes drawn in code in that style). The in-level audio is synthesised by code; the title and door recording is the original human-made soundtrack.
+- **Credits to confirm (owner):** the names, nicknames and roles come from the original GDD (Cauê Melo, Daniel Calônico "raenkumi", Lucas Santos "LSdS", Rafael Lima "Kimoh"; soundtrack by Amanda "meromei" and Bruno Mareto "Bu Maré", whom the GDD thanks "for granting the music used in the soundtrack"). The GDD names the font "Solarum Basic" (the shipped file's internal name is "Solarum Regular", made with Calligraphr in 2021). Please confirm the spelling and that the soundtrack's authors agree to public web distribution. No licence file exists yet: ownership stays with the original project, so the owner chooses one.
+
+## Cover and screenshot candidates (real captures)
+
+All from the real build through Chrome (SwiftShader), in `../common/artifacts/solarum-v1-page/`:
+
+- **Cover** (315:250): `cover-1260x1000.png` (master) and `cover-630x500.png` (upload): the logo over the title ground and the sprout, cropped from the real 960×640 title at 2x with the title panel and corner buttons hidden, so the only text is the game's own logo.
+- **Screenshots** (960×640, cropped from the root QA's captures of the actual ZIP): `01-title-960x640.png` (the title), `02-ii-the-gift-960x640.png` (II, the asteroid's eye at the crater: the cape is earned), `03-iv-the-way-down-960x640.png` (IV, the dive), `04-vii-the-falling-road-960x640.png` (VII, a cape flight over the falling road), `05-viii-the-far-door-960x640.png` (VIII, the super jump's relic), `06-credits-960x640.png` (the Credits card). Pick three to five; the owner chooses.
+
+Upload sizes: cover 630×500 (315:250), a 1260×1000 master is kept; 3–5 screenshots. No text beyond the game's own title on the cover.
+
+## Before going public (owner checklist)
+
+1. Read the draft copy above and approve or edit it; decide the AI disclosure, price and the licence.
+2. Upload `dist/solarum-itch.zip` as a **Restricted** draft with the embed settings above; wait for itch to process it.
+3. In the real iframe: click once, press a key (audio starts and keys do not scroll the page), fullscreen, pause on blur, reload (progress kept), and play I and VIII to the door.
+4. On a physical phone in landscape: tap to wake, play I, pause and resume. If it is not good, turn `mobileFriendly` off in `itch.json`, rebuild and re-upload.
+5. Then tag `v1.0.0` in this repository and publish. The tag is not set yet.

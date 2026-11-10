@@ -1,5 +1,13 @@
 # Solarum browser demo
 
+**v1.0 release candidate (2026-11-10).** `package.json` is 1.0.0 and the title shows `v1.0`; [CHANGELOG.md](./CHANGELOG.md) lists what players get, [ITCH_IO.md](./ITCH_IO.md) holds the itch.io export notes and the draft page copy (for the owner). Nothing is uploaded and `v1.0.0` is not tagged until the owner approves the draft. What the v1.0 round added:
+- **Credits** on the title (footer link next to the `v1.0` label): the original team (Cauê Melo, Daniel Calônico "raenkumi", Lucas Santos "LSdS", Rafael Lima "Kimoh"), the soundtrack (Amanda "meromei" and Bruno Mareto "Bu Maré", the original recording heard on the title and at the far door), the Solarum Basic font, and a note that every in-level sound is synthesised. Esc, Back or a tap outside closes it; keys never reach the game behind it. `__game.getCredits()` / `showCredits(open)` for QA.
+- **No more clamped-frequency warning.** The star glass's tiny bell (two octaves over a high melody note) put its 3.5x FM modulator at 24-33 kHz on levels II, VI, VII and VIII; Chrome clamped it and logged "Oscillator.frequency.setValueAtTime value ... outside nominal range" on each call. `fm()` in `audio.mjs` now folds a modulator past `OSC_MAX_HZ` (22050 Hz, Nyquist at 44.1 kHz) down by whole octaves, keeping the index; over a 30-112 midi sweep of every recipe only layers that were out of range changed (357 layers, 0 of them in range). `tests/audio-range.test.mjs` runs the main and upper routes of all eight levels through the engine and sweeps every voice over its own register.
+- **Saves:** unchanged format (`solarum.levels` version 3, with `solarum.sound`, `solarum.music`, `solarum.volume`), now pinned by `tests/release.test.mjs`: a version-1 save, a version-2 save naming retired interim levels, field-by-field sanitising, hostile values, and settings read from storage that throws.
+- **Player docs only in the ZIP:** `README.md` and `CHANGELOG.md` (and any licence file); the research, design and audit notes stay in the repository.
+- **Mobile friendly is on (landscape)**, on the strength of an emulated-phone end-to-end touch run only (see [ITCH_IO.md](./ITCH_IO.md)); the owner decides after a physical phone.
+- Root browser QA ([../common/tests/browser.mjs](../common/tests/browser.mjs), `ONLY=Solarum`): the meteor "lossless" check compares the canvas command stream instead of raster pixels (Chrome rasterises one frozen frame differently on successive draws), II's GET expects the full bar the re-solve gave it, and new data-driven checks cover every level's GET, touch play end to end and the credits.
+
 **A Signal in the Dark** is the authored first chapter of the original Solarum runner. Diana runs on her own across floating islands toward a faint signal from Earth. The original cream-on-black hand-drawn art, Diana's cape, the stars, the solitude and the far door stay at the centre.
 
 This revision (2026-11-09, "ink and starlight") implements the approved research brief ([RESEARCH.md](./RESEARCH.md)): a three-movement map built around one idea each (jump, crumble, cape), a cape that is its own meter, dive-smash, singing constellations, a beat cascade, solar-wind updrafts, a real super jump, three Great Fallen Stars with a colour memory of Earth, a fair camera, a 1.1 s respawn without a death card, and a new UI made from the game's own font, palette and art. The approved character animations are unchanged.
@@ -32,7 +40,7 @@ It is still a 2D side-scrolling autorunner with the original Diana / cape / sign
 
 ```sh
 npm run dev          # http://127.0.0.1:4173
-npm test             # 119 tests: every level's routes and fairness, mechanics, glyphs, camera, UI, the wake, audio and the score
+npm test             # every level's routes and fairness, mechanics, glyphs, camera, UI, the wake, audio (incl. oscillator range), the score, the human proxies and the release chores
 npm run score:bake   # re-bake the four path clocks after a geometry, model or pilot change
 node scripts/arcs.mjs 1 hold tap double:4   # authoring: a move's height on every sixteenth
 npm run build:itch   # dist/solarum-itch.zip
@@ -607,7 +615,7 @@ Earlier browser evidence (layout at 960×640 and 390×844, touch targets, reduce
 
 ## itch.io export
 
-`npm run build:itch` writes `dist/solarum-itch.zip` (61 files, 10.51 MiB with the no-cape and breath-bar art; 47 files, 9.33 MiB in revision seven; the soundboard, tests, scripts and the archived WAVs are left out), `dist/itch/` and `dist/build-report.json`. `index.html` is at the root and every path is relative; `.mjs` runtime modules become `.js`. Use an HTML game page, 960×640 embed, click-to-play and fullscreen. See [ITCH_IO.md](./ITCH_IO.md). Nothing has been uploaded.
+`npm run build:itch` writes `dist/solarum-itch.zip` (59 files, 10.55 MiB), `dist/itch/` and `dist/build-report.json`. Since v1.0 the ZIP carries the game and player documents only (`README.md`, `CHANGELOG.md`, any licence file); the research, design and audit notes, `ITCH_IO.md`, the soundboard, tests, scripts and the archived WAVs are left out. `index.html` is at the root and every path is relative; `.mjs` runtime modules become `.js`. Use an HTML game page, 960×640 embed, click-to-play, fullscreen and (decision in `itch.json`, on the strength of an emulated-phone run only) mobile friendly in landscape. See [ITCH_IO.md](./ITCH_IO.md) for the draft page copy. Nothing has been uploaded and `v1.0.0` is not tagged.
 
 ## Asset provenance and credits
 
