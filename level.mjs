@@ -1710,7 +1710,7 @@ const BREAKING = {
  * twist: flying out of the wind's top (its song gives the cape back, so a
  * flight pressed just before the column, refunded, or spent earlier still
  * leaves one) and wind, dive, wind; then the finale (a cracked launch, two
- * flights around the finale-song, the finale wind) and the last wind (the
+ * flights around a cape star at the double's top, the finale wind) and the last wind (the
  * cape held and let go; Great Star 3 for a flight out of its top). Great
  * Star 1 is at the top of the first fly-out column, which only the held
  * cape reaches. 23 bars, the door on the downbeat of bar 24 (368).
@@ -1784,13 +1784,16 @@ const J_MAIN = [
   jIsle("dive-gate", 194, 1, 196, JY.diveGate, 55),
   // Wind, dive, wind: jump into column D (196), dive out of its top (202)
   // onto the islet (204), jump into column E (206) up onto the storm shore (215).
-  jIsle("dive-islet", 204, 1, 206, JY.diveIslet, 50, undefined, -6),
+  // (Its lead is 90 px, was 50: a dive pressed up to 290 ms early still
+  // lands on it; early dives were the human proxies' second VI spot.)
+  jIsle("dive-islet", 204, 1, 206, JY.diveIslet, 90, undefined, -6),
   ["storm-shore", gk(215, 1) - 80, JY.stormShore, gk(228, 1) + 10 - (gk(215, 1) - 80)],
   // The finale: a hop onto the launch stone (233); jump 235, cape at the
   // top (238; the launch-song on the hop, the stone and the jump's rise
   // charges it, whatever was spent before the hop), the
-  // double (244), the finale-song along the flight and the double, cape
-  // 246, down onto the finale shore (252); jump into the finale wind (254)
+  // double (244), the cape star at its top, cape 246, down onto the finale
+  // shore (252; 170 px of lead, so it is in view at the jump and a short
+  // second flight lands too); jump into the finale wind (254)
   // up onto the high stone (263); a jump and a dive from its top (265, 268)
   // down onto stone H1 (270: stable, a dive smashes a crack it lands on), a
   // double (272, 275) down onto crack H2 (282)
@@ -1799,7 +1802,7 @@ const J_MAIN = [
   // would end a failed finale out of view; the launch-song still charges
   // the first flight after the hop.)
   jIsle("finale-launch", 233, 1, 235, JY.finaleCrack, 60, undefined, -6),
-  jIsle("finale-shore", 252, 3, 254, JY.finaleShore, 90),
+  jIsle("finale-shore", 252, 3, 254, JY.finaleShore, 170),
   jIsle("finale-high", 263, 3, 265, JY.finaleHigh, 80, undefined, -6),
   jIsle("h-stone-1", 270, 3, 272, JY.hCrack1, 55, undefined, -6),
   jIsle("h-crack-2", 282, 3, 284, JY.hCrack2, 70, "crumble", -6),
@@ -1848,7 +1851,6 @@ const J_CHAINS = [
   // rise (complete on 236), three sixteenths before the first flight.
   { id: "launch-song", route: "low", stars: [jArc(229, 1, JY.stormShore, -61.8), jArc(232, 1, JY.stormShore, -79.9), jRun(234, 1, JY.finaleCrack), jArc(236, 1, JY.finaleCrack, -61.8)] },
   // Required: along the first flight and at the double (complete on 244), before the second.
-  { id: "finale-song", route: "low", stars: [[gk(238, 1) + 69.69 + 39.5, jAt(JY.finaleCrack, -105.2)], [gk(238, 1) + 2 * 69.69 + 39.5, jAt(JY.finaleCrack, -105.2)], [gk(238, 1) + 3 * 69.69 + 39.5, jAt(JY.finaleCrack, -105.2)], jArc(244, 2, JY.finaleCrack, -17.4)] },
   // Wind, dive, wind (complete on 212).
   { id: "storm-song", route: "low", stars: [jArc(198, 1, JY.diveGate, -100.5), jRun(205, 1, JY.diveIslet), jArc(208, 1, JY.diveIslet, -100.5), jArc(210, 1, JY.diveIslet, -167.8), jArc(212, 1, JY.diveIslet, -235.1)] },
   // The last wind's float (complete on 320).
@@ -1860,6 +1862,9 @@ const J_GREAT = [
   { id: "great-3", x: gk(213, 1), y: JY.diveIslet - 347, line: "the top of the storm wind: hold the cape in it and float onto the storm shore" },
 ];
 const J_STARS = [
+  // The finale's first flight: three loose stars on its line (+1/8 each; the
+  // cape star at the double's top is the second flight's charge).
+  ...[1, 2, 3].map((i) => [`finale-star-${i - 1}`, gk(238, 1) + 69.69 * i + 33.5, jAt(JY.finaleCrack, -105.2), "low"]),
   // (The beacons' runs carry their breezes' stars instead.)
   ...[[359, 3, JY.plain], [362, 3, JY.plain], [365, 3, JY.plain]].map(([k, F, y], i) => [`run-star-${i}`, gk(k, F) + 33.5, y - 40, "low"]),
   ...[[23, 0, JY.gate], [41, 0, JY.crack2], [99, 0, JY.lifted], [119, 0, JY.lCrack2], [170, 1, JY.columnShore], [178, 1, JY.cCrack1], [190, 1, JY.cCrack2], [327, 3, JY.gShore], [335, 3, JY.gCrack1], [347, 3, JY.gCrack2]].map(([k, F, y], i) => [`hop-star-${i}`, gk(k + 1, F) + 33.5, jAt(y, -64.7), "low"]),
@@ -1932,6 +1937,12 @@ const BORROWED_WIND = {
   chains: J_CHAINS,
   great: J_GREAT,
   // The helper rides the hearth breeze ahead of her (RESEARCH_PROGRESSION 2.1).
+  // The finale's second flight (critic, 2026-11-10): a cape star at the
+  // top of the double, lit because the first flight spent the bar (the
+  // three stars on its line give 3/8). It replaced the finale-song, whose
+  // last star sat at the double itself: an early double, jump or cape broke
+  // it and left the second flight empty (the human proxies' VI hot spot).
+  refills: [{ id: "cape-finale", kind: "cape", x: gk(245, 2) + 36, y: jAt(JY.finaleCrack, -17.4 - 82), required: true }],
   moments: [{ id: "helper-breeze", kind: "helper", k: 36, target: "hearth-breeze" }],
   decor: [],
   prompts: [
