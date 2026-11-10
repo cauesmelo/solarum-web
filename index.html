@@ -84,6 +84,11 @@
       </div>
 
       <!-- Pause: a paper card over the dimmed scene. -->
+      <!-- Between levels: the orbit line grows from one station to the next (skippable). -->
+      <div class="veil map-veil" id="map-veil" role="dialog" aria-label="The orbit map" hidden>
+        <svg id="map-svg" class="map-svg" viewBox="0 0 720 240" aria-hidden="true"></svg>
+        <p class="map-hint" id="map-hint">Any key or tap to go on</p>
+      </div>
       <div class="veil" id="pause-veil" hidden>
         <div class="card pause-card" id="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
           <div class="card-page" id="pause-main">

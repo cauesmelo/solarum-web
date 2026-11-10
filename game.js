@@ -1546,6 +1546,7 @@ function startLevel(n, { wake: wakeNow = true, force = true } = {}) {
   if (!ready) return null;
   const level = Math.max(1, Math.min(LEVELS.length, Math.round(n) || 1));
   if (!force && level > progress.unlocked) return null;
+  map?.cancel();
   hideCards();
   clearWords();
   audio.scoreReset();
@@ -1566,6 +1567,69 @@ function startLevel(n, { wake: wakeNow = true, force = true } = {}) {
     draw();
   }
   return snapshot(state);
+}
+/** Between levels (RESEARCH_LEVELS 4): the orbit line grows from the
+ * station just finished to the next over one bar of the next tempo
+ * (0.3 s with reduced motion); any key or tap skips it. Then that level
+ * begins with its title card. */
+let map = null;
+function showMap(next) {
+  if (!ready || next > LEVELS.length) return;
+  // (The win stays shown as seen, so the frame loop does not bring the card back.)
+  $("victory-card").hidden = true;
+  const svg = $("map-svg");
+  svg.innerHTML = "";
+  const w = 720,
+    h = 240,
+    at = (i) => bezier(0.06 + (0.88 * i) / (LEVELS.length - 1), w, h);
+  const [x0, y0] = bezier(0, w, h),
+    [x2, y2] = bezier(1, w, h);
+  const d = `M${x0} ${y0} Q${w / 2} ${-h * 0.25} ${x2} ${y2}`;
+  el("path", { d, class: "arc" }, svg);
+  const travelled = el("path", { d, class: "travelled" }, svg);
+  const length = travelled.getTotalLength?.() || 800;
+  LEVELS.forEach((lv, i) => {
+    const [x, y] = at(i);
+    el("circle", { cx: x, cy: y, r: lv.id === next ? 11 : 8, class: `station${lv.id === next ? " next" : ""}` }, svg);
+    el("text", { x, y: y + 40, "text-anchor": "middle", class: "label" }, svg).textContent = lv.numeral;
+    el("text", { x, y: y + 60, "text-anchor": "middle", class: "name" }, svg).textContent = lv.title;
+  });
+  el("circle", { cx: x2, cy: y2, r: 9, class: "earth-dot" }, svg);
+  const leaf = el("g", {}, svg);
+  el("path", { d: "M0 0 C-7 -2 -9 -9 -6 -13 C-1 -11 1 -5 0 0Z", class: "leaf" }, leaf);
+  el("path", { d: "M0 0 C5 -1 9 -6 9 -11 C4 -11 0 -6 0 0Z", class: "leaf" }, leaf);
+  const t0 = 0.06 + (0.88 * (next - 2)) / (LEVELS.length - 1),
+    t1 = 0.06 + (0.88 * (next - 1)) / (LEVELS.length - 1);
+  const seconds = reduced ? 0.3 : (4 * 60) / LEVELS[next - 1].bpm;
+  const begin = performance.now();
+  $("map-veil").hidden = false;
+  audio.play("ui-select");
+  announce(`${LEVELS[next - 1].numeral}. ${LEVELS[next - 1].title}.`);
+  let done = false;
+  const draw = (u) => {
+    const t = t0 + (t1 - t0) * u;
+    travelled.style.strokeDasharray = `${(length * t).toFixed(1)} ${length}`;
+    const [x, y] = bezier(t, w, h);
+    leaf.setAttribute("transform", `translate(${x.toFixed(1)} ${(y - 4).toFixed(1)}) scale(1.6)`);
+  };
+  const finish = () => {
+    if (done) return;
+    done = true;
+    map = null;
+    $("map-veil").hidden = true;
+    startLevel(next);
+  };
+  const step = (now) => {
+    if (done) return;
+    const u = Math.min(1, (now - begin) / 1000 / seconds);
+    draw(u);
+    if (u >= 1) setTimeout(finish, reduced ? 0 : 350);
+    else requestAnimationFrame(step);
+  };
+  draw(0);
+  requestAnimationFrame(step);
+  // cancel: another level was opened directly (QA startLevel) meanwhile.
+  map = { finish, next, cancel: () => ((done = true), (map = null), ($("map-veil").hidden = true)) };
 }
 /** The title's orbit map: four stations, open ones selectable. */
 function syncLevelMap() {
@@ -1660,6 +1724,11 @@ window.addEventListener("keydown", (e) => {
       buttons[(i + d + buttons.length) % buttons.length]?.focus();
     }
     return;
+  }
+  if (map) {
+    // Any key skips the map between levels.
+    e.preventDefault();
+    return map.finish();
   }
   if (onButton && ["Space", "Enter"].includes(e.code)) return; // native activation
   if (GAME_KEYS.includes(e.code)) e.preventDefault();
@@ -1787,7 +1856,8 @@ $("resume").addEventListener("click", closePause);
 $("back-to-light").addEventListener("click", backToLight);
 $("restart-chapter").addEventListener("click", restartChapter);
 $("again").addEventListener("click", restartChapter);
-$("continue").addEventListener("click", () => startLevel(state.level + 1));
+$("continue").addEventListener("click", () => showMap(state.level + 1));
+$("map-veil").addEventListener("pointerdown", () => map?.finish());
 $("to-title").addEventListener("click", toTitle);
 $("reload").addEventListener("click", () => location.reload());
 $("sound").addEventListener("click", () => setSound(!sound.on));
@@ -1858,6 +1928,8 @@ window.__game = {
   // Levels: startLevel(n) opens level n (1-4) and wakes it; levels() lists
   // them with their tempo and whether they are open in this browser.
   startLevel: (n, options) => startLevel(n, options),
+  // The animated map between levels, as Continue plays it (skippable).
+  showMap: (n) => (showMap(n), !!map),
   levels: () => LEVELS.map((d) => ({ id: d.id, title: d.title, bpm: d.bpm, clock: d.clock, verbs: { ...d.verbs }, unlocked: d.id <= progress.unlocked, great: progress.great[d.id] ?? 0 })),
   // Harmony feedback: { gentle: true } removes every dissonance (no detune,
   // a fade instead of the tape-stop). Persisted like the sound setting.

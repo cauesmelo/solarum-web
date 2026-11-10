@@ -334,6 +334,62 @@ button:disabled {
   outline: 3px solid var(--paper);
   outline-offset: 2px;
 }
+/* The orbit map between levels: ink stations on the orbit arc, the line
+ * travelled so far, and the two-leaf marker moving to the next station. */
+.map-veil {
+  background: rgba(12, 12, 15, 0.88);
+  align-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.map-svg {
+  width: min(92%, 760px);
+  height: auto;
+  overflow: visible;
+}
+.map-svg .arc {
+  fill: none;
+  stroke: var(--dim);
+  stroke-width: 2;
+  stroke-dasharray: 4 7;
+}
+.map-svg .travelled {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.map-svg .station {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 2.5;
+}
+.map-svg .station.next {
+  stroke: var(--paper);
+  stroke-width: 4;
+}
+.map-svg .earth-dot {
+  fill: var(--earth);
+  stroke: var(--paper);
+  stroke-width: 2.5;
+}
+.map-svg .label {
+  fill: var(--paper);
+  font-size: 22px;
+}
+.map-svg .name {
+  fill: var(--mute);
+  font-size: 16px;
+}
+.map-svg .leaf {
+  fill: var(--paper);
+}
+.map-hint {
+  margin: 0;
+  color: var(--mute);
+  font-size: 16px;
+  text-align: center;
+}
 .victory-title {
   margin: 0;
   font-size: 18px;
