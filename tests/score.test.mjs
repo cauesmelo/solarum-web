@@ -377,10 +377,10 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   const bar = (run, voice, b) => run.notes.filter((v) => v.voice === voice && v.event === "tick" && Math.floor(v.pos / BAR) + 1 === b).length;
   // (l2-l4: the interim levels, revision five's II-IV.)
   const [l1, gift, still, l2, l3, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door].map((n) => musicRun({ level: n }));
-  // III: one soft brush on 2 and 4 (the shaker voice), from bar 5; nothing
+  // III: one soft brush on beat 4 (the shaker voice), from bar 5; nothing
   // on the downbeats, no heartbeat, no marimba.
   assert.equal(bar(still, "shaker", 3), 0, "III rests while the helper comes");
-  assert.equal(bar(still, "shaker", 6), 2);
+  assert.equal(bar(still, "shaker", 6), 1);
   assert.equal(still.notes.filter((v) => v.voice === "pulse" || v.voice === "marimba").length, 0);
   // II: the heartbeat alone (1 and 3), resting while the gift arrives and
   // over the long void; no shaker, no marimba (restraint).

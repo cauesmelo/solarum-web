@@ -394,18 +394,57 @@ test("L8: I's songs complete with natural holds of 250, 350 and 500 ms; no 2-bar
     assert.ok(real(I, (reach - q.k) * SIX) >= 2.2, `${q.id}: ${real(I, (reach - q.k) * SIX).toFixed(2)} s ahead`);
   }
 });
-test("M1: Diana's own notes on the perfect run rise at least 10% from I to II (the bed stays sparse)", () => {
+test("M1: Diana's own notes on the perfect run rise at least 10% stage over stage (the bed stays sparse, under hers)", () => {
   const rate = (d) => {
     const r = musicRun({ level: d.id });
     const own = r.notes.filter((v) => !LAYERS[v.layer].bed).length;
     const bed = r.notes.filter((v) => LAYERS[v.layer].bed && v.event === "tick").length;
     return { own: own / real(d, r.s.time), bed: bed / real(d, r.s.time) };
   };
-  const [a, b] = [rate(I), rate(II)];
-  assert.ok(a.own >= 1.2 && a.own <= 2.0, `I ${a.own.toFixed(2)} own onsets/s`);
-  assert.ok(b.own >= a.own * 1.1, `II ${b.own.toFixed(2)} vs I ${a.own.toFixed(2)}`);
+  const rates = BUILT.map(rate);
+  assert.ok(rates[0].own >= 1.2 && rates[0].own <= 2.0, `I ${rates[0].own.toFixed(2)} own onsets/s`);
+  for (let i = 1; i < rates.length; i++) assert.ok(rates[i].own >= rates[i - 1].own * 1.1, `${BUILT[i].numeral} ${rates[i].own.toFixed(2)} vs ${rates[i - 1].own.toFixed(2)}`);
   // Restraint (revision five feedback): fewer bed onsets than Diana's own.
-  assert.ok(a.bed < a.own && b.bed < b.own, `bed ${a.bed.toFixed(2)} / ${b.bed.toFixed(2)} per s`);
+  rates.forEach((r, i) => assert.ok(r.bed < r.own, `${BUILT[i].numeral} bed ${r.bed.toFixed(2)} vs own ${r.own.toFixed(2)} per s`));
+});
+/** RESEARCH_PROGRESSION 4.2 for I-IV (real units, main route). */
+const LADDER = [
+  { narrow: [400, Infinity], median: 500, inputs: [1.1, 1.5], peak: 2, gap: 14 },
+  { narrow: [320, 420], median: 450, inputs: [1.3, 1.7], peak: 3, gap: 13 },
+  { narrow: [280, 370], median: 410, inputs: [1.5, 1.9], peak: 3, gap: 12.5 },
+  { narrow: [250, 330], median: 370, inputs: [1.7, 2.1], peak: 4, gap: 12 },
+];
+test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon gaps in each stage's band; windows never widen and inputs never thin out", () => {
+  const rows = BUILT.map((d) => {
+    const nom = nominalRun(d.id);
+    const ms = nom.plan
+      .map(([, a], i) => (a === "glide" || a === "unglide" ? null : timingWindow(d.id, nom, i)))
+      .filter((w) => w && w.required)
+      .map((w) => (assert.ok(w.works, `${d.numeral} step ${w.i}`), w.widthMs))
+      .sort((a, b) => a - b);
+    // Bars: the door is on the downbeat after the last one.
+    const bars = Math.round(nom.ticks * TICK / SIX / 16);
+    const perBar = Array.from({ length: bars }, () => 0);
+    const inputs = inputsOf(nom);
+    for (const q of inputs) perBar[Math.min(bars - 1, Math.floor(q.tick * TICK / SIX / 16))]++;
+    const xs = [d.level.startX, ...d.checkpoints.map((c) => c.x), d.level.finishX];
+    const gap = Math.max(...xs.slice(1).map((x, i) => real(d, (x - xs[i]) / 270)));
+    return { d, narrow: ms[0], median: ms[Math.floor(ms.length / 2)], inputs: inputs.length / bars, peak: Math.max(...perBar), gap };
+  });
+  rows.forEach((r, i) => {
+    const want = LADDER[i],
+      where = `${r.d.numeral}: narrowest ${r.narrow.toFixed(0)} ms, median ${r.median.toFixed(0)}, ${r.inputs.toFixed(2)} inputs a bar (peak ${r.peak}), beacons ${r.gap.toFixed(1)} s`;
+    assert.ok(r.narrow >= want.narrow[0] && r.narrow <= want.narrow[1], where);
+    assert.ok(r.median >= want.median, where);
+    assert.ok(r.inputs >= want.inputs[0] && r.inputs <= want.inputs[1], where);
+    assert.ok(r.peak <= want.peak, where);
+    assert.ok(r.gap <= want.gap, where);
+    if (i === 0) return;
+    const p = rows[i - 1];
+    assert.ok(r.narrow <= p.narrow && r.median <= p.median, `${where}: windows never widen (${p.narrow.toFixed(0)} / ${p.median.toFixed(0)} before)`);
+    assert.ok(r.inputs >= p.inputs - 1e-9, `${where}: inputs never thin out (${p.inputs.toFixed(2)} before)`);
+    assert.ok(r.d.bpm > p.d.bpm, where);
+  });
 });
 
 /* ---------- the save ---------- */

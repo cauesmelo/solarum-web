@@ -261,7 +261,7 @@ const PRESETS = {
     bpm: 100, bars: 23, pickup: 0,
     // III · Still Water, floating and flowing (RESEARCH_PROGRESSION 4.3):
     // G Lydian, a chord a bar. Restraint (revision five: the bed was "too
-    // full, too present, too loud"): the groove is one soft brush on 2 and
+    // full, too present, too loud"): the groove is one soft brush on beat
     // 4 and nothing else; the held cape's whistle and Diana's own notes
     // (the long descending glide lines) carry the song.
     groove: "brush", maxFlat: 15, space: { seconds: 5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
@@ -275,10 +275,14 @@ const PRESETS = {
       "float-song": [83, 81, 79, 76],
       // bar 6 (A/G): up along the flight, down the glide, E5 F#5 A5 | B5 A5 F#5.
       "still-song": [76, 78, 81, 83, 81, 78],
+      // bar 9 (Gmaj7#11): down off the ledge, D6 B5 A5 G5.
+      "ledge-song": [86, 83, 81, 79],
       // bar 11 (F#m7): over the islets, C#5 E5 F#5 E5 C#5.
       "drift-song": [73, 76, 78, 76, 73],
       // bar 17 (Gmaj7#11): the refill climbs, D5 E5 G5 A5.
       "refill-song": [74, 76, 79, 81],
+      // bar 17 (Gmaj7#11) into 18 (A/G): the second flight, B5 A5 E5 | C#5.
+      "deep-song": [83, 81, 76, 73],
       // bar 20 (Em9): the rise, E5 G5 A5 B5.
       "climb-song": [76, 79, 81, 83],
       // bars 20-21: Neptune's song falls and opens, B5 A5 G5 | D6.
@@ -805,8 +809,8 @@ export function createConductor(options = {}) {
     const grooveOn = bar >= 3 && S.pulse !== false && !st.dropped;
     const coda = sec === "coda" ? 0.6 : 1;
     if (grooveOn && P.groove === "brush") {
-      // III: one soft brush on beats 2 and 4, nothing on the downbeats (water).
-      if (inBar === 4 || inBar === 12) bed({ layer: "pulse", voice: "shaker", dur: 0.08, gain: 0.4 * coda });
+      // III: one soft brush on beat 4, nothing on the downbeats (water).
+      if (inBar === 12) bed({ layer: "pulse", voice: "shaker", dur: 0.08, gain: 0.4 * coda });
     } else if (grooveOn && P.groove === "heartbeat") {
       // A felt heartbeat on beats 1 and 3 (the half-time feel), a tick on 2 and 4.
       if (inBar === 0 || inBar === 8) bed({ layer: "pulse", voice: "pulse", dur: 0.4, gain: (inBar === 0 ? 1 : 0.7) * coda });

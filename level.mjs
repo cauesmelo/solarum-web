@@ -997,11 +997,16 @@ const S_CHAINS = [
   { id: "float-song", route: "low", stars: [[51, 24.9], [52, 44.4], [53, 64.1], [54, 83.7]].map(([k, dy]) => [gk(k, 1) + 39.5, at(SY.cliff, dy)]) },
   // The need: three along the flight, three down the held glide.
   { id: "still-song", route: "low", stars: [...flightStars(79, 1, SY.field, 3, false), ...[[86, -61.4], [88, -22.2], [90, 17.1]].map(([k, dy]) => [gk(k, 2) + 39.5, at(SY.field, dy)])] },
+  // The cape floats when it cannot fly: down the pure glide off the ledge.
+  { id: "ledge-song", route: "low", stars: [[134, -86], [136, -47.5], [138, -8.2], [140, 31]].map(([k, dy]) => [gk(k, 3) + 39.5, at(SY.ledge, dy)]) },
   // Letting go: along the flight and the first of the glide.
   { id: "drift-song", route: "low", stars: [...flightStars(159, 3, SY.shoreA, 3, false), ...[[166, -61.4], [168, -22.2]].map(([k, dy]) => [gk(k, 4) + 39.5, at(SY.shoreA, dy)])] },
   // The widest void: one per sixteenth from the cape, complete on 266, so
   // the second flight (269) has its cape.
   { id: "refill-song", route: "low", stars: flightStars(263, 5, SY.stair3, 4, false) },
+  // ...and the second flight and the start of the hold (it refills the
+  // cape in the air; the rise beacon refills it again before it matters).
+  { id: "deep-song", route: "low", stars: [...[1, 2, 3].map((j) => [gk(269, 6) + 69.69 * j + 39.5, at(SY.stair3, -15.4)]), [gk(274, 7) + 39.5, at(SY.stair3, -6.4)]] },
   // The rise: two on climb-1 and two on the second jump's rise, complete on
   // 312, before the second cape (313).
   { id: "climb-song", route: "low", stars: [[gk(307, 8) + 39.5, SY.climb1 - 40], [gk(308, 8) + 39.5, SY.climb1 - 40], [gk(311, 8) + 39.5, at(SY.climb1, -64.7)], [gk(312, 8) + 39.5, at(SY.climb1, -99.3)]] },
@@ -1095,6 +1100,11 @@ const STILL = {
     // Running stars where the bar is full or the next cape press is a
     // flight anyway (after the plain's wake and each beacon).
     ...[[12, 0, SY.plain], [15, 0, SY.plain], [18, 0, SY.plain], [106, 2, SY.far], [109, 2, SY.far], [112, 2, SY.far], [146, 3, SY.shoreA], [149, 3, SY.shoreA], [152, 3, SY.shoreA], [194, 4, SY.next], [197, 4, SY.next], [200, 4, SY.next], [250, 5, SY.stair3], [253, 5, SY.stair3], [256, 5, SY.stair3], [282, 7, SY.wide], [285, 7, SY.wide], [288, 7, SY.wide], [343, 9, SY.shelf], [346, 9, SY.shelf], [349, 9, SY.shelf]].map(([k, F, y], i) => [`run-star-${i}`, gk(k, F) + 33.5, y - 40, "low"]),
+    // The field after the float, the end of the still void's glide and the
+    // first stair step (one: the stair's held capes must not find a full bar).
+    ...[58, 60, 62].map((k, i) => [`field-star-${i}`, gk(k, 1) + 33.5, SY.field - 40, "low"]),
+    ...[[92, 56.3], [94, 95.6]].map(([k, dy], i) => [`still-star-${i}`, gk(k, 2) + 33.5, at(SY.field, dy), "low"]),
+    ["stair-star-0", gk(220, 5) + 33.5, SY.stair1 - 40, "low"],
     // A star on each hop's rise.
     ...[[327, SY.climb2], [336, SY.lid]].map(([k, y], i) => [`hop-star-${i}`, gk(k + 1, 9) + 33.5, y - 64 - 36, "low"]),
   ],
