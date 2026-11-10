@@ -559,8 +559,9 @@ function triggerCascade(s, group) {
   const first = s.platforms.find((q) => q.id === group.tiles[0]);
   group.t0 = s.time - (s.player.x - first.x) / s.def.level.speed + group.lead / s.def.level.speed;
   group.tiles.forEach((id, i) => {
-    const q = s.platforms.find((t) => t.id === id);
-    q.collapseAt = group.t0 + i * group.interval;
+    // A missing tile (null, VII's twist) keeps its beat: the wave rests there.
+    const q = id && s.platforms.find((t) => t.id === id);
+    if (q) q.collapseAt = group.t0 + i * group.interval;
   });
   event(s, "cascade", { group: group.id });
 }

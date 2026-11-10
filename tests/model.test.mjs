@@ -137,6 +137,8 @@ test("each main route reaches every beacon and uses its level's kit through publ
     [LEVEL_ID["still-water"]]: { dash: 9, "double-jump": 3, constellations: 6 },
     [LEVEL_ID["way-down"]]: { dash: 8, dive: 1, "double-jump": 2, constellations: 5 },
     [LEVEL_ID["borrowed-wind"]]: { dash: 3, "double-jump": 5, constellations: 6 },
+    // VII: the dives land on stable stones (a dive smashes a tile), so it smashes nothing.
+    [LEVEL_ID["falling-road"]]: { dash: 4, "double-jump": 6, constellations: 7, cascade: true },
     [LEVEL_ID.breaking]: { dash: 2, dive: 1, "double-jump": 2, constellations: 7 },
     [LEVEL_ID.door]: { dash: 4, "super-jump": 2, constellations: 1, cascade: true },
   };
@@ -262,6 +264,8 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   assert.deepEqual([...kinds(levelDef(LEVEL_ID["borrowed-wind"]))], ["crumble"], "VI: cracks between the winds");
   assert.ok(createLevel(LEVEL_ID["borrowed-wind"]).updrafts.length >= 8, "VI: the solar wind");
   assert.ok(LEVELS.filter((d) => d.id < LEVEL_ID["borrowed-wind"]).every((d) => !createLevel(d).updrafts.length), "no wind before VI");
+  assert.deepEqual([...kinds(levelDef(LEVEL_ID["falling-road"]))].sort(), ["cascade", "crumble"], "VII: the falling road and its cracks");
+  assert.ok(LEVELS.filter((d) => d.id < LEVEL_ID["falling-road"]).every((d) => !kinds(d).has("cascade")), "no cascade before VII");
   assert.ok(kinds(interim[0]).has("crumble") && kinds(interim[0]).has("cascade"));
   assert.ok(interim[0].prompts.some((q) => q.action === "super-jump" && !q.optional));
   assert.ok(!LEVELS.filter((d) => d !== interim[0]).some((d) => d.prompts.some((q) => q.action === "super-jump")));
@@ -275,7 +279,7 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   // lower terminal speed (560 px/s real).
   const f = levelPhysics(LEVELS[0]);
   assert.ok(f.apexHang && Math.abs(f.apexHang.below * LEVELS[0].clock - 54.28) < 0.01 && Math.abs(f.maxFall * LEVELS[0].clock - 560) < 1e-9);
-  for (const d of [levelDef(LEVEL_ID.breaking), levelDef(LEVEL_ID["borrowed-wind"]), interim[0]]) assert.ok(Math.abs(levelPhysics(d).crumbleAfter - 5 * (15 / 107)) < 1e-12, `${d.numeral}: cracks break 5/16 after touch-down`);
+  for (const d of [levelDef(LEVEL_ID.breaking), levelDef(LEVEL_ID["borrowed-wind"]), levelDef(LEVEL_ID["falling-road"]), interim[0]]) assert.ok(Math.abs(levelPhysics(d).crumbleAfter - 5 * (15 / 107)) < 1e-12, `${d.numeral}: cracks break 5/16 after touch-down`);
 });
 test("L1's float: a held jump hangs at the top and falls no faster than 560 px/s real", () => {
   const s = start(game(1));
@@ -499,7 +503,7 @@ test("no required crossing depends on a chain unless a beacon sits right before 
   // The required chains are V's split-song and VI's launch-song and
   // finale-song (tested above); each one's beacon is the last before it,
   // within 6 s of run.
-  for (const [n, chain, beacon] of [[LEVEL_ID.breaking, "split-song", "split"], [LEVEL_ID["borrowed-wind"], "launch-song", "storm"], [LEVEL_ID["borrowed-wind"], "finale-song", "storm"]]) {
+  for (const [n, chain, beacon] of [[LEVEL_ID.breaking, "split-song", "split"], [LEVEL_ID["borrowed-wind"], "launch-song", "storm"], [LEVEL_ID["borrowed-wind"], "finale-song", "storm"], [LEVEL_ID["falling-road"], "gap-song", "dive"], [LEVEL_ID["falling-road"], "red-song", "gap"]]) {
     const stars = createLevel(n).pickups.filter((q) => q.chain === chain);
     const before = levelDef(n).checkpoints.filter((c) => c.x < stars[0].x).at(-1);
     assert.equal(before.id, beacon);
@@ -714,6 +718,9 @@ test("a beacon (or the level's start) sits right before the first required use o
     // VI: the first wind, the flight out of the fly-out wind's top, the
     // launch-song that charges the finale's first flight.
     [LEVEL_ID["borrowed-wind"]]: { updraft: 220 + 37.85 * 84 + 30, flight: 220 + 37.85 * 162, constellation: 220 + 37.85 * 229 + 113.55 + 39.5 },
+    // VII: the first road, the dive onto the first stone, the flight over
+    // the first missing tile and the gap-song that charges the second.
+    [LEVEL_ID["falling-road"]]: { cascade: gx(44) - 80, dive: gx(158), flight: gx(219), constellation: gx(220) + 31.84 + 39.5 },
     // V: the second crack (the first that must be left), the split voids'
     // first flight and song, the dive through the first stone.
     [LEVEL_ID.breaking]: { fragile: 220 + 37.85 * 73 - 80, flight: 220 + 37.85 * 182, constellation: 220 + 37.85 * 182 + 69.69 + 39.5, dive: 220 + 37.85 * 249.6 + 113.55 * 2 },
@@ -747,7 +754,7 @@ test("main-route gaps and rises respect each level's authoring limits", () => {
   // L1's float allows a 180 px double rise; L4's super jump climbs 235 px;
   // L2's long void is crossed by two flights around a refill constellation.
   // V: the split voids are two flights around the split-song.
-  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.breaking]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["borrowed-wind"]]: { rise: 165, gap: 400, void: 800 }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
+  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.breaking]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["borrowed-wind"]]: { rise: 165, gap: 400, void: 800 }, [LEVEL_ID["falling-road"]]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
   for (const n of IDS) {
     const chains = createLevel(n).pickups.filter((q) => q.chain);
     for (const [a, b] of mainPairs(n)) {
@@ -771,6 +778,8 @@ test("no blind landings: every required landing is in view when the input that c
     [LEVEL_ID["still-water"]]: [["islet-gs2", "islet-2"], ["islet-1", "islet-2"]],
     [LEVEL_ID["way-down"]]: [["star-cache", "broken-gate"], ["lid-well", "ring-3b"], ["ring-islet", "ring-3"]],
     [LEVEL_ID["borrowed-wind"]]: [["bridge-ledge", "bridge-shore-2"]],
+    // VII: Great Star 1's double and flight off the dive road's last tile.
+    [LEVEL_ID["falling-road"]]: [["c2", "dive-shore"]],
     [LEVEL_ID.breaking]: [["chain-c", "ridge-b"], ["crown-stair-2", "last-crack"]],
     [LEVEL_ID.door]: [["school-shore", "storm-step"], ["lid", "well-floor"], ["finale-crack", "low-a"]],
   };
