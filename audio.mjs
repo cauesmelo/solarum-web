@@ -2607,6 +2607,17 @@ export function createAudioEngine(options = {}) {
    * on a downbeat, the original recording fades in at its full section
    * (bar 26 of the file, where it is as loud as the score; its intro sat
    * 9 dB under and left a hole): the title song, finished by the player. */
+  /** After a door without the recording (I-III), the closing chord stays in
+   * the sky under the victory card and the map between levels: a soft pad
+   * that swells in as the cadence fades and is re-voiced every 5.5 s (the
+   * playtest critic measured -70 dBFS of silence there). scoreReset / hush
+   * end it. */
+  let rest = null;
+  function restFrame(now) {
+    if (!rest || now < rest.next || !score) return;
+    renderMusic({ layer: "sky", voice: "pad", midis: rest.pad, dur: 7, gain: 0.85, t: 0 }, { at: now + LOOKAHEAD });
+    rest.next = now + 5.5;
+  }
   function door(fx) {
     try {
       for (const v of music) if (v.hold) fadeOut(v, 4, t() + 0.5);
@@ -2616,7 +2627,9 @@ export function createAudioEngine(options = {}) {
     }
     // Only the last level's door opens onto Earth and the original recording;
     // the others close on the score's own cadence (RESEARCH_LEVELS 4).
-    if (offline || !musicEl || !LEVELS.find((d) => d.id === level)?.level.earth) return;
+    const earth = !!LEVELS.find((d) => d.id === level)?.level.earth;
+    if (!earth && ctx) rest = { pad: fx.chord?.pad ?? CHORDS.Dadd9.pad, next: t() + 2 };
+    if (offline || !musicEl || !earth) return;
     clearTimeout(doorTimer);
     const wait = (BAR * SIXTEENTH) / sc.scale;
     doorTimer = setTimeout(() => {
@@ -2729,6 +2742,7 @@ export function createAudioEngine(options = {}) {
         for (const n of conductor.ticks(nowPos, aheadPos)) renderMusic(n);
       }
       applyTuning(now);
+      restFrame(now);
       whistle(sc.sim, now);
       singWind(f, now);
     } catch {
@@ -2943,11 +2957,14 @@ export function createAudioEngine(options = {}) {
     bed.wind = !!wind;
   }
 
-  function hush(fade = 0.06) {
+  /** `hold`: a longer fade for held pads only (a level that follows the map
+   * swells in under the last one's closing chord instead of starting cold). */
+  function hush(fade = 0.06, { hold = fade } = {}) {
     conductor.revoice(); // a silenced bed is voiced again on the next tick
+    rest = null;
     if (!ctx) return;
     for (const v of voices) fadeOut(v, fade);
-    for (const v of music) fadeOut(v, fade);
+    for (const v of music) fadeOut(v, v.hold ? hold : fade);
     held.pad = held.choir = null;
     if (sc.shaker) silenceScore(t(), fade);
     if (bed) setAirSilent();
@@ -2968,6 +2985,19 @@ export function createAudioEngine(options = {}) {
     prepare,
     play,
     duck,
+    /** The map between levels: one bar of the next level's pulse at its
+     * tempo (felt beats, the first accented) under the held closing chord,
+     * with the Signal calling on the downbeat, so the next level does not
+     * start cold. `delay` seconds from now; returns the beats scheduled. */
+    countIn({ bpm = 107, delay = 0, signal = 74 } = {}) {
+      if (!canPlay() || !score) return 0;
+      const beat = 60 / bpm,
+        at0 = t() + LOOKAHEAD + Math.max(0, delay);
+      let n = 0;
+      for (let k = 0; k < 4; k++) if (renderMusic({ layer: "pulse", voice: "pulse", gain: k === 0 ? 0.9 : 0.5, t: 0 }, { at: at0 + k * beat })) n++;
+      renderMusic({ layer: "signal", voice: "signal", midi: signal, dur: 1.2, pan: 0.6, t: 0 }, { at: at0 });
+      return n;
+    },
     /** The player's Music and Sounds settings (0-1 each), applied over 80 ms. */
     setVolumes({ music = vol.music, sounds = vol.sounds } = {}) {
       vol.music = Math.max(0, Math.min(1, Number(music) || 0));
@@ -3060,10 +3090,11 @@ export function createAudioEngine(options = {}) {
       return level;
     },
     /** A fresh score (restart chapter, title): bar 1, H = 1, silence. */
-    scoreReset() {
+    scoreReset({ hold = 0.12 } = {}) {
       conductor.reset();
+      rest = null;
       if (ctx) {
-        for (const v of music) fadeOut(v, 0.12);
+        for (const v of music) fadeOut(v, v.hold ? hold : 0.12);
         held.pad = held.choir = null;
         restoreTape(0);
         destroyWhistle();
@@ -3242,6 +3273,7 @@ export function createAudioEngine(options = {}) {
           earth: st.earth,
           voices: ctx ? active(now, music).length : 0,
           peakVoices: peakMusic, peakBed,
+          rest: rest ? { next: +rest.next.toFixed(2) } : null, // the closing chord held after a door (I-III)
           scheduled: sc.scheduled,
           lateNotes: sc.lateCount,
           maxLateMs: +(sc.maxLate * 1000).toFixed(1),

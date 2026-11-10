@@ -800,3 +800,24 @@ test("Music and Sounds volumes: guarded storage, defaults 1, clamped", async () 
   assert.match(pause, /id="vol-sounds" type="range"/);
   assert.match(js, /volumes: readVolumes\(\(\) => window\.localStorage\)/);
 });
+
+/* ---------- revision seven: transitions are never silent ---------- */
+test("the map's count-in schedules one bar of felt beats; a door without the recording holds its chord until a reset", () => {
+  const r = rig();
+  r.engine.unlock();
+  assert.equal(r.engine.countIn({ bpm: 118, delay: 0.35 }), 4);
+  const run = scoreRun();
+  assert.equal(run.s.status, "won");
+  // Level III's door (no recording): the closing chord is held after it.
+  assert.ok(run.stats.score.rest, "the rest pad is armed after the door");
+  run.engine.hush(0.1);
+  assert.equal(run.engine.stats().score.rest, null, "a reset ends it");
+});
+test("browser layer: glyph rows clear Diana, touch controls appear on the first real touch", async () => {
+  const js = await read("game.js"),
+    css = await read("style.css");
+  assert.match(js, /if \(right > v\.x - 26 && left < v\.x \+ 26 && bottom > v\.y - 90 && gy - r < v\.y\) gy -= bottom - \(v\.y - 90\) \+ 8;/);
+  assert.match(js, /e\.pointerType !== "touch" \|\| root\.classList\.contains\("touch"\)/);
+  assert.match(css, /\.solarum\.touch \.controls \{\n  display: block;/);
+  assert.match(js, /if \(!reduced\) audio\.countIn\(\{ bpm: LEVELS\[next - 1\]\.bpm \* pace, delay: 0\.35 \}\);/);
+});

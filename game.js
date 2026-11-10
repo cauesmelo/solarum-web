@@ -923,12 +923,24 @@ function drawPrompts() {
       discs = items.filter((g) => g !== "then").length;
     let gx = q.x - ((discs - 1) * spacing) / 2;
     const bob = reduced ? 0 : Math.sin(clock * 3) * 2;
+    // Never over Diana: on small (portrait) skies the discs grow up to 1.8x
+    // and a row of three could cover her head (playtest critic, IV). When the
+    // row would touch her (head 90 px above the feet, +-26 px), it rises
+    // until it clears her by 8 px. Drawing only: the glyph's timing window
+    // is unchanged.
+    const r = 19 * scale + 4,
+      v = viewPos();
+    let gy = q.y + bob;
+    const left = gx - r,
+      right = gx + (discs - 1) * spacing + r,
+      bottom = gy + r + (items.some((g) => g.startsWith("hold-")) ? 14 : 0);
+    if (right > v.x - 26 && left < v.x + 26 && bottom > v.y - 90 && gy - r < v.y) gy -= bottom - (v.y - 90) + 8;
     for (const g of items) {
       if (g === "then") {
-        diamond(gx - spacing / 2, q.y + bob, 3, PAPER, alpha);
+        diamond(gx - spacing / 2, gy, 3, PAPER, alpha);
         continue;
       }
-      glyph(gx, q.y + bob, g, alpha, scale);
+      glyph(gx, gy, g, alpha, scale);
       gx += spacing;
     }
   }
@@ -1686,15 +1698,18 @@ function loadLevel(n) {
 }
 /** QA and Continue: open level n (when it is unlocked, or always for QA
  * with { force: true }) and, by default, wake it at once. */
-function startLevel(n, { wake: wakeNow = true, force = true } = {}) {
+function startLevel(n, { wake: wakeNow = true, force = true, fromMap = false } = {}) {
   if (!ready) return null;
   const level = Math.max(1, Math.min(LEVELS.length, Math.round(n) || 1));
   if (!force && level > progress.unlocked) return null;
   map?.cancel();
   hideCards();
   clearWords();
-  audio.scoreReset();
-  audio.hush(0.12);
+  // From the map the last level's held chord fades over 1.4 s, under the
+  // new sky's swell, so the next level never starts cold.
+  const hold = fromMap ? 1.4 : 0.12;
+  audio.scoreReset({ hold });
+  audio.hush(0.12, { hold });
   audio.clearMoments();
   audio.fadeOutMusic(0.6);
   loadLevel(level);
@@ -1736,7 +1751,9 @@ function showMap(next) {
     const [x, y] = at(i);
     el("circle", { cx: x, cy: y, r: lv.id === next ? 11 : 8, class: `station${lv.id === next ? " next" : ""}` }, svg);
     el("text", { x, y: y + 40, "text-anchor": "middle", class: "label" }, svg).textContent = lv.numeral;
-    el("text", { x, y: y + 60, "text-anchor": "middle", class: "name" }, svg).textContent = lv.title;
+    // Names for the stop just finished and the next one only, so eight or
+    // ten stations never collide; the rest keep their numerals.
+    if (lv.id === next || lv.id === next - 1) el("text", { x, y: y + 60, "text-anchor": "middle", class: "name" }, svg).textContent = lv.title;
   });
   el("circle", { cx: x2, cy: y2, r: 9, class: "earth-dot" }, svg);
   const leaf = el("g", {}, svg);
@@ -1748,6 +1765,9 @@ function showMap(next) {
   const begin = performance.now();
   $("map-veil").hidden = false;
   audio.play("ui-select");
+  // A one-bar count-in of the next level's pulse, landing its downbeat on
+  // the moment the level begins (the line grows for one bar, then 0.35 s).
+  if (!reduced) audio.countIn({ bpm: LEVELS[next - 1].bpm * pace, delay: 0.35 });
   announce(`${LEVELS[next - 1].numeral}. ${LEVELS[next - 1].title}.`);
   let done = false;
   const draw = (u) => {
@@ -1761,7 +1781,7 @@ function showMap(next) {
     done = true;
     map = null;
     $("map-veil").hidden = true;
-    startLevel(next);
+    startLevel(next, { fromMap: true });
   };
   const step = (now) => {
     if (done) return;
@@ -2055,6 +2075,17 @@ function bindTouch(id, down, up) {
     }
   });
 }
+// A device that reports a fine pointer but also has a touchscreen (a
+// convertible laptop) gets the touch controls from its first real touch.
+window.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (e.pointerType !== "touch" || root.classList.contains("touch")) return;
+    root.classList.add("touch");
+    if (state.status === "ready" && !coarse) $("title-keys").textContent = "tap left to jump · right thumb: cape, dive";
+  },
+  true,
+);
 bindTouch("touch-jump", doJump, () => releaseJump(state));
 bindTouch("touch-cape", doCape, () => (held.glide = false));
 bindTouch("touch-dive", doDive);
