@@ -14,7 +14,7 @@ It is still a 2D side-scrolling autorunner with the original Diana / cape / sign
 
 ```sh
 npm run dev          # http://127.0.0.1:4173
-npm test             # 85 tests: every level's routes and fairness, mechanics, glyphs, camera, UI, audio and the score
+npm test             # 86 tests: every level's routes and fairness, mechanics, glyphs, camera, UI, audio and the score
 npm run score:bake   # re-bake the four path clocks after a geometry, model or pilot change
 node scripts/arcs.mjs 1 hold tap double:4   # authoring: a move's height on every sixteenth
 npm run build:itch   # dist/solarum-itch.zip
@@ -264,7 +264,7 @@ For the root checks: press **D** in level II (`__game.startLevel(2)`, then Space
 
 ## Validation evidence (2026-11-10, Node 22.14.0)
 
-`npm test`: **85/85 pass** (about 20 s): 58 model / UI tests (every level's routes at 30/60/120/240 Hz with zero deaths, the step-up sweep, F3 clearance, glyph windows, camera at each level's speed), 16 audio and engine tests and 11 score tests (every level). At 120 Hz (time in real seconds):
+`npm test`: **86/86 pass** (about 20 s): 59 model / UI tests (every level's routes at 30/60/120/240 Hz with zero deaths, the step-up sweep, F3 clearance, crisp input and identical arcs at every rate in every level, glyph windows, camera at each level's speed), 16 audio and engine tests and 11 score tests (every level). At 120 Hz (time in real seconds):
 
 | Route | Time | Stars | Great Stars | Constellations | Beacons | Jumps / flights / dives / super | Smashes |
 | --- | --- | --- | --- | --- | --- | --- | --- |

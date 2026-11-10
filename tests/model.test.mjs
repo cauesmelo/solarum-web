@@ -1151,6 +1151,41 @@ test("fixed step: the same input gives the same arc at 30, 60, 120, 144 and 240 
   }
   assert.equal(landings[0].y, 520, "on the shelf");
 });
+test("crisp input: a press acts in the same step at any frame rate and every level's arc is identical at 30/60/120/240 Hz", () => {
+  for (const n of IDS)
+    for (const hz of [30, 60, 120, 240]) {
+      const s = start(game(n));
+      s.platforms = [{ id: "floor", x: -1000, y: 540, width: 1600, phase: 0, route: "low", crumbleAfter: null, triggeredAt: null, collapseAt: null, collapsed: false, cascade: null }];
+      s.updrafts = [];
+      Object.assign(s.player, { x: 220, y: 540, grounded: true });
+      update(s, 0.013); // land the press between two ticks
+      assert.equal(jump(s), true);
+      assert.equal(s.player.vy, -s.physics.jump, `L${n} ${hz} Hz: the jump speed is set by the press itself`);
+      const y0 = s.player.y;
+      update(s, 1 / 120);
+      assert.ok(s.player.y < y0, `L${n} ${hz} Hz: she is rising on the next tick`);
+    }
+  // The same held jump traces the same arc at every rate (fixed 1/120 s
+  // step), including L1's apex hang and fall cap.
+  for (const n of IDS) {
+    const arcs = [30, 60, 120, 240].map((hz) => {
+      const s = start(game(n));
+      s.platforms = [{ id: "floor", x: -1000, y: 540, width: 1230, phase: 0, route: "low", crumbleAfter: null, triggeredAt: null, collapseAt: null, collapsed: false, cascade: null }];
+      s.updrafts = [];
+      Object.assign(s.player, { x: 220, y: 540, grounded: true });
+      jump(s);
+      // y by simulation tick, sampled wherever a call ends on a 1/30 s tick.
+      const ys = new Map();
+      for (let i = 0; i < 1.2 * hz; i++) {
+        update(s, 1 / hz);
+        const tick = Math.round(s.time * 120);
+        if (tick % 4 === 0) ys.set(tick, +s.player.y.toFixed(6));
+      }
+      return ys;
+    });
+    for (const [tick, y] of arcs[0]) for (const a of arcs.slice(1)) assert.equal(a.get(tick), y, `L${n} tick ${tick}`);
+  }
+});
 test("the first gap forgives a first input (a held jump or a 0 ms tap clears it) but still needs one", async () => {
   const { followGlyph } = await import("./glyphs.mjs");
   const p = levelDef(1).prompts.find((q) => q.id === "p-jump");
