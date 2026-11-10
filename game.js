@@ -27,6 +27,7 @@ import {
   stepCamera,
 } from "./geometry.mjs";
 import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetting, writeGentleSetting } from "./audio.mjs";
+import { createFrameClock } from "./frame-clock.mjs";
 
 /* Renderer, input and UI. All gameplay rules live in model.mjs / level.mjs;
  * this file only draws the simulation, forwards input and plays sound. */
@@ -73,7 +74,6 @@ let manifest = null,
   pixelScale = 1,
   layout = "landscape",
   clock = 0,
-  lastNow = 0,
   lastSerial = 0,
   wakeAt = -99,
   wonAt = -99,
@@ -1740,6 +1740,7 @@ window.addEventListener("keydown", (e) => {
     }
     return;
   }
+  if (GAME_KEYS.includes(e.code)) atInput(e);
   if (["Space", "ArrowUp", "KeyW"].includes(e.code)) doJump();
   if (["KeyD", "ArrowRight"].includes(e.code)) doCape();
   if (["KeyS", "ArrowDown"].includes(e.code)) doDive();
@@ -1779,15 +1780,20 @@ window.addEventListener("keydown", () => audio.nudge(), true);
   });
 }
 window.addEventListener("keyup", (e) => {
+  if (GAME_KEYS.includes(e.code)) atInput(e);
   if (["KeyD", "ArrowRight"].includes(e.code)) held.glide = false;
   if (["Space", "ArrowUp", "KeyW"].includes(e.code)) releaseJump(state);
 });
+// Keys let go while the window is away never send keyup: release the jump
+// and the cape here (A3: no jump stays "held" behind the pause card).
 window.addEventListener("blur", () => {
   held.glide = false;
   if (state.status === "running") openPause();
+  releaseJump(state);
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && state.status === "running") openPause();
+  if (document.hidden) ((held.glide = false), releaseJump(state));
 });
 function bindTouch(id, down, up) {
   const b = $(id);
@@ -1799,10 +1805,12 @@ function bindTouch(id, down, up) {
       /* synthetic events may not own a pointer */
     }
     b.classList.add("pressed");
+    atInput(e);
     down();
   });
-  const end = () => {
+  const end = (e) => {
     b.classList.remove("pressed");
+    atInput(e);
     up?.();
   };
   b.addEventListener("pointerup", end);
@@ -1838,9 +1846,10 @@ bindTouch("touch-dive", doDive);
 }
 canvas.addEventListener("pointerdown", (e) => {
   e.preventDefault();
+  if (e.pointerType === "mouse") atInput(e);
   if (e.pointerType === "mouse" || state.status === "ready") doJump();
 });
-canvas.addEventListener("pointerup", () => releaseJump(state));
+canvas.addEventListener("pointerup", (e) => (atInput(e), releaseJump(state)));
 $("start").addEventListener("click", wake);
 $("pause").addEventListener("click", openPause);
 $("resume").addEventListener("click", closePause);
@@ -1879,14 +1888,28 @@ if (!reduced) {
   }, 125);
 }
 
-function frame(now) {
-  const real = lastNow ? Math.min((now - lastNow) / 1000, 0.05) : 0;
-  lastNow = now;
+/** Simulate up to `now` (an animation-frame or input-event timestamp). An
+ * input handler calls it with the event's own timeStamp before applying the
+ * press, so the press lands on the tick it was made in (frame-clock.mjs). */
+const frameClock = createFrameClock({ maxStep: 0.1 });
+function advanceTo(now) {
+  const real = frameClock.advance(now);
   clock += state.status === "paused" ? 0 : real;
+  // The level's clock (BPM / 107) and Gentle pace scale time only, so
+  // every arc and gap stays identical (RESEARCH_LEVELS 3).
+  if (ready && real > 0) update(state, real * simScale(), held);
+  return real;
+}
+/** Before an input acts: catch the simulation up to the event's time (the
+ * camera eases over that time on the next frame). */
+let caughtUp = 0;
+function atInput(e) {
+  if (ready && state.status === "running" && e?.timeStamp) caughtUp += advanceTo(e.timeStamp);
+}
+function frame(now) {
+  const real = advanceTo(now) + caughtUp;
+  caughtUp = 0;
   if (ready) {
-    // The level's clock (BPM / 107) and Gentle pace scale time only, so
-    // every arc and gap stays identical (RESEARCH_LEVELS 3).
-    update(state, real * simScale(), held);
     processEvents();
     syncAudio();
     if (state.status === "won" && !ui.victoryShown && clock - wonAt > 1.5) showVictory();

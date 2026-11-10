@@ -32,6 +32,7 @@ import {
 } from "../geometry.mjs";
 import { playRoute, chooseAction, createRouteMemory } from "./routes.mjs";
 import { visibleBounds } from "./png.mjs";
+import { createFrameClock } from "../frame-clock.mjs";
 const manifest = JSON.parse(
   await readFile(new URL("../assets/manifest.json", import.meta.url)),
 );
@@ -1254,6 +1255,29 @@ test("crisp input: a press acts in the same step at any frame rate and every lev
     });
     for (const [tick, y] of arcs[0]) for (const a of arcs.slice(1)) assert.equal(a.get(tick), y, `L${n} tick ${tick}`);
   }
+});
+test("inputs act at their own timestamps: the frame clock and game.js catch the simulation up to each event", async () => {
+  const fc = createFrameClock({ maxStep: 0.1 });
+  assert.equal(fc.advance(1000), 0, "the first timestamp only starts the clock");
+  assert.ok(Math.abs(fc.advance(1016.5) - 0.0165) < 1e-12);
+  assert.equal(fc.advance(1010), 0, "an older event never runs time backwards");
+  assert.equal(fc.advance(1600), 0.1, "a stall is clamped (the world slows, it does not jump)");
+  // A press 13 ms into a 33 ms frame takes off on the tick it was made in,
+  // as at 120 Hz, not at the frame's start.
+  const at = (frameMs) => {
+    const s = start(game(2));
+    const clock = createFrameClock();
+    clock.advance(0);
+    for (let t = frameMs; t < 500; t += frameMs) update(s, clock.advance(t));
+    const t0 = Math.floor(500 / frameMs) * frameMs;
+    update(s, clock.advance(t0 + 13));
+    jump(s);
+    return s.events.at(-1).x;
+  };
+  assert.equal(at(1000 / 30), at(1000 / 120));
+  const js = await read("game.js");
+  assert.match(js, /function atInput\(e\)[^]*?advanceTo\(e\.timeStamp\)/);
+  assert.ok((js.match(/atInput\(e\)/g) ?? []).length >= 6, "keys, touch buttons and the mouse");
 });
 test("the first gap forgives a first input (a held jump or a 0 ms tap clears it) but still needs one", async () => {
   const { followGlyph } = await import("./glyphs.mjs");
