@@ -81,6 +81,40 @@ What is left, by spot (first-timer): IV the broken well (14 of 20 falls; the div
 
 **Chrome, real keys** (Playwright Chrome on port 4445, the real `game.js`, the critic's in-page human bot pressing `page.keyboard` at the bot's times; σ without the reaction model): II won with 0 falls at σ 0, 60 and 90 ms (the relic at x 6579, both refill stars taken, no console errors); VI won with 0 falls at σ 0 and 60 (the finale's cape star taken); I won with 0 falls at σ 90. At II's gift, `getHud().breath` goes from hidden (no cape) to shown and full (`charge 1`, disc `meteor`).
 
+## Human proxies, round 8: the hot spots of IV-VIII (2026-11-10, level-tuning squad)
+
+**What the falls had in common.** A proxy hook that prints the chain and cape state at every death showed one cause behind the biggest spots: a **required star placed at the very press that spends what it gives**. The cape needs the star's charge, a star is a 80 x 86 px box on an arc, and a press 50-100 ms early (a first-timer's σ is 90) either skipped the star or reached the next press before the star was taken (the cape press buffer is only 0.14 s). Windows measured 92 ms early (IV), 72 (V), 51 (VII), 60 (VI) while the late side was 200-400. The same mechanism made VIII's and VII's small landing stones (70 px) the target of two or three compounding presses. Second cause, level-wide: a land-and-go press that comes after the stone's end has only the coyote time (about 130 ms) left, and 6.5% of a first-timer's presses are later than that.
+
+**Rules that came out of it** (LEVEL_DESIGN, "Round 8 rules"): a required star or song completes **2/16 or more before** the press that needs it and lies on the run, on a flight's flat line or on the plateau of a jump (never on a steep fall); a star that must be met by a double goes 45 px under the double's top (late presses are the common miss); a small stone that two presses must hit reaches 90-130 px back; from IV to VII a stone ends 45 px past the route's last ground takeoff (tail rule, tested).
+
+Falls a run, 20 seeds (mean, worst spot in a row), before (d8276b2) -> after (this round's tip); 60 seeds in brackets:
+
+| | First-timer | Casual | Expert |
+| --- | --- | --- | --- |
+| I | 0.10, 2 -> 0.10, 2 | 0 -> 0 | 0 -> 0 |
+| II | 0.30, 2 -> 0.30, 2 | 0 -> 0 | 0 -> 0 |
+| III | 0.10, 1 -> 0.10, 1 | 0.05 -> 0.05 | 0 -> 0 |
+| IV | 1.00, 4 -> **0.20, 1** [0.12] | 0.25 -> **0** | 0.05 -> **0** [0 in 60] |
+| V | 1.40, 5 -> **0.80, 2** [1.07] | 0.30 -> **0.20** | 0.05 -> **0** [0 in 60] |
+| VI | 1.95, 4 -> **1.20, 3** [0.98] | 0.30 -> **0.15** | 0.05 -> 0.05 [0.03] |
+| VII | 4.80, 9 -> **1.15, 2** [0.90] | 1.60 -> **0.25** | 0.20 -> **0** [0 in 60] |
+| VIII | 3.85, 4 -> **1.95, 3** [2.42] | 1.25 -> **0.55** | 0.20 -> 0.15 [0.22] |
+
+Runs of 60 first-timer seeds with three or more falls in a row at one beacon, before -> after: IV 3 -> **0**, V 5 -> **3**, VI 10 -> **5**, VII 14 -> **2**, VIII 22 -> **7** (worst chain 3, 3, 3, 6 in V-VIII). The 20-seed worst spot is 3 in VI and VIII, so the target "no spot three times in a row" is **met in IV, V and VII, not in VI and VIII** (a first-timer's σ 90 against any window under 400 ms is a 10-20% miss; the stretch between two beacons has half a dozen of them).
+
+**Fixes, by level** (each a measured cell):
+- **IV, the broken well (25 of 32 falls):** the well-song (the cape's charge for the flight out) now runs on the well's floor and the jump's rise and completes 5/16 before the flight; windows 300 -> 442-542 ms, the first-timer 1.00 -> 0.25.
+- **V, the split voids (24 of 55):** the song keeps its two flight-line stars but drops the descent star (a steep fall: ±1/16 of timing moved it out of the box) for two stars on the cracked islet's run; the window of the flight press 72 ms early -> 151; the first-timer 1.40 -> 0.80.
+- **VI, the finale (38 of 85):** the cape star sat at the double's top, so an early double reached the flight press before the star (the double's window was VI's narrowest, 204 ms); it now lies on the first flight's descent before the double (window 476 ms, -310/+159).
+- **VII, the dive road (54 of 96):** d4 is 190 px wide (was 70); the gap-song's four stars are on the hop's arc, two on the first flight's line and on the double's rise under the arc (the old song missed a star in 34 of 34 deaths); the dive islets reach 100 px back and keep a 10 px tail so the dive is still required; the leaf star sits 45 px under the double's top. 4.80 -> 1.15.
+- **VIII:** small stones reach 90-130 px back (wind shore 150); the rise-song completes 2/16 earlier; the proxy now takes the low line under the star road when it lands on it (a person sees the catch and uses it): 2.85 -> 1.95. Left: the last climb (a double 4/16 after the jump, whose late limit is +139 ms), the gauntlet's crack and the star road's third star.
+
+**Ladder.** The narrowest required window was the star-gating accident in IV-VII (IV 300, V 263, VI 204, VII 203 ms), so with the cells fixed IV-VII's narrowest windows are 533, 486, 469 and 290 ms. The ladder test keeps every floor and the VIII band, keeps I-III monotone, and from VII on the median and lower-quartile windows fall again (VII 551, VIII 467 ms median); IV-VI sit at 640-700 ms because of the tail rule's +165 ms of late press. The proxies carry the rise (first-timer IV 0.2, V 0.8, VI 1.2, VII 1.15, VIII 1.95; casual 0, 0.2, 0.15, 0.25, 0.55).
+
+**Late-press rescue** (ceiling): IV 78% (60, **not met**; was 86), V 70% (55, **not met**; was 75), VI 79% (50, **not met**; was 85), VII 32% (40), VIII 31% (35). The tail rule leaves IV-VI where they were (a longer stone also takes the late press). A real fix needs required jump + double cells in a third of IV-VI's ground jumps (a re-solve and re-bake of 4-5 cells per level); not done.
+
+**Chrome, real keys** (Playwright Chrome on port 4446, the real `game.js`, the critic's in-page human bot, σ without the reaction model): IV, V, VI and VII won with 0 falls at σ 0 and 60 ms; at σ 90 IV and VII fell once, V and VI 0 times; VIII won with 0 falls at σ 60; no page errors.
+
 ## Scorecard
 
 | # | Criterion | Before | After |
