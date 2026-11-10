@@ -3,7 +3,7 @@
  * engine, renders runs and stems of the adaptive score offline from the
  * real model and pilots, and exposes `window.__soundboard` so browser QA can
  * export WAVs and measure them. */
-import { CUES, CUE_NAMES, BEDS, VOICES, VOICE_NAMES, createAudioEngine, renderCueOffline, renderRunOffline, MUSIC_LEVEL } from "./audio.mjs";
+import { CUES, CUE_NAMES, BEDS, VOICES, VOICE_NAMES, BODY_BEFORE, createAudioEngine, renderCueOffline, renderRunOffline, MUSIC_LEVEL } from "./audio.mjs";
 import { CHORDS, BEAT, chordTones, rootIn, safeAtOrAbove, LAYERS } from "./score.mjs";
 import { recordFrames, SLOPPY_RUNS } from "./tests/music-run.mjs";
 import { LEVELS } from "./level.mjs";
@@ -340,6 +340,53 @@ for (const [group, title] of Object.entries(GROUPS)) {
   groups.append(h, grid);
 }
 
+/* ---------- A/B: the movement bodies before and after revision seven ----------
+ * The user found the jump and landing sounds "too hard, clashing with the
+ * atmosphere". Each pair plays the old recipe (BODY_BEFORE) and the soft one
+ * through the same chain, with the same seed; the sequence plays a jump, a
+ * double, a ledge catch and landings at game timings, over the score's
+ * harmonica and felt bass when "with Diana's notes" is ticked. */
+const beforeEngine = createAudioEngine({ enabled: true, seed: 7, cues: BODY_BEFORE });
+const afterEngine = createAudioEngine({ enabled: true, seed: 7 });
+const abVoices = () => $("ab-voices")?.checked;
+function abPlay(which, name) {
+  const e = which === "before" ? beforeEngine : afterEngine;
+  e.unlock();
+  ready();
+  e.play(name, { chord: chord() });
+  if (abVoices()) {
+    const c = chord(),
+      r = rootIn(c, 62);
+    if (name === "jump") e.voice("harmonica", { midi: r, glideTo: safeAtOrAbove(c, r + 7), glide: 0.38, dur: 0.6, pan: -0.25 });
+    if (name === "double-jump") e.voice("harmonica", { midi: safeAtOrAbove(c, r + 7), glideTo: safeAtOrAbove(c, r + 14), glide: 0.3, dur: 0.5, pan: -0.25 });
+    if (name.startsWith("land")) e.voice("bass", { midi: c.bass });
+  }
+}
+const AB_SEQ = [[0, "jump"], [0.34, "double-jump"], [0.95, "land-soft"], [1.3, "jump"], [1.78, "lip-catch"], [1.8, "land-soft"], [2.3, "jump"], [2.7, "dive"], [3.05, "land-hard"], [3.6, "super-jump"], [4.5, "land-soft"]];
+for (const name of Object.keys(BODY_BEFORE)) {
+  const row = document.createElement("div");
+  row.className = "ab-row";
+  const label = document.createElement("strong");
+  label.textContent = CUES[name].label;
+  row.append(label);
+  for (const which of ["before", "after"]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ink";
+    b.dataset.ab = `${which}:${name}`;
+    b.textContent = which === "before" ? "Before" : "After";
+    b.addEventListener("click", () => (abPlay(which, name), log(`${CUES[name].label}: ${which} (${which === "before" ? "revision six" : "revision seven"})`)));
+    row.append(b);
+  }
+  $("body-ab")?.append(row);
+}
+for (const which of ["before", "after"]) {
+  card($("body-ab-seq"), `Run of moves: ${which}`, which === "before" ? "Revision six bodies: felt thumps, ticks and pats" : "Revision seven bodies: breath, cloth and settling air", null, () => {
+    for (const [at, name] of AB_SEQ) setTimeout(() => abPlay(which, name), at * 1000);
+    log(`Run of moves, ${which}`);
+  });
+}
+
 /* ---------- sequences: body cues at game timings (270 px/s, 107 BPM) ---------- */
 const SEQUENCES = {
   "Run, jump and fly": [
@@ -462,10 +509,11 @@ window.__soundboard = {
   beds: Object.keys(BEDS),
   layers: Object.keys(LAYERS),
   meta: Object.fromEntries([...CUE_NAMES.map((n) => [n, { maxTail: CUES[n].maxTail, short: !!CUES[n].short, group: CUES[n].group }]), ...Object.keys(BEDS).map((n) => [n, { maxTail: BEDS[n].seconds + 2.6, short: false, group: "air" }])]),
-  async render(name, { params = {}, safety = true, seed = 1 } = {}) {
-    const { buffer, stats } = await renderCueOffline(name, { params, safety, seed });
+  async render(name, { params = {}, safety = true, seed = 1, before = false } = {}) {
+    const { buffer, stats } = await renderCueOffline(name, { params, safety, seed, cues: before ? BODY_BEFORE : null });
     return { ...pack(buffer), nodes: stats.nodes };
   },
+  bodyBefore: Object.keys(BODY_BEFORE),
   /** A run of the adaptive score: kind main | sloppy | gentle | upper, the
    * excerpt [from, from + seconds) in wall seconds since waking; `only`
    * renders some layers (a stem); `cues: false` drops the body sounds. */

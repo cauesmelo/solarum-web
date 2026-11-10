@@ -362,57 +362,87 @@ export const CUES = {
         ],
       }),
   },
+  emerge: {
+    group: "story",
+    label: "Emerge",
+    about: "The soil stirs as Diana rises out of the earth: a slow low breath of air and a few soft leaf whispers (the wake follows when she pops out)",
+    limit: 1,
+    minGap: 0.5,
+    maxTail: 3,
+    build: (rng) =>
+      voice({
+        gain: 0.1,
+        send: 0.35,
+        layers: [
+          noise({ color: "brown", filter: { type: "lowpass", freq: [[0, 180], [0.9, 420, "exp"]], q: 0.5 }, env: [[0, 0], [0.5, 1, "lin"], [1.0, 0.6, "lin"], [1.4, Z, "exp"]], gain: 0.26 }),
+          noise({ filter: { type: "bandpass", freq: [[0, 500], [1.0, 1200, "exp"]], q: 0.7 }, env: [[0, 0], [0.7, 1, "lin"], [1.3, Z, "exp"]], gain: 0.16, at: 0.2 }),
+          noise({ filter: { type: "bandpass", freq: 2600 * (1 + spread(rng, 0.1)), q: 1 }, env: env.perc(0.03, 0.12), gain: 0.1, at: 0.05 }),
+          noise({ filter: { type: "bandpass", freq: 3100 * (1 + spread(rng, 0.1)), q: 1 }, env: env.perc(0.03, 0.12), gain: 0.08, at: 0.4 }),
+        ],
+      }),
+  },
   jump: {
     group: "move",
     label: "Jump",
-    about: "A small soft 'hup': a breath puff over a felt lift (unpitched; the score adds a glass harmonica gliding root to fifth)",
+    about: "An airy upward breath with a whisper of cloth, no thump (the score adds a glass harmonica gliding root to fifth)",
     limit: 3,
     minGap: 0.03,
     short: true,
     maxTail: 1.6,
+    // Revision seven (user: "too hard, it clashes with the atmosphere"): the
+    // 3 ms felt thump is gone. Every layer swells in over 18-30 ms and is
+    // low-passed air, so the body is felt rather than heard as a hit, about
+    // 6 dB under the old peak and far under Diana's voice (README, Sound).
     build: (rng) =>
       voice({
-        gain: 0.69,
-        send: 0.08,
+        gain: 0.4,
+        send: 0.2,
         layers: [
-          noise({ filter: { type: "bandpass", freq: [[0, 800 * (1 + spread(rng, 0.06))], [0.09, 1300, "exp"]], q: 1.1 }, env: env.perc(0.004, 0.11), gain: 0.32 }),
-          thump(150 * (1 + spread(rng, 0.04)), 96, 0.07, { env: env.perc(0.003, 0.1), gain: 0.18 }),
+          // The breath rises with her: a soft band of pink noise opening upward.
+          noise({ filter: { type: "bandpass", freq: [[0, 420 * (1 + spread(rng, 0.06))], [0.22, 1150, "exp"]], q: 0.7 }, env: env.perc(0.03, 0.2), gain: 0.3 }),
+          // Cloth lifting: brighter air, low-passed under 2.4 kHz.
+          noise({ filter: { type: "lowpass", freq: 2400, q: 0.5 }, highpass: 700, env: env.perc(0.024, 0.12), gain: 0.06 }),
+          // Felt weight leaving the ground: deep, slow air instead of a sine.
+          noise({ color: "brown", filter: { type: "lowpass", freq: 260, q: 0.5 }, env: env.perc(0.026, 0.12), gain: 0.16 }),
         ],
       }),
   },
   "double-jump": {
     group: "move",
     label: "Double jump",
-    about: "Higher and lighter: a thinner breath and a tiny spark tick (the score glides fifth to ninth)",
+    about: "Higher and lighter: a thinner rising breath with a soft airy shimmer, no tick (the score glides fifth to ninth)",
     limit: 3,
     minGap: 0.03,
     short: true,
     maxTail: 1.8,
     build: (rng) =>
       voice({
-        gain: 0.97,
-        send: 0.15,
+        gain: 0.46,
+        send: 0.3,
         layers: [
-          noise({ filter: { type: "bandpass", freq: [[0, 1500 * (1 + spread(rng, 0.06))], [0.08, 2300, "exp"]], q: 1.3 }, env: env.perc(0.003, 0.09), gain: 0.26 }),
-          noise({ color: "white", filter: { type: "bandpass", freq: 5200, q: 2 }, env: env.perc(0.001, 0.025), gain: 0.05, at: 0.012 }),
+          noise({ filter: { type: "bandpass", freq: [[0, 800 * (1 + spread(rng, 0.06))], [0.18, 1900, "exp"]], q: 0.8 }, env: env.perc(0.024, 0.16), gain: 0.24 }),
+          // Where a 1 ms white tick was: air sparkling in over 16 ms.
+          noise({ filter: { type: "bandpass", freq: 4200, q: 1.2 }, env: env.perc(0.02, 0.1), gain: 0.035, at: 0.01 }),
         ],
       }),
   },
   "super-jump": {
     group: "move",
     label: "Super jump",
-    about: "A rising whoosh with a glittering trail (the score stacks open fifths, a thirty-second apart)",
+    about: "A long rising wash of air with a soft shimmer above it (the score stacks open fifths, a thirty-second apart)",
     limit: 2,
     minGap: 0.1,
     short: true,
     maxTail: 3,
-    build: (rng) =>
+    // Its crackle trail was a burst of 2 ms grains (transients): now one
+    // smooth band of air, and 6 dB down so it no longer matches the score.
+    build: () =>
       voice({
-        gain: 0.74,
-        send: 0.3,
+        gain: 0.3,
+        send: 0.4,
         layers: [
-          noise({ filter: { type: "bandpass", freq: [[0, 500], [0.32, 3000, "exp"]], q: 0.9 }, env: [[0, 0], [0.06, 1, "lin"], [0.22, 0.7, "lin"], [0.45, Z, "exp"]], gain: 0.32 }),
-          crackle({ at: 0.05, dur: 0.3, from: 160, to: 40, rise: [0.6, 0.2], band: 5200, q: 0.9, grain: 0.002, gain: 0.08, seed: rng() * 1e9 }),
+          noise({ filter: { type: "bandpass", freq: [[0, 420], [0.34, 2200, "exp"]], q: 0.8 }, env: [[0, 0], [0.07, 1, "lin"], [0.24, 0.7, "lin"], [0.5, Z, "exp"]], gain: 0.32 }),
+          noise({ filter: { type: "bandpass", freq: [[0, 3200], [0.35, 4600, "exp"]], q: 1.1 }, env: [[0, 0], [0.12, 1, "lin"], [0.5, Z, "exp"]], gain: 0.05, at: 0.04 }),
         ],
       }),
   },
@@ -447,70 +477,75 @@ export const CUES = {
   dive: {
     group: "move",
     label: "Dive",
-    about: "A descending air rush, 2.6 kHz to 380 Hz (the score glides an octave down to the root)",
+    about: "A falling rush of air, 1.7 kHz down to 320 Hz (the score glides an octave down to the root)",
     limit: 2,
     minGap: 0.06,
     short: true,
     maxTail: 1.8,
+    // Starts darker (it opened at 2.6 kHz) and 5 dB softer.
     build: () =>
       voice({
-        gain: 0.69,
-        send: 0.12,
-        layers: [noise({ filter: { type: "bandpass", freq: [[0, 2600], [0.3, 380, "exp"]], q: 1 }, env: [[0, 0], [0.03, 1, "lin"], [0.22, 0.6, "lin"], [0.36, Z, "exp"]], gain: 0.34 })],
+        gain: 0.3,
+        send: 0.18,
+        layers: [noise({ filter: { type: "bandpass", freq: [[0, 1700], [0.3, 320, "exp"]], q: 0.8 }, env: [[0, 0], [0.04, 1, "lin"], [0.22, 0.6, "lin"], [0.38, Z, "exp"]], gain: 0.34 })],
       }),
   },
   "land-soft": {
     group: "move",
     label: "Land (soft)",
-    about: "A muted padded thump; kept quiet because it happens constantly",
+    about: "Feet settling into soft ground: a short hush of air and cloth, felt rather than heard",
     limit: 2,
     minGap: 0.06,
     short: true,
     maxTail: 1,
+    // The thump (a 2 ms sine sweep) is gone: the landing's note is the felt
+    // bass the score plays on the grid; the body only settles under it.
     build: (rng) =>
       voice({
-        gain: 0.41,
-        send: 0.03,
+        gain: 0.44,
+        send: 0.08,
         layers: [
-          // Pitched above the felt bass (D2-B2, 73-123 Hz) so a landing's
-          // body never masks the note it plays.
-          thump(190 * (1 + spread(rng, 0.05)), 125, 0.06, { env: env.perc(0.002, 0.08), gain: 0.3 }),
-          noise({ color: "brown", filter: { type: "lowpass", freq: 620, q: 0.5 }, highpass: 140, env: env.perc(0.002, 0.05), gain: 0.34 }),
+          noise({ filter: { type: "lowpass", freq: 900 * (1 + spread(rng, 0.08)), q: 0.5 }, highpass: 150, env: env.perc(0.018, 0.1), gain: 0.2 }),
+          noise({ color: "brown", filter: { type: "lowpass", freq: 240, q: 0.5 }, env: env.perc(0.02, 0.09), gain: 0.2 }),
         ],
       }),
   },
   "land-hard": {
     group: "move",
     label: "Land (hard)",
-    about: "A deeper, longer thump with a little gravel, only after big falls or dives",
+    about: "A deeper, longer settle with a little dust in the air, only after big falls or dives",
     limit: 2,
     minGap: 0.06,
     short: true,
     maxTail: 1.2,
+    // No sine and no stone grains: weight is slow low air, the "gravel" a
+    // soft band of dust that swells in over 25 ms.
     build: (rng) =>
       voice({
-        gain: 0.185, // 6 dB under its first mix (audio critic: it masked the score)
-        send: 0.06,
+        gain: 0.26,
+        send: 0.12,
         layers: [
-          thump(170 * (1 + spread(rng, 0.05)), 100, 0.12, { env: env.perc(0.002, 0.18), gain: 0.5 }),
-          noise({ color: "brown", filter: { type: "lowpass", freq: 800, q: 0.5 }, highpass: 130, env: env.perc(0.002, 0.09), gain: 0.4 }),
-          crackle({ dur: 0.12, from: 220, to: 60, rise: [1, 0.2], band: 1400, q: 0.8, gain: 0.12, seed: rng() * 1e9 }),
+          noise({ color: "brown", filter: { type: "lowpass", freq: 300, q: 0.5 }, env: env.perc(0.022, 0.2), gain: 0.34 }),
+          noise({ filter: { type: "lowpass", freq: 1100 * (1 + spread(rng, 0.08)), q: 0.5 }, highpass: 140, env: env.perc(0.02, 0.14), gain: 0.18 }),
+          noise({ filter: { type: "bandpass", freq: 1700, q: 0.7 }, env: env.perc(0.025, 0.22), gain: 0.035, at: 0.02 }),
         ],
       }),
   },
   "lip-catch": {
     group: "move",
     label: "Ledge catch",
-    about: "A tiny pat when a near miss pops onto the lip (the score scoops into the chord's third)",
+    about: "A soft brush of cloth when a near miss or a step-up lifts her onto the lip (the score scoops into the chord's third)",
     limit: 1,
     minGap: 0.1,
     short: true,
     maxTail: 1,
     build: () =>
       voice({
-        gain: 1.0,
-        send: 0.08,
-        layers: [noise({ filter: { type: "bandpass", freq: 1800, q: 1.5 }, env: env.perc(0.002, 0.03), gain: 0.19 })],
+        gain: 0.56,
+        send: 0.12,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 700], [0.09, 1300, "exp"]], q: 0.8 }, env: env.perc(0.02, 0.075), gain: 0.12 }),
+        ],
       }),
   },
   "crumble-shake": {
@@ -920,6 +955,136 @@ export const CUES = {
   },
 };
 export const CUE_NAMES = Object.freeze(Object.keys(CUES));
+/** The movement bodies as they were before revision seven (a 2-3 ms felt
+ * thump under the jump and landings, 1-2 ms ticks and pats, a crackle trail
+ * on the super jump), kept only so the soundboard can A/B them against the
+ * soft bodies above (createAudioEngine({ cues }) / renderCueOffline({ cues })).
+ * The game never plays them. */
+export const BODY_BEFORE = Object.freeze({
+  jump: {
+    group: "move",
+    label: "Jump",
+    about: "A small soft 'hup': a breath puff over a felt lift (unpitched; the score adds a glass harmonica gliding root to fifth)",
+    limit: 3,
+    minGap: 0.03,
+    short: true,
+    maxTail: 1.6,
+    build: (rng) =>
+      voice({
+        gain: 0.69,
+        send: 0.08,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 800 * (1 + spread(rng, 0.06))], [0.09, 1300, "exp"]], q: 1.1 }, env: env.perc(0.004, 0.11), gain: 0.32 }),
+          thump(150 * (1 + spread(rng, 0.04)), 96, 0.07, { env: env.perc(0.003, 0.1), gain: 0.18 }),
+        ],
+      }),
+  },
+  "double-jump": {
+    group: "move",
+    label: "Double jump",
+    about: "Higher and lighter: a thinner breath and a tiny spark tick (the score glides fifth to ninth)",
+    limit: 3,
+    minGap: 0.03,
+    short: true,
+    maxTail: 1.8,
+    build: (rng) =>
+      voice({
+        gain: 0.97,
+        send: 0.15,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 1500 * (1 + spread(rng, 0.06))], [0.08, 2300, "exp"]], q: 1.3 }, env: env.perc(0.003, 0.09), gain: 0.26 }),
+          noise({ color: "white", filter: { type: "bandpass", freq: 5200, q: 2 }, env: env.perc(0.001, 0.025), gain: 0.05, at: 0.012 }),
+        ],
+      }),
+  },
+  "super-jump": {
+    group: "move",
+    label: "Super jump",
+    about: "A rising whoosh with a glittering trail (the score stacks open fifths, a thirty-second apart)",
+    limit: 2,
+    minGap: 0.1,
+    short: true,
+    maxTail: 3,
+    build: (rng) =>
+      voice({
+        gain: 0.74,
+        send: 0.3,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 500], [0.32, 3000, "exp"]], q: 0.9 }, env: [[0, 0], [0.06, 1, "lin"], [0.22, 0.7, "lin"], [0.45, Z, "exp"]], gain: 0.32 }),
+          crackle({ at: 0.05, dur: 0.3, from: 160, to: 40, rise: [0.6, 0.2], band: 5200, q: 0.9, grain: 0.002, gain: 0.08, seed: rng() * 1e9 }),
+        ],
+      }),
+  },
+  dive: {
+    group: "move",
+    label: "Dive",
+    about: "A descending air rush, 2.6 kHz to 380 Hz (the score glides an octave down to the root)",
+    limit: 2,
+    minGap: 0.06,
+    short: true,
+    maxTail: 1.8,
+    build: () =>
+      voice({
+        gain: 0.69,
+        send: 0.12,
+        layers: [noise({ filter: { type: "bandpass", freq: [[0, 2600], [0.3, 380, "exp"]], q: 1 }, env: [[0, 0], [0.03, 1, "lin"], [0.22, 0.6, "lin"], [0.36, Z, "exp"]], gain: 0.34 })],
+      }),
+  },
+  "land-soft": {
+    group: "move",
+    label: "Land (soft)",
+    about: "A muted padded thump; kept quiet because it happens constantly",
+    limit: 2,
+    minGap: 0.06,
+    short: true,
+    maxTail: 1,
+    build: (rng) =>
+      voice({
+        gain: 0.41,
+        send: 0.03,
+        layers: [
+          // Pitched above the felt bass (D2-B2, 73-123 Hz) so a landing's
+          // body never masks the note it plays.
+          thump(190 * (1 + spread(rng, 0.05)), 125, 0.06, { env: env.perc(0.002, 0.08), gain: 0.3 }),
+          noise({ color: "brown", filter: { type: "lowpass", freq: 620, q: 0.5 }, highpass: 140, env: env.perc(0.002, 0.05), gain: 0.34 }),
+        ],
+      }),
+  },
+  "land-hard": {
+    group: "move",
+    label: "Land (hard)",
+    about: "A deeper, longer thump with a little gravel, only after big falls or dives",
+    limit: 2,
+    minGap: 0.06,
+    short: true,
+    maxTail: 1.2,
+    build: (rng) =>
+      voice({
+        gain: 0.185, // 6 dB under its first mix (audio critic: it masked the score)
+        send: 0.06,
+        layers: [
+          thump(170 * (1 + spread(rng, 0.05)), 100, 0.12, { env: env.perc(0.002, 0.18), gain: 0.5 }),
+          noise({ color: "brown", filter: { type: "lowpass", freq: 800, q: 0.5 }, highpass: 130, env: env.perc(0.002, 0.09), gain: 0.4 }),
+          crackle({ dur: 0.12, from: 220, to: 60, rise: [1, 0.2], band: 1400, q: 0.8, gain: 0.12, seed: rng() * 1e9 }),
+        ],
+      }),
+  },
+  "lip-catch": {
+    group: "move",
+    label: "Ledge catch",
+    about: "A tiny pat when a near miss pops onto the lip (the score scoops into the chord's third)",
+    limit: 1,
+    minGap: 0.1,
+    short: true,
+    maxTail: 1,
+    build: () =>
+      voice({
+        gain: 1.0,
+        send: 0.08,
+        layers: [noise({ filter: { type: "bandpass", freq: 1800, q: 1.5 }, env: env.perc(0.002, 0.03), gain: 0.19 })],
+      }),
+  },
+});
 
 /* ---------- the score's voices ----------
  * `build(rng, note)` turns a note from score.mjs (midi or midis, dur, gain,
@@ -1450,6 +1615,9 @@ export function createAudioEngine(options = {}) {
     buffers = {},
     plucks = new Map();
   let level = options.level ?? 1;
+  // A cue book override (the soundboard's before / after A/B); the game
+  // always plays CUES.
+  const book = options.cues ? { ...CUES, ...options.cues } : CUES;
   const makeConductor = (n, gentle) => createConductor({ level: n, path: PATHS[n], cracked: CRACKED, seed: seed ^ 0x51, gentle });
   let conductor = makeConductor(level, !!options.gentle);
   const clock = createClockMap();
@@ -1943,7 +2111,7 @@ export function createAudioEngine(options = {}) {
   }
 
   function play(name, params = {}) {
-    const cue = CUES[name];
+    const cue = book[name];
     if (!cue || !canPlay()) return null;
     try {
       const now = t();
@@ -2922,12 +3090,12 @@ export function createAudioEngine(options = {}) {
 }
 
 /** Render one cue (or a bed) offline: used by the soundboard and browser QA. */
-export async function renderCueOffline(name, { OfflineContext = globalThis.OfflineAudioContext, sampleRate = 48000, params = {}, seed = 1, safety = true, tail = 2.6 } = {}) {
+export async function renderCueOffline(name, { OfflineContext = globalThis.OfflineAudioContext, sampleRate = 48000, params = {}, seed = 1, safety = true, tail = 2.6, cues = null } = {}) {
   const bedDef = BEDS[name];
-  const spec = bedDef ? null : CUES[name].build(mulberry32(seed), params);
+  const spec = bedDef ? null : (cues?.[name] ?? CUES[name]).build(mulberry32(seed), params);
   const seconds = (bedDef ? bedDef.seconds + 0.6 : spec.dur) + tail + 0.05;
   const ctx = new OfflineContext(2, Math.ceil(seconds * sampleRate), sampleRate);
-  const engine = createAudioEngine({ context: ctx, seed, safety });
+  const engine = createAudioEngine({ context: ctx, seed, safety, cues });
   engine.unlock();
   if (bedDef) {
     engine.setAir(bedDef.air, 0.01);

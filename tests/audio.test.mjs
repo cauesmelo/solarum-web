@@ -703,3 +703,36 @@ test("pausing fades out over 15 ms before suspending and fades back in after res
   await new Promise((r) => setTimeout(r, 40));
   assert.equal(ctx().state, "running");
 });
+
+/* ---------- revision seven: soft movement bodies ---------- */
+test("movement bodies are breath, cloth and air: no thump, grain or tick, every attack at least 12 ms", async () => {
+  const { BODY_BEFORE } = await import("../audio.mjs");
+  const soft = ["jump", "double-jump", "land-soft", "land-hard", "lip-catch", "super-jump", "dive", "emerge"];
+  const attack = (L) => (L.env ? L.env[1][0] : Infinity);
+  for (const name of soft)
+    for (let seed = 1; seed <= 5; seed++) {
+      const spec = CUES[name].build(mulberry32(seed), {});
+      for (const L of spec.layers) {
+        assert.equal(L.kind, "noise", `${name}: only filtered noise (no sine thump, no crackle grains)`);
+        assert.notEqual(L.color, "white", `${name}: no white noise`);
+        assert.ok(attack(L) >= 0.012, `${name}: attack ${attack(L)} s`);
+        const f = L.filter.freq,
+          top = Array.isArray(f) ? Math.max(...f.map((p) => p[1])) : f;
+        assert.ok(top <= 5000, `${name}: filter at ${top} Hz`);
+      }
+    }
+  // The A/B keeps the old recipes, which did have the hard parts.
+  const old = (name) => BODY_BEFORE[name].build(mulberry32(1), {}).layers;
+  assert.ok(old("jump").some((L) => L.kind === "tone" && !L.tonal), "the old jump had a thump");
+  assert.ok(old("land-soft").some((L) => attack(L) < 0.005), "the old landing had a 2 ms attack");
+  assert.ok(old("super-jump").some((L) => L.kind === "crackle"), "the old super jump had a crackle trail");
+  assert.deepEqual(Object.keys(BODY_BEFORE).sort(), ["dive", "double-jump", "jump", "land-hard", "land-soft", "lip-catch", "super-jump"]);
+});
+test("an engine can play an overriding cue book (the soundboard's before / after), the game never does", async () => {
+  const { BODY_BEFORE } = await import("../audio.mjs");
+  const js = await read("game.js");
+  assert.ok(!/BODY_BEFORE|cues:/.test(js.slice(js.indexOf("createAudioEngine("), js.indexOf("createAudioEngine(") + 200)), "the game uses CUES");
+  const board = await read("soundboard.js");
+  assert.match(board, /createAudioEngine\(\{ enabled: true, seed: 7, cues: BODY_BEFORE \}\)/);
+  assert.ok(BODY_BEFORE.jump.build && CUES.jump.build !== BODY_BEFORE.jump.build);
+});

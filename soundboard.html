@@ -44,6 +44,35 @@
         margin: 28px 0 10px;
         color: var(--hill);
       }
+      .ab {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 8px 16px;
+        margin-bottom: 12px;
+      }
+      .ab-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ab-row strong {
+        flex: 1;
+        font-weight: 400;
+      }
+      .ab-row button {
+        min-height: 40px;
+        padding: 4px 14px;
+        border: 2px solid var(--paper);
+        border-radius: 14px;
+        background: var(--ink);
+        color: var(--paper);
+        font: inherit;
+        cursor: pointer;
+      }
+      .ab-row button[data-ab^="after"] {
+        background: var(--paper);
+        color: var(--ink);
+      }
       p.lede {
         color: var(--mute);
         margin: 0 0 16px;
@@ -177,6 +206,15 @@
       <div class="grid" id="stems"></div>
       <h2>Score voices</h2>
       <div class="grid" id="voices"></div>
+      <h2>Movement bodies: before / after (revision seven)</h2>
+      <p class="lede">
+        The jump, double jump, landings, ledge catch / step-up, super jump and dive as they were (felt thumps, 1-3 ms ticks and
+        pats, a crackle trail) and as they are now (breath, cloth and settling air, every attack 12 ms or longer, under the score).
+        Same chain and seed for both. Peak, crest factor, attack and centroid of each are in the README's Sound section.
+        <label><input id="ab-voices" type="checkbox" checked /> with Diana's notes (harmonica, felt bass)</label>
+      </p>
+      <div class="ab" id="body-ab"></div>
+      <div class="grid" id="body-ab-seq"></div>
       <h2>Sequences</h2>
       <div class="grid" id="sequences"></div>
       <div id="groups"></div>
