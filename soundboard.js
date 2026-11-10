@@ -263,7 +263,7 @@ async function startAB(button, renders, labels) {
     for (const s of ab.sources) s.stop();
     const was = ab.button;
     ab = null;
-    for (const id of ["ab", "ab-mix", "ab-sky", "ab-bed", "ab-tune"]) $(id).setAttribute("aria-pressed", "false");
+    for (const id of ["ab", "ab-mix", "ab-sky", "ab-bed", "ab-tune", "ab-r9", "ab-sfx"]) $(id).setAttribute("aria-pressed", "false");
     $("ab-switch").disabled = true;
     if (was === button) return;
   }
@@ -418,6 +418,54 @@ for (const which of ["before", "after"]) {
     log(`Run of moves, ${which}`);
   });
 }
+
+/* ---------- A/B: revision eight and nine (bodies, the palette, the SFX level) ----------
+ * Each pair plays a body with Diana's note on the same instant through
+ * revision eight's mix ("rev8": its bodies and voices, the SFX at their old
+ * level) and the current one, same seed. */
+const rev8Engine = createAudioEngine({ enabled: true, seed: 7, mix: "rev8" });
+function r9Play(which, name) {
+  const e = which === "rev8" ? rev8Engine : afterEngine;
+  e.unlock();
+  ready();
+  const c = chord(),
+    r = rootIn(c, 62);
+  const VOICED = {
+    jump: () => e.voice("harmonica", { midi: r, glideTo: safeAtOrAbove(c, r + 7), glide: 0.38, dur: 0.6, gain: 0.7, pan: -0.25 }),
+    "double-jump": () => e.voice("harmonica", { midi: safeAtOrAbove(c, r + 7), glideTo: safeAtOrAbove(c, r + 14), glide: 0.3, dur: 0.6, gain: 0.6, pan: -0.25 }),
+    "land-soft": () => e.voice("bass", { midi: c.bass, gain: 0.85 }),
+    "land-hard": () => e.voice("bass", { midi: c.bass, gain: 1 }),
+    "lip-catch": () => e.voice("harmonica", { midi: chordTones(c, 64, 76)[0], glideTo: chordTones(c, 64, 76)[1], glide: 0.06, dur: 0.3, gain: 0.5, pan: -0.25 }),
+    star: () => e.voice("glass", { midi: chordTones(c, 74, 90)[1], gain: 0.8 }),
+  };
+  e.play(name === "refill-star" && which === "rev8" ? "refill" : name, { chord: c, count: 5, verb: "glide" });
+  VOICED[name]?.();
+}
+const R9 = [["jump", "Jump"], ["double-jump", "Double jump"], ["land-soft", "Land (soft)"], ["land-hard", "Land (hard)"], ["lip-catch", "Ledge catch"], ["star", "Star"], ["refill-star", "Refill star"], ["constellation", "Constellation"], ["relic", "Relic"]];
+for (const [name, label] of R9) {
+  const row = document.createElement("div");
+  row.className = "ab-row";
+  const strong = document.createElement("strong");
+  strong.textContent = label;
+  row.append(strong);
+  for (const which of ["rev8", "rev9"]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ink";
+    b.dataset.ab = `${which}:${name}`;
+    b.textContent = which === "rev8" ? "Rev. 8" : "Rev. 9";
+    b.addEventListener("click", () => (r9Play(which, name), log(`${label}: ${which === "rev8" ? "revision eight" : "revision nine"}`)));
+    row.append(b);
+  }
+  $("r9-ab")?.append(row);
+}
+for (const which of ["rev8", "rev9"])
+  card($("r9-seq"), `Run of moves: ${which === "rev8" ? "revision eight" : "revision nine"}`, which === "rev8" ? "Brown-noise weight under jumps and landings, the felt bass under every landing" : "Air without anything under 350 Hz, the jump's glass chime, the landing's bowl", null, () => {
+    for (const [at, name] of AB_SEQ) setTimeout(() => r9Play(which, name), at * 1000);
+    log(`Run of moves, ${which}`);
+  });
+$("ab-r9").addEventListener("click", () => startAB("ab-r9", () => [renderRun({ kind: "main", from: 0, seconds: 27, mix: "rev8" }), renderRun({ kind: "main", from: 0, seconds: 27 })], ["A (revision eight)", "B (revision nine)"]));
+$("ab-sfx").addEventListener("click", () => startAB("ab-sfx", () => [renderRun({ kind: "main", from: 0, seconds: 27, mix: { sfx: 0, player: 0 } }), renderRun({ kind: "main", from: 0, seconds: 27 })], ["A (SFX at revision eight's level)", "B (bodies -4 dB)"]));
 
 /* ---------- sequences: body cues at game timings (270 px/s, 107 BPM) ---------- */
 const SEQUENCES = {
