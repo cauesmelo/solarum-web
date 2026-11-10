@@ -192,3 +192,19 @@ The breath bar's original meaning is not all kept: in the original HUD the full 
 ### Unchanged
 
 Every caped clip, pivot, frame order, the body-first / cape-second layering and the model's animation state machine. The per-level backdrops (`backdrop.mjs`) are drawn in code, except Saturn's ring strokes (the original `saturn.png`) and home's bright star (the original star sprite).
+
+## Revision five (2026-11-10): scripted moments, decor, II's asteroid eye and island marks
+
+The builders' `def.moments` (event `moment`) and `def.decor` now have their art (`moments.mjs` `MOMENT_KINDS` / `DECOR_KINDS`, drawn in `game.js`). No new image was extracted; three originals gain new on-screen uses (recorded in `manifest.json → usage.onScreen` and `scripts/extract-assets.py`):
+
+| Original | New use on screen | How |
+| --- | --- | --- |
+| `meteor` (`Sprites/UI/meteoroCheio.png`, until now HUD-only) | the world's asteroid | Drawn on the canvas at 60% over an opaque ink disc (under `--mute`, so Diana stays brightest): the head of the brightest star's fall in I (9 px), half buried under I's dust plume beyond the door, and half buried in II's crater, where it opens its eye. Rotated −0.35 rad, scaled by its 525 px disc radius |
+| `star` frames 2–7 | I's falling shower and the GET's soft star, the brightest star's core, the locks' stars, glints, II's eye light | Frame 2 for stars at rest and in flight (the same 0.21 / 0.24 scales as the pickups they become), burst frames 4–7 for each landing |
+| `tailStar` | the streaks of the falling stars, the asteroid's fall and the eye's light | Its head (520, 200) is placed on the falling thing and the streak turned onto its heading (the PNG travels at 0.37 rad); 0.13 for a shower star, 0.34 for the asteroid, 0.08 for the eye's light |
+
+Drawn in code (ink and paper, Earth's blue only in the eye's pupil): the asteroid's eye (a lash line, then a paper almond with an ink iris and a small blue world for a pupil), the landing rings, the flash, the dust plume's billows, the lock hairlines, the glint's rays, and the island marks and particles of `islands.mjs` (frost cracks, waves, striations, ice nubs, strata, hatching, craters; rings, ice flecks, ring flecks, wind lines, dust). The `cadent1` / `cadent2` clips stay the sky's occasional shooting stars: the shower's stars must land on given pickups on the beat, which those fixed clips cannot aim, so they are drawn as the star sprite with a tail-star streak.
+
+**Home's brightest star redrawn.** The owner read the old body (two stroked rings and full horizontal and vertical lines) as a sniper's crosshair. It is now a soft radial glow, five short tapering flares of unequal length at uneven angles, and the original star sprite as its core; it brightens toward its flash and is gone once it falls (it is the asteroid). Nothing about it resembles the Earth glint's ringed blue dot. Before / after: `common/artifacts/revision-4/solarum-brightstar-before.png`, `solarum-brightstar-after.png`.
+
+**Unchanged:** every Diana clip, pivot and layering; the GET moments of I, III and IV (now timed on the simulation clock); II's cape settle is the same crossfade, held back a beat by the eye.
