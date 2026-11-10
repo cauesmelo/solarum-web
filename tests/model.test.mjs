@@ -165,10 +165,12 @@ test("L2's ability route glides in the wind, smashes the cache lid and keeps two
   assert.ok(l1.result.actions.some((q) => q.action === "releaseJump" || q.action === "tap"), "L1's ability route taps");
 });
 test("removing a level's new action fails exactly at the challenge that teaches it", () => {
+  // I: the safe first use under the key costs nothing; the leap (the need,
+  // one bar after the first-star beacon) is where a missing double fails.
   const noDouble = traverse("main", 1 / 120, "double", null, 1).s;
   assert.equal(noDouble.status, "dead");
-  assert.ok(noDouble.player.x > gx(84) && noDouble.player.x < gx(96), `L1 no double: ${noDouble.player.x}`);
-  assert.equal(noDouble.checkpoint.id, "drift");
+  assert.ok(noDouble.player.x > gx(152) && noDouble.player.x < gx(168), `L1 no double: ${noDouble.player.x}`);
+  assert.equal(noDouble.checkpoint.id, "first-star");
   const noCape = traverse("main", 1 / 120, "dash", null, 2).s;
   assert.equal(noCape.status, "dead");
   assert.ok(noCape.player.x > 15060 && noCape.player.x < 15460, `L2 no cape: ${noCape.player.x}`);
@@ -197,7 +199,7 @@ test("missing a required midair constellation leaves the cape spent over the voi
 test("four levels, each faster and each adding a verb; ≤ 80 s real, door on a downbeat", async () => {
   const { PATHS } = await import("../score-path.mjs");
   const { SCORES } = await import("../score.mjs");
-  assert.deepEqual(LEVELS.map((d) => d.bpm), [96, 107, 118, 128]);
+  assert.deepEqual(LEVELS.map((d) => d.bpm), [88, 107, 118, 128]);
   for (const d of LEVELS) {
     assert.ok(Math.abs(d.clock - d.bpm / 107) < 1e-12, `L${d.id} clock`);
     // px per beat is the same ruler everywhere: 270 px/s of simulation.
@@ -210,7 +212,7 @@ test("four levels, each faster and each adding a verb; ≤ 80 s real, door on a 
   }
   // L1 is basics only; L2 opens the cape, wind and dive; L3 brings cracked
   // shelves and the cascade; L4 requires the super jump.
-  assert.deepEqual(LEVELS[0].verbs, { cape: false, dive: false, glide: false });
+  assert.deepEqual(LEVELS[0].verbs, { double: false, cape: false, glide: false, dive: false, super: false });
   assert.ok(LEVELS.slice(1).every((d) => d.verbs.cape && d.verbs.dive && d.verbs.glide));
   const kinds = (d) => new Set(createLevel(d).platforms.map((q) => q.type).filter(Boolean));
   assert.equal(kinds(LEVELS[0]).size, 0, "L1: stable stone only");
@@ -224,9 +226,10 @@ test("four levels, each faster and each adding a verb; ≤ 80 s real, door on a 
     assert.ok(Math.abs(ph.coyote / d.clock - RULES.coyote) < 1e-9 && Math.abs(ph.jumpBuffer / d.clock - RULES.jumpBuffer) < 1e-9, `L${d.id}`);
     assert.ok((ph.respawnShatter + ph.respawnIris + ph.respawnPop) / d.clock <= 1.2);
   }
-  // L1 floats: half gravity at the apex while held, a lower terminal speed.
+  // I hangs: half gravity at the apex while held (|vy| < 54 px/s real), a
+  // lower terminal speed (560 px/s real).
   const f = levelPhysics(LEVELS[0]);
-  assert.ok(f.apexHang && Math.abs(f.apexHang.below * LEVELS[0].clock - 70) < 1e-9 && Math.abs(f.maxFall * LEVELS[0].clock - 560) < 1e-9);
+  assert.ok(f.apexHang && Math.abs(f.apexHang.below * LEVELS[0].clock - 54.28) < 0.01 && Math.abs(f.maxFall * LEVELS[0].clock - 560) < 1e-9);
   assert.ok(Math.abs(levelPhysics(LEVELS[2]).crumbleAfter - 5 * (15 / 107)) < 1e-12, "cracks break 5/16 after touch-down");
 });
 test("L1's float: a held jump hangs at the top and falls no faster than 560 px/s real", () => {
@@ -406,7 +409,8 @@ test("constellations: 4–6 stars on the route, completed in order, a miss costs
   for (const n of IDS) {
     const w = createLevel(n);
     for (const c of w.chains) {
-      assert.ok(c.count >= 4 && c.count <= 6, c.id);
+      // (I's shower is the one long song: eight falling stars.)
+      assert.ok(c.count >= 4 && c.count <= (c.id === "shower-song" ? 8 : 6), c.id);
       const stars = w.pickups.filter((q) => q.chain === c.id).sort((a, b) => a.index - b.index);
       for (let i = 1; i < stars.length; i++) assert.ok(stars[i].x > stars[i - 1].x, `L${n} ${c.id} runs forward`);
     }
@@ -653,7 +657,7 @@ test("beacons are at most 14 s of real run apart and leave 400 px before the nex
 });
 test("a beacon (or the level's start) sits right before the first required use of each mechanic", () => {
   const firstUse = {
-    1: { "double-jump": gx(84), tap: gx(164) },
+    1: { tap: gx(90), "double-jump": gx(152) },
     2: { flight: 14982, constellation: 16157 + 37.85 * 35, updraft: 18047 + 37.85 * 35, glide: 21113.2, dive: 21491.7 + 37.85 * 64 },
     3: { fragile: 7190, cascade: 11477.2, dive: 14925, flight: 14982 + 37.85 * 70, constellation: 16147 + 37.85 * 70 },
     4: { "super-jump": gx(68) + 63.67, cascade: createLevel(4).platforms.find((q) => q.id === "tile-0").x, constellation: 16147 - 6988.46 },
@@ -704,7 +708,7 @@ test("main-route gaps and rises respect each level's authoring limits", () => {
 });
 test("no blind landings: every required landing is in view when the input that commits to it is made", () => {
   const rejoin = {
-    1: [["high-crown", "field"], ["float-3", "field"]],
+    1: [["tier-3", "stone-a"], ["hang-1", "rim-1"]],
     2: [["lid-2", "star-cache"], ["finale-rock", "low-a"]],
     3: [["chain-exit", "ridge-c"], ["crown-stair-2", "hearth"]],
     4: [["school-shore", "storm-step"], ["lid", "well-floor"], ["finale-crack", "low-a"]],
@@ -984,7 +988,7 @@ test("jump release shortens the arc; a buffered tap stays a tap", () => {
   }
   const tap = pendingJump(true),
     held = pendingJump(false);
-  assert.ok(tap.player.vy >= -RULES.tapCap);
+  assert.ok(tap.player.vy >= -tap.physics.tapCap);
   assert.ok(held.player.vy < -500);
   const s = start(createGame());
   jump(s);
@@ -1286,7 +1290,7 @@ test("the first gap forgives a first input (a held jump or a 0 ms tap clears it)
   const { followGlyph } = await import("./glyphs.mjs");
   const p = levelDef(1).prompts.find((q) => q.id === "p-jump");
   const w = createLevel(1).platforms;
-  const gap = w.find((q) => q.id === "drift-a").x - (w.find((q) => q.id === "home").x + w.find((q) => q.id === "home").width);
+  const gap = w.find((q) => q.id === "drift").x - (w.find((q) => q.id === "home").x + w.find((q) => q.id === "home").width);
   assert.ok(gap <= 110, `first gap ${gap} px`);
   // Walking off without any input misses the next island.
   const idle = start(game(1));
@@ -1332,7 +1336,7 @@ test("every star is reachable (some pilot collects it) and none sits inside an i
       for (const q of traverse(route, 1 / 120, null, null, n).s.pickups) if (q.collected) got.add(q.id);
     const w = createLevel(n);
     const missing = w.pickups.filter((q) => !got.has(q.id)).map((q) => q.id);
-    assert.deepEqual(missing, [], `L${n}`);
+    assert.deepEqual(missing, [], `L${n} ${missing}`);
     for (const star of w.pickups)
       for (const p of w.platforms)
         assert.ok(

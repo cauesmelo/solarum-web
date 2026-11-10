@@ -1357,7 +1357,7 @@ const AIR = { wind: 0.088, glide: 0.052 };
 export const EVENT_NAMES = Object.freeze([
   "wake", "jump", "double-jump", "super-jump", "dash", "dive", "smash", "cascade", "tile-drop", "land", "lip-catch",
   "star", "chain-note", "constellation", "chain-fade", "refill", "great-star", "great-banked", "checkpoint",
-  "movement", "death", "respawn", "wind-catch", "win", "get", "wind-refund",
+  "movement", "death", "respawn", "wind-catch", "win", "get", "wind-refund", "moment",
 ]);
 /** Returns [{ cue, params, music }]. A cue the engine must count (star steps,
  * cascade tiles, the chain's size) is resolved by the engine. */
@@ -1395,6 +1395,10 @@ export function cuesForEvent(e) {
     // cape's refill glint (RESEARCH_PROGRESSION 2.2, 3.2).
     case "get": return [{ cue: "great-banked" }];
     case "wind-refund": return [{ cue: "refill" }];
+    // Scripted world moments (level I's shower, the brightest star and the
+    // crash): a star landing ahead glints softly; the flash and the crash
+    // borrow the Great Star and the hard landing until they get their own.
+    case "moment": return [{ cue: e.kind === "crash" ? "land-hard" : e.kind === "flash" ? "great-star" : "refill" }];
     case "win": return [{ cue: "win", params: { earth: !!e.earth } }];
     default: return [];
   }

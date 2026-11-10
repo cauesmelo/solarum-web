@@ -158,26 +158,48 @@ const L4_SECTIONS = [
  */
 export const SCORES = Object.freeze({
   1: {
-    level: 1, bpm: 96, bars: 27, pickup: 0,
-    // floaty, calm: half the harmonic rhythm (a chord a bar), no drums; the
-    // pad re-voicing on every bar line is the breath.
-    groove: "breath", maxFlat: 10, space: { seconds: 5.5, shimmer: 0.45 }, tapeStop: 0.35, rewind: false, dropOnFall: false,
-    sections: [{ id: "wake", from: 1, to: 2 }, { id: "drift", from: 3, to: 24, shaker: false }, { id: "coda", from: 25, to: Infinity }],
+    level: 1, bpm: 88, bars: 20, pickup: 0,
+    // I · Waking, floaty and calm (RESEARCH_PROGRESSION 4.3): the cycle at
+    // half harmonic rhythm in maj7 / add9 voicings, no drums at all; the pad
+    // re-voicing on every bar line is the breath. Restraint (user, revision
+    // five: the music was "too full, too present, too loud"): the bed is the
+    // pad and four far Signal calls, nothing else until Diana's own notes;
+    // the tension of the crash is harmonic (bars 15-16), never louder.
+    groove: "breath", maxFlat: 12, space: { seconds: 5.5, shimmer: 0.45 }, tapeStop: 0.35, rewind: false, dropOnFall: false,
+    sections: [
+      { id: "wake", from: 1, to: 2 },
+      { id: "climb", from: 3, to: 4 },
+      { id: "shower", from: 5, to: 7 },
+      { id: "first-star", from: 8, to: 9 },
+      { id: "leap", from: 10, to: 12 },
+      { id: "stairs", from: 13, to: 15 },
+      { id: "home", from: 16, to: 19 },
+      { id: "coda", from: 20, to: Infinity },
+    ],
     chordAt(pos) {
       const bar = barOf(Math.max(0, pos));
       if (bar <= 2) return C["Bm(add9)"];
-      if (bar <= 24) return L1_CYCLE[(bar - 3) % 8];
-      if (bar === 25) return C.Gmaj7;
-      if (bar === 26) return C.Dmaj7;
+      // The brightest star (bar 15) hangs on the dominant colour; the crash
+      // lands on the tonic's relative (bar 16) and the run goes home.
+      if (bar === 15) return C["F#m7"];
+      if (bar <= 17) return L1_CYCLE[(bar - 3) % 8];
+      if (bar === 18) return C.Gmaj7;
+      if (bar === 19) return C.Dmaj7;
       return C.Dadd9;
     },
-    signalBars: [1, 3, 11, 19], closeFrom: 25,
+    // The first call at the wake, the lookout (bar 5), after the first star
+    // (bar 9) and after the crash (bar 16); the theme closes from bar 18.
+    signalBars: [1, 5, 9, 16], closeFrom: 18,
     phrases: {
-      // bars 2-5, one note per hop apex: the motif's head, slowed: D5 C#5 B4 | A4.
+      // the climb (bars 2-4, Bm(add9)): the motif's head, slowed: D5 C#5 B4 | A4.
       "first-song": [74, 73, 71, 69],
-      // the climb (bar 8, D): A4 B4 D5 | E5.
-      "climb-song": [69, 71, 74, 76],
-      // home (bar 25-26): the answer falling home, F#5 E5 D5 A4.
+      // the shower (bar 5 F#m7, bar 6 Dmaj7): falling, then rising past the
+      // lookout's height: A5 F#5 E5 | D5 F#5 A5 B5 A5.
+      "shower-song": [81, 78, 76, 74, 78, 81, 83, 81],
+      // the upper tier's four (bars 5-6): C#5 E5 | F#5 A5.
+      "tier-song": [73, 76, 78, 81],
+      // home (bars 16-19, Dmaj7 Gmaj7 Gmaj7 Dmaj7): the answer falling home,
+      // F#5 E5 D5 A4.
       "home-song": [78, 76, 74, 69],
     },
   },

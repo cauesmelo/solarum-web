@@ -83,6 +83,9 @@ test("A1: every verb changes state on the press itself, in every level and at an
       releaseJump(s);
       assert.ok(s.player.vy > v && s.player.vy === -s.physics.tapCap, `${where}: the release cuts on its own step`);
       while (s.player.vy < 0) update(s, 1 / 120);
+      // (A level that starts without it owns the double after its GET; the
+      // unowned press is U2's.)
+      s.verbs.double = true;
       assert.equal(jump(s), true);
       assert.equal(s.player.vy, -s.physics.doubleJump, `${where}: double jump on the press`);
     }
@@ -226,7 +229,7 @@ test("A3: presses at landing, respawn, pause and level start are honoured or ign
 
 /* ---------- B. Jump, forgiveness, air resources ---------- */
 test("B5-B8: apex time, tap/hold ratio, release cut and fall per level (L1 floats on purpose)", () => {
-  const want = { 1: [0.5, 0.56], 2: [0.36, 0.39], 3: [0.33, 0.35], 4: [0.3, 0.33] };
+  const want = { 1: [0.5, 0.53], 2: [0.36, 0.39], 3: [0.33, 0.35], 4: [0.3, 0.33] };
   for (const n of IDS) {
     const held = arc(n),
       tap = arc(n, { release: 0 }),
@@ -239,7 +242,8 @@ test("B5-B8: apex time, tap/hold ratio, release cut and fall per level (L1 float
     const ph = physicsReal(n);
     if (n === 1) {
       assert.equal(ph.maxFall.toFixed(0), "560");
-      assert.ok(ph.hangExtra > 0.12 && ph.hangExtra < 0.14, `L1 hang adds ${ph.hangExtra.toFixed(3)} s`);
+      // RESEARCH_PROGRESSION 4.1: I's hang adds at most 0.12 s (B8).
+      assert.ok(ph.hangExtra > 0.08 && ph.hangExtra <= 0.12, `L1 hang adds ${ph.hangExtra.toFixed(3)} s`);
     } else assert.equal(ph.maxFall, null, "L2-L4 keep the symmetric, uncapped arc their cells are solved on");
   }
 });
@@ -371,6 +375,7 @@ test("D1: the optional techniques measurably change outcomes", () => {
   // Super jump vs double jump apex (L2+), from a jump 2/16 in.
   const apex = (n, acts) => {
     const s = world(n, [["floor", -400, 540, 3000]]);
+    s.verbs.double = true; // (owned from I's GET on)
     s.physics = { ...s.physics, fallLimit: 1e9 };
     let min = 540;
     for (let t = 0; t < 240; t++) {
@@ -407,7 +412,7 @@ test("D1: the optional techniques measurably change outcomes", () => {
     return 700 - s.player.y;
   };
   assert.ok(lift(true) > lift(false) * 1.3, `glide ${lift(true).toFixed(0)} vs ${lift(false).toFixed(0)} px`);
-  // L1: an early second press climbs higher (Great Star 1's line).
+  // I: an early second press climbs higher (Great Star 2's line).
   const l1 = (k) => apex(1, [[0, "jump"], [Math.round((k * 15) / 107 / TICK), "jump"]]);
   assert.ok(l1(3) - l1(5) > 15, `L1 early double ${l1(3).toFixed(0)} vs late ${l1(5).toFixed(0)} px`);
 });

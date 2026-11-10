@@ -459,178 +459,268 @@ function shift(list, dx, dy, kind, rename = (id) => id) {
   return list;
 }
 
-/* ---- L1 · Waking (96 BPM): floating, calm, basics only ----
- * Cells re-solved on L1's own float (scripts/arcs.mjs, 1/120 s): gravity
- * 1050 px/s² real, jump 510, double 460, half gravity while |vy| < 70 px/s
- * real and jump held, fall capped at 560 px/s real. In sim units (÷ clock,
- * ÷ clock²) that is 1304 / 568 / 513, hang below 78, max fall 624. Heights at
- * exactly k sixteenths after a takeoff on the grid (down > 0):
- *   hold   5: -104  6: -63  7: +5 (flat lands ON the grid)  8: +91  9: +179
- *   tap    3: 0  4: +52
- *   double, second press at 3: 9: -146 10: -72; at 4: 10: -146 11: -72;
- *   at 5: 10: -177 11: -129 12: -55
- * A takeoff is on the grid with the island's edge 10 px later (coyote keeps
- * ~29 px more); landings start 60 px before the grid landing point, so the
- * window to press is about 0.45 s real and the island is at least 260 px. */
-const L1_CLOCK = 96 / 107;
-const L1_HOLD = [0, -66.5, -106.7, -121.9, -121.1, -104.4, -62.7, 4.7, 91.2, 178.6];
-const L1_D3 = [0, -66.5, -106.7, -121.9, -179.3, -212.6, -222.3, -218.1, -195.1, -146.4, -72.1];
-const L1_D5 = [0, -66.5, -106.7, -121.9, -121.1, -104.4, -159.5, -193.3, -203.4, -199.4, -176.9];
-/** Heights after the stepping stones (each solved from the one before). */
-const L1Y = { end: 502, field: 502 - 144 + 91, crown: 502 - 144 - 146, door: 502 - 144 + 91 - 58 + 91 };
-const isle = (id, landK, takeoffK, y, lead = 60) => [id, gx(landK) - lead, y, gx(takeoffK) + 10 - (gx(landK) - lead)];
-const L1_MAIN = [
-  ["home", -700, 540, gx(24) + 10 + 700],
-  // develop: four hops on flat-ish cells, one every three beats (hold 7, 6, 7, 8).
-  // The first gap is only 90 px, so a first input of any kind clears it (a
-  // 0 ms tap lands 3/16 later) while walking off still falls short.
-  ["drift-a", gx(24) + 100, 545, gx(36) + 10 - (gx(24) + 100)],
-  isle("drift-b", 42, 48, 482),
-  isle("drift-c", 55, 60, 487),
-  isle("drift-d", 67, 84, 492),
-  // twist: a 384 px leap needs a late second jump (4/16 after the first,
-  // landing 12/16 after it, 16 px lower); then a 177 px double climb (second
-  // press 5/16 after the first).
-  isle("far-shore", 96, 104, 508),
-  isle("climb-crown", 114, 124, 331, 90),
-  // ...and a 177 px drop (9/16) back down to the run.
-  isle("crown-down", 133, 164, 508),
-  // develop II, stepping stones: tap islets 6/16 apart. A held jump flies
-  // 7/16 and passes the next islet's end by 28 px, so only taps chain them;
-  // the wide gap after them needs a hold. (Solved for a tap released at
-  // once; the pilots press and release in the same tick.)
-  isle("stone-a", 167, 170, 508, 50),
-  isle("stone-b", 173, 176, 508, 50),
-  isle("stone-wide", 183, 192, 513),
-  isle("stone-c", 196, 199, 565, 50),
-  isle("stone-d", 202, 205, 565, 50),
-  isle("stone-end", 211, 252, L1Y.end),
-  // conclude: a double-jump staircase (second press 3/16 after the first,
-  // up 72 px each), then a drop to the calm field.
-  isle("stair-1", 262, 268, L1Y.end - 72),
-  isle("stair-2", 278, 284, L1Y.end - 144),
-  isle("field", 292, 344, L1Y.field),
-  // coda: two gentle hops and the far door on bar 27.
-  isle("coda-a", 351, 364, L1Y.field + 5),
-  isle("coda-b", 370, 380, L1Y.field - 58),
-  ["door-isle", gx(388) - 60, L1Y.door, gx(416) + 520 - (gx(388) - 60)],
+/* ---- I · Waking (88 BPM): floaty, calm; jump, then the double jump ----
+ * RESEARCH_PROGRESSION 4.5 and 5. Diana wakes with the jump only (no cape,
+ * no air jump), climbs three held hops to the lookout, sees the shower land
+ * ahead of her, chooses the floor or the upper tier, takes the stepping
+ * stones, sees a star cluster she cannot reach (the lock), runs through the
+ * first star that lands softly (the GET: the double jump), reaches that
+ * cluster (the key), then needs the double jump for distance (the leap) and
+ * for height (the climb), climbs the double staircase while the brightest
+ * star falls, and runs a confident double-jump line down to the crater rim.
+ * 19 bars, the door on the downbeat of bar 20 (sixteenth 304), 51.8 s real.
+ *
+ * Physics (scripts/arcs.mjs, 1/120 s; RESEARCH_PROGRESSION 4.1): real
+ * gravity 1109 px/s², jump 522, double 469, half gravity while the jump is
+ * held and |vy| < 54 (the hang), fall capped at 560. In simulation units
+ * (÷ clock, ÷ clock²) 1640 / 635 / 570, hang below 66, fall cap 681. A held
+ * jump lands on flat ground 6/16 later (1.02 s real) with a 121 px apex.
+ * Heights at exactly k sixteenths after a grid takeoff (up < 0):
+ *   hold  2: -112  3: -121  4: -112  5: -73  6: -1 (flat)  7: +93  8: +188
+ *   tap   1: -26   2: -20   3: +19   4: +90 (tap cap 308 px/s of simulation)
+ *   double, second press at 3: 8: -157 9: -79 10: +16
+ *            at 4: 9: -148 10: -70 11: +26     at 5: 11: -30 12: +65
+ * Human holds (250-500 ms real) land up to 1/16 earlier, so every landing
+ * starts 70-110 px before its grid point (the early side of the window and
+ * the short hold both land there) and every song star sits on the first
+ * two sixteenths of its arc, where every hold flies the same (L8).
+ * Walk-offs land on the grid too: a 64.5 px drop takes exactly 2/16 and a
+ * 115 px drop 2.67/16, so the lookout's edge sits 0.33/16 off the grid. */
+const W_CLOCK = 88 / 107;
+const W_SIX = 15 / 107;
+/** The main route's heights (each solved from the one before). */
+const WY = (() => {
+  const lookout = 540 - 72 - 76 - 80;
+  const floor = lookout + 115;
+  const stoneB = floor - 19 - 19;
+  const field = stoneB + 93;
+  const shore = field + 65;
+  const crown = shore - 148;
+  const base = crown + 64.5;
+  const stair2 = base - 70 - 70;
+  const field2 = stair2 + 105.5;
+  return { home: 540, c1: 540 - 72, c2: 540 - 72 - 76, lookout, floor, stoneA: floor - 19, stoneB, field, shore, crown, base, stair1: base - 70, stair2, field2, fin1: field2 + 65, fin2: field2 + 130, rim: field2 + 146 };
+})();
+/** A landing island: from `lead` px before grid landing point landK to 10 px
+ * past the takeoff at takeoffK (coyote keeps about 27 px more). */
+const wIsle = (id, landK, takeoffK, y, lead = 80) => [id, gx(landK) - lead, y, gx(takeoffK) + 10 - (gx(landK) - lead)];
+const W_MAIN = [
+  ["home", -700, WY.home, gx(24) + 10 + 700],
+  // The first gap is 90 px: any first input clears it (a 0 ms tap lands
+  // 2.6/16 later, 98 px on) and walking off does not.
+  ["drift", gx(24) + 100, WY.home, gx(34) + 10 - (gx(24) + 100)],
+  // To the highest point: three held hops up 72, 76 and 80 px, each landing
+  // 5/16 later; the last is too high for anything but a held jump.
+  wIsle("climb-1", 39, 42, WY.c1, 75),
+  wIsle("climb-2", 47, 50, WY.c2, 75),
+  // The lookout. Its edge is where the floor begins: walking off it drops
+  // 115 px and lands on the grid at sixteenth 73.
+  ["lookout", gx(55) - 75, WY.lookout, gx(70.33) - 16 - (gx(55) - 75)],
+  ["floor", gx(72), WY.floor, gx(90) + 10 - gx(72)],
+  // Stepping stones: two taps up 19 px (each lands 2/16 later; walking off
+  // cannot climb, so both are needed), then a wide gap down 93 px that only
+  // a held jump crosses (7/16; a tap comes down 50 px short of the lip).
+  wIsle("stone-a", 92, 96, WY.stoneA, 60),
+  wIsle("stone-b", 98, 102, WY.stoneB, 60),
+  // The field of the first star: the GET at sixteenth 120 (bar 8, beat 3),
+  // the key cluster over it, the beacon at 136 and the leap's edge at 152.
+  wIsle("glint-field", 109, 152, WY.field, 70),
+  // The leap: a late double (second press 5/16 after the first) lands 12/16
+  // after the takeoff, 65 px lower, 374 px across.
+  wIsle("far-shore", 164, 168, WY.shore, 80),
+  // The climb: second press at 4/16, up 148 px 9/16 after the takeoff.
+  ["climb-crown", gx(177) - 90, WY.crown, gx(180) - 16 - (gx(177) - 90)],
+  // Walking off the crown drops 64.5 px and lands 2/16 later, on the grid.
+  ["stair-base", gx(182) - 20, WY.base, gx(196) + 10 - (gx(182) - 20)],
+  // The double staircase: second press at 4/16, up 70 px 10/16 after.
+  wIsle("stair-1", 206, 210, WY.stair1, 90),
+  // Walking off the top stair drops 105.5 px in 2.55/16: its edge sits
+  // 0.45/16 past the grid so she lands on the crash field on sixteenth 227.
+  ["stair-2", gx(220) - 90, WY.stair2, gx(224.45) - 16 - (gx(220) - 90)],
+  ["crash-field", gx(226), WY.field2, gx(244) + 10 - gx(226)],
+  // The confident finish: three doubles down to the rim, two presses a bar
+  // (second press at 5/16: +65 at 12/16, twice; then at 3/16: +16 at
+  // 10/16), no glyphs.
+  wIsle("rim-1", 256, 260, WY.fin1, 100),
+  wIsle("rim-2", 272, 276, WY.fin2, 100),
+  ["crater-rim", gx(286) - 90, WY.rim, gx(304) + 520 - (gx(286) - 90)],
 ];
-// Mastery: the high crown (Great Star 2) off the top stair and the float
-// line (Great Star 3): three islets only held, hanging jumps chain (a tap
-// flies 113 px, the gaps are 215). The field lies under all of it, at most
-// 232 px down, so a missed float is a soft landing, never a fall.
-const L1_HIGH = [
-  isle("high-crown", 292, 298, L1Y.crown),
-  isle("float-1", 305, 307, L1Y.crown + 5, 40),
-  isle("float-2", 314, 316, L1Y.crown + 10, 40),
-  isle("float-3", 323, 325, L1Y.crown + 15, 40),
+// Mastery lines. The upper tier off the lookout: three islets at its height
+// taken with held jumps 6/16 apart (flat cells), Great Star 1 over the last
+// hang. The floor runs 115 px under them. The high crown off the top stair
+// (a double up 70 px) and the hang line, Great Star 3 at its end; the crash
+// field runs 175 px under it.
+const W_HIGH = [
+  // (tier-1 starts 1.5/16 past the lookout's edge: walking off, Diana is
+  // already 20 px under its top when her collider reaches it.)
+  // The three hang jumps bounce (each touch-down is the next takeoff), so
+  // the tier ends before the stones: a long tap's apex there stays 60+ px
+  // under nothing.
+  wIsle("tier-1", 74, 74, WY.lookout + 1, 80),
+  wIsle("tier-2", 80, 80, WY.lookout + 2, 50),
+  wIsle("tier-3", 86, 88, WY.lookout + 3, 50),
+  wIsle("high-crown", 234, 236, WY.stair2 - 70, 70),
+  // The hang line ends at 245, before the finish's first double rises
+  // under it (her apex stays clear of its top, so she never steps up).
+  wIsle("hang-1", 242, 245, WY.stair2 - 69, 50),
 ];
-// On the hang apex 4/16 after each takeoff (an even sixteenth, so the
-// completed song blooms on an eighth).
-const apexStar = (k, y0) => [gx(k + 4) + 40, Math.round(y0 - 121 - 36)];
-const L1_CHAINS = [
-  { id: "first-song", route: "low", stars: [apexStar(24, 540), apexStar(36, 545), apexStar(48, 482), apexStar(60, 487)] },
-  { id: "climb-song", route: "low", stars: [7, 8, 9, 10].map((j) => [gx(104 + j) + 40, Math.round(508 + L1_D5[j] - 36)]) },
-  { id: "home-song", route: "low", stars: [2, 4, 6, 8].map((j) => [gx(380 + j) + 40, Math.round(L1Y.field - 58 + L1_HOLD[j] - 36)]) },
+/** A song star on the rising part of a held jump from a takeoff at k on
+ * ground y0, collected 2/16 after the takeoff (every hold is at -111 there). */
+const riseStar = (k, y0, at = 2) => [gx(k + at) + 39.5, Math.round(y0 - 111 - 36)];
+/** A song star at running height, collected on sixteenth k. */
+const runStar = (k, y) => [gx(k) + 39.5, y - 40];
+const W_CHAINS = [
+  // The climb: one note per hop, on the way up.
+  { id: "first-song", route: "low", stars: [riseStar(24, WY.home), riseStar(34, WY.home), riseStar(42, WY.c1), riseStar(50, WY.c2)] },
+  // The shower: eight stars land on the floor ahead (each 14/16 = 2.4 s real
+  // before Diana reaches it), and she runs through them on the eighths.
+  { id: "shower-song", route: "low", stars: [74, 76, 78, 80, 82, 84, 86, 88].map((k) => runStar(k, WY.floor)) },
+  // The upper tier's own four: they land on its islets, one per hop.
+  { id: "tier-song", route: "high", stars: [riseStar(68, WY.lookout), riseStar(74, WY.lookout + 1), riseStar(80, WY.lookout + 2), runStar(87, WY.lookout + 3)] },
+  // Home: the finish's second presses, falling toward the rim.
+  { id: "home-song", route: "low", stars: [riseStar(244, WY.field2), riseStar(260, WY.fin1), riseStar(276, WY.fin2), runStar(288, WY.rim)] },
 ];
-const L1_GREAT = [
-  // Over the climb, where only an early second press (3/16, apex 222 px)
-  // reaches: the main route's later press peaks 203 px up, 94 px too low.
-  { id: "great-1", x: gx(110), y: 508 - 290, line: "above the climb: press the second jump early" },
-  { id: "great-2", x: gx(295), y: L1Y.crown - 42, line: "the high crown above the staircase" },
-  { id: "great-3", x: gx(324), y: L1Y.crown + 15 - 42, line: "the end of the float line" },
+const W_GREAT = [
+  { id: "great-1", x: gx(83) + 30, y: WY.lookout - 152, line: "the upper tier: a full hang over the last islet" },
+  { id: "great-2", x: gx(172) + 20, y: WY.shore - 285, line: "above the climb: press the second jump early" },
+  { id: "great-3", x: gx(239) + 20, y: WY.stair2 - 69 - 152, line: "the hang line over the crash: a full hang" },
 ];
-function l1Stars() {
+/** The key: four stars on the optional double's arc (jump at 124, second
+ * press at 127: 4: -183, 5: -215, 6: -219, 7: -204 px), each entering the
+ * pickup box on a sixteenth; no single jump reaches them (its body peaks
+ * 62+ px under the lowest). The lock over stone-b repeats the shape. */
+const W_KEY = [[4, -183], [5, -215], [6, -219], [7, -204]].map(([j, dy]) => [gx(124 + j) + 33.5, Math.round(WY.field + dy - 36)]);
+function wStars() {
   const out = [];
-  [505, 533, 561].forEach((x, i) => out.push([`tap-${i}`, x, i === 1 ? 437 : 442, "low"]));
-  // Hold stars sit at the hang apex: only a held jump (95+ px) takes them.
-  [860, 900, 940].forEach((x, i) => out.push([`hold-${i}`, x, i === 1 ? 356 : 362, "low"]));
-  // Loose stars sketch the stepping stones' taps and the field's run.
-  // A tap's top (26 px up) is 1-2/16 after the press.
-  [[164, 508], [170, 508], [192, 513], [199, 565]].forEach(([k, y], i) => out.push([`stone-star-${i}`, gx(k + 1) + 34, y - 26 - 36, "low"]));
-  [300, 306, 312, 318].forEach((k, i) => out.push([`field-star-${i}`, gx(k) + 34, L1Y.field - 40, "low"]));
-  [298, 307, 316].forEach((k, i) => out.push([`float-star-${i}`, gx(k + 4) + 34, L1Y.crown + 5 * i - 121 - 36, "high"]));
+  // The opening lesson on the home ground: a tap row (a 0 ms tap's body
+  // reaches it, running does not) and a hang row (only a held jump).
+  // (Along a 0 ms tap from sixteenth 5: it peaks 29 px up 1.3/16 later.)
+  [25, 50, 75].forEach((dx, i) => out.push([`tap-${i}`, gx(5) + dx, 447 - (i === 1 ? 4 : 0), "low"]));
+  [15, 16, 17].forEach((j, i) => out.push([`hold-${i}`, gx(j) + 40, 385 - (i === 1 ? 4 : 0), "low"]));
+  // The stones' taps and the key: four stars at double height over the
+  // field, the same shape as the lock over stone-b (no single jump reaches).
+  [91, 97].forEach((k, i) => out.push([`stone-star-${i}`, gx(k) + 33.5, WY.floor - 19 * i - 26 - 36, "low"]));
+  // (Each on the optional double's arc where it enters the pickup box on a
+  // sixteenth: the jump at 124, the second press at 127.)
+  W_KEY.forEach(([x, y], i) => out.push([`key-${i}`, x, y, "low"]));
+  // The crash field under the hang line, and the crown's run.
+  // (Loose stars are taken within 34 px, constellation stars within 40.)
+  [232, 236, 240].forEach((k, i) => out.push([`crash-star-${i}`, gx(k) + 33.5, WY.field2 - 40, "low"]));
   return out;
 }
-const J = (k, when = "g") => [gx(k) - 0.3, "jump", when];
-// A tap: pressed and released in the same tick (tests/routes.mjs "tap").
-const TAP = (k) => [[gx(k) - 0.3, "tap", "g"]];
-const L1_PLAN_MAIN = [
-  J(24), J(36), J(48), J(60),
-  J(84), J(88, "a"),
-  J(104), J(109, "a"),
-  J(124),
-  ...TAP(164), ...TAP(170), J(176), ...TAP(192), ...TAP(199), J(205),
-  J(252), J(255, "a"), J(268), J(271, "a"),
-  J(284),
-  J(344), J(364), J(380),
+const WJ = (k, when = "g") => [gx(k) - 0.3, "jump", when];
+const WTAP = (k) => [gx(k) - 0.3, "tap", "g"];
+const W_PLAN_MAIN = [
+  WJ(24), WJ(34), WJ(42), WJ(50),
+  // (the lookout's edge: she walks onto the floor)
+  WTAP(90), WTAP(96), WJ(102),
+  // the safe first use: a double under the key (optional)
+  WJ(124), WJ(127, "a"),
+  WJ(152), WJ(157, "a"),
+  WJ(168), WJ(172, "a"),
+  // (the crown's edge: she walks onto the stair base)
+  WJ(196), WJ(200, "a"), WJ(210), WJ(214, "a"),
+  // (the top stair's edge: she walks onto the crash field)
+  WJ(244), WJ(249, "a"), WJ(260), WJ(265, "a"), WJ(276), WJ(279, "a"),
 ];
-const L1 = {
-  id: 1,
+const W_GET = gx(120);
+const WAKING = {
   key: "waking",
-  numeral: "I",
   title: "Waking",
-  bpm: 96,
-  clock: L1_CLOCK,
-  // Sim units (real ÷ clock, ÷ clock²). constellationGap is longer because
-  // L1's songs are one star per hop apex, three beats apart.
+  look: "home",
+  toward: "Home",
+  introduces: "double",
+  bpm: 88,
+  clock: W_CLOCK,
   physics: {
-    gravity: 1050 / L1_CLOCK ** 2,
-    jump: 510 / L1_CLOCK,
-    doubleJump: 460 / L1_CLOCK,
-    apexHang: { below: 70 / L1_CLOCK, factor: 0.5 },
-    maxFall: 560 / L1_CLOCK,
-    constellationGap: 1.9,
+    gravity: 1640,
+    jump: 635,
+    doubleJump: 570,
+    apexHang: { below: 66, factor: 0.5 },
+    maxFall: 560 / W_CLOCK,
+    // A 0 ms tap rises 29 px (0.23 of a held jump, as in the other levels;
+    // the global 280 would leave I's stronger gravity a 24 px stub).
+    tapCap: 308,
+    // Songs are one note per hop, up to 16/16 (2.24 s of simulation) apart
+    // in the finish.
+    constellationGap: 2.4,
   },
-  verbs: { cape: false, dive: false, glide: false },
+  verbs: { double: false, cape: false, glide: false, dive: false, super: false },
+  gets: [{ id: "first-star", verb: "double", x: W_GET }],
+  capeRule: "breath",
   view: null,
-  level: { title: "Waking", speed: 270, startX: 220, startY: 540, finishX: gx(416), finishY: L1Y.door, beat: BEAT },
-  movements: [{ id: "L1", x: -1000, numeral: "I", name: "Waking" }],
+  level: { title: "Waking", speed: 270, startX: 220, startY: WY.home, finishX: gx(304), finishY: WY.rim, beat: BEAT },
+  movements: [{ id: "I", x: -1000, numeral: "I", name: "Waking" }],
   sections: [
-    { x: -1000, movement: "L1", step: "introduce", name: "I · Waking" },
-    { x: gx(24), movement: "L1", step: "develop", name: "I · Waking — four hops" },
-    { x: gx(80), movement: "L1", step: "twist", name: "I · Waking — the leap and the climb" },
-    { x: gx(160), movement: "L1", step: "develop", name: "I · Waking — stepping stones" },
-    { x: gx(240), movement: "L1", step: "conclude", name: "I · Waking — the staircase" },
-    { x: gx(336), movement: "L1", step: "coda", name: "I · Waking — the field" },
+    { x: -1000, movement: "I", step: "introduce", name: "I · Waking" },
+    { x: gx(32), movement: "I", step: "develop", name: "I · Waking — to the highest point" },
+    { x: gx(56), movement: "I", step: "develop", name: "I · Waking — the shower" },
+    { x: gx(88), movement: "I", step: "develop", name: "I · Waking — stepping stones" },
+    { x: gx(112), movement: "I", step: "get", name: "I · Waking — the first star" },
+    { x: gx(144), movement: "I", step: "need", name: "I · Waking — the leap" },
+    { x: gx(160), movement: "I", step: "twist", name: "I · Waking — the climb" },
+    { x: gx(184), movement: "I", step: "develop", name: "I · Waking — the staircase" },
+    { x: gx(224), movement: "I", step: "set-piece", name: "I · Waking — the brightest star" },
+    { x: gx(240), movement: "I", step: "conclude", name: "I · Waking — down to the crater" },
   ],
-  // Beacons on half bars 5½, 10½, 16 and 21½ (≤ 13.7 s real apart).
+  // Beacons on half bars 4½, 9, 12½ and 15½ (≤ 13.6 s real apart).
   checkpoints: [
-    { id: "drift", x: gx(72) - 3, y: 492, platform: "drift-d", story: "Somewhere ahead, something was calling. She was light enough to follow.", tip: "Hold the jump to float longer at the top." },
-    { id: "climb", x: gx(152) - 3, y: 508, platform: "crown-down", story: "The dark had steps in it, if she jumped twice.", tip: "Jump, then jump again near the top to reach farther or higher." },
-    { id: "stones", x: gx(240) - 3, y: L1Y.end, platform: "stone-end", story: "Small stones, close together: she only had to touch them.", tip: "Tap the jump for the small stones; hold it for the wide gap." },
-    { id: "crown", x: gx(328) - 3, y: L1Y.field, platform: "field", story: "A quiet field. The signal was singing now.", tip: "Run to the door at the end of the field." },
+    { id: "lookout", x: gx(56) - 3, y: WY.lookout, platform: "lookout", story: "From the highest point, every star was going the same way.", tip: "Hold the jump for the high stones. Or walk on: the floor is safe." },
+    { id: "first-star", x: gx(136) - 3, y: WY.field, platform: "glint-field", story: "One star had come down gently, as if it meant to stay.", tip: "Jump, then jump again near the top to reach farther." },
+    { id: "climb", x: gx(184) - 3, y: WY.base, platform: "stair-base", story: "The dark had steps in it, if she jumped twice.", tip: "Jump, then jump again near the top to climb." },
+    { id: "crash", x: gx(232) - 3, y: WY.field2, platform: "crash-field", story: "Something enormous had fallen, just ahead.", tip: "Jump twice for each long gap, all the way down." },
   ],
-  startTip: "Jump when you reach the edge. Hold the jump to float.",
-  main: L1_MAIN,
-  high: L1_HIGH,
+  startTip: "Jump at the edge. Hold the jump to hang at the top.",
+  main: W_MAIN,
+  high: W_HIGH,
   updrafts: [],
   cascades: [],
-  chains: L1_CHAINS,
-  great: L1_GREAT,
-  prompts: [
-    // [from, inputX] is the window in which following the glyph works: from
-    // the earliest press that still lands to the last one coyote allows.
-    { id: "p-jump", glyph: ["up"], action: "jump", x: gx(24) - 30, y: 430, from: gx(24) - 20, to: gx(24) + 40, inputX: gx(24) + 20 },
-    { id: "p-double", glyph: ["up", "up"], action: "double-jump", x: gx(86), y: 330, from: gx(84) - 30, to: gx(92), inputX: gx(84) + 14 },
-    { id: "p-climb", glyph: ["up", "up"], action: "double-jump", x: gx(106), y: 340, from: gx(104) - 30, to: gx(110), inputX: gx(104) + 14 },
-    { id: "p-tap", glyph: ["tap-up"], action: "jump", x: gx(162), y: 420, from: gx(163.5), to: gx(166), inputX: gx(164) + 20 },
+  chains: W_CHAINS,
+  great: W_GREAT,
+  // Scripted moments (sixteenths of simulation time from the wake; the model
+  // emits `moment` for the renderer and the score): the shower's stars land
+  // on the beat 14/16 before Diana reaches them, the GET's star lands softly
+  // two bars ahead, the brightest star flashes on bar 15 and the asteroid
+  // strikes on the downbeat of bar 16.
+  moments: [
+    ...[74, 76, 78, 80, 82, 84, 86, 88].map((k, i) => ({ id: `shower-${i}`, k: k - 14, kind: "fall", target: `shower-song-${i}` })),
+    ...[70, 76, 82, 87].map((k, i) => ({ id: `tier-${i}`, k: k - 14, kind: "fall", target: `tier-song-${i}` })),
+    { id: "first-star", k: 104, kind: "fall", target: "first-star" },
+    { id: "brightest-star", k: 224, kind: "flash" },
+    { id: "crash", k: 240, kind: "crash" },
   ],
-  stars: l1Stars(),
+  // Decor: the lock (four stars at double-jump height over stone-b, out of
+  // reach before the GET; the key over the field repeats its shape) and the
+  // dust plume of the crash beyond the rim.
+  decor: [
+    { id: "lock", kind: "cluster", stars: W_KEY.map(([x, y]) => [x - gx(127) + gx(97), y - WY.field + WY.stoneB]) },
+    { id: "plume", kind: "plume", x: gx(330), y: WY.rim, from: 240 },
+  ],
+  prompts: [
+    { id: "p-jump", glyph: ["up"], action: "jump", x: gx(24) - 30, y: WY.home - 110, from: gx(24) - 20, to: gx(24) + 40, inputX: gx(24) + 20 },
+    { id: "p-tap", glyph: ["tap-up"], action: "jump", x: gx(88), y: WY.floor - 110, from: gx(89), to: gx(90) + 30, inputX: gx(90) + 10 },
+    // ↑ ↑: [from, inputX] is the first jump's window; `to` ends the second's.
+    { id: "p-key", glyph: ["up", "up"], action: "double-jump", x: gx(125), y: WY.field - 300, from: gx(124) - 30, to: gx(130), inputX: gx(124) + 14, optional: true, route: "main" },
+    { id: "p-leap", glyph: ["up", "up"], action: "double-jump", x: gx(153), y: WY.field - 250, from: gx(152) - 30, to: gx(160), inputX: gx(152) + 14 },
+  ],
+  stars: wStars(),
   routes: {
-    main: L1_PLAN_MAIN,
-    // The three Great Stars: an early second press on the climb, then the
-    // high crown and the float line off the top stair.
+    main: W_PLAN_MAIN,
+    // The three Great Stars: the upper tier (holds off the lookout), the
+    // early second press on the climb, and the crown and hang line.
     upper: [
-      ...L1_PLAN_MAIN.filter(([x]) => x < gx(100)),
-      J(104), J(107, "a"),
-      ...L1_PLAN_MAIN.filter(([x]) => x > gx(110) && x < gx(280)),
-      J(282), J(286, "a"), J(298), J(307), J(316), J(325),
-      ...L1_PLAN_MAIN.filter(([x]) => x > gx(330)),
+      ...W_PLAN_MAIN.filter(([x]) => x < gx(60)),
+      // (off the tier's end she drops 100 px onto stone-a and taps on)
+      WJ(68), WJ(74), WJ(80), WJ(88),
+      ...W_PLAN_MAIN.filter(([x]) => x > gx(94) && x < gx(166)),
+      WJ(168), WJ(170, "a"),
+      ...W_PLAN_MAIN.filter(([x]) => x > gx(180) && x < gx(222)),
+      WJ(223.5), WJ(227.5, "a"), WJ(236), WJ(245),
+      ...W_PLAN_MAIN.filter(([x]) => x > gx(255)),
     ],
     // The opening lesson: tap for the low star row, hold for the high one.
-    ability: [[482, "tap", "g"], [748, "jump", "g"], ...L1_PLAN_MAIN],
-    safe: L1_PLAN_MAIN,
+    ability: [[gx(5) - 0.3, "tap", "g"], WJ(13), ...W_PLAN_MAIN],
+    safe: W_PLAN_MAIN.filter(([x]) => x < gx(122) || x > gx(130)),
   },
 };
 
@@ -1154,7 +1244,7 @@ const L4_S2 = insertSection(L4_S1, {
 });
 const L4 = L4_S2;
 
-export const LEVELS = Object.freeze([L1, L2, L3, L4].map((d) => Object.freeze(d)));
+export const LEVELS = Object.freeze([{ ...WAKING, id: 1, numeral: "I" }, L2, L3, L4].map((d) => Object.freeze(d)));
 export function levelDef(n = 1) {
   return LEVELS[Math.max(0, Math.min(LEVELS.length - 1, (n ?? 1) - 1))];
 }

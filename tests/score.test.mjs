@@ -384,5 +384,5 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   assert.equal(bar(l4, "marimba", 5), 8);
   // Each level its own space (RESEARCH_LEVELS 6): 5.5 s, 5.5, 3.5, 2.5.
   assert.deepEqual(IDS.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 3.5, 2.5]);
-  assert.deepEqual(IDS.map((n) => SCORES[n].maxFlat), [10, 15, 20, 20]);
+  assert.deepEqual(IDS.map((n) => SCORES[n].maxFlat), [12, 15, 20, 20]);
 });
