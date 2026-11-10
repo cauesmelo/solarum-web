@@ -568,6 +568,18 @@ button {
 .solarum.waking .wake-block {
   opacity: 0;
 }
+/* The boil repaints the drawn marks eight times a second. Each of these parts
+ * is its own compositing layer, so that repaint does not re-raster the panel's
+ * filtered frame with them: in software rendering (SwiftShader) that filter is
+ * the expensive part, and measured on the title it brought the frame count of
+ * four seconds from about 125 back to about 170 (the old boil alone: 132). */
+.title-panel .stations,
+.title-panel .wake,
+.title-panel .title-foot,
+.title-panel .station-info,
+.corner-hint {
+  will-change: transform;
+}
 /* The title's corner hints: M for the sound, F for fullscreen. Ink on the
  * cream ground, drawn like everything else; they are hints, not buttons. */
 .corner-hint {
