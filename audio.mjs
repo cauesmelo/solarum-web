@@ -167,6 +167,9 @@ function choirLayer(midi, o = {}) {
     kind: "choir",
     tonal: true,
     midi,
+    // Several notes can share one pair of formant filters (the choir voice):
+    // one sum and two band-passes per voice instead of per note.
+    midis: o.midis,
     cents: o.cents ?? 0,
     count: o.count ?? 3,
     spread: o.spread ?? 7,
@@ -933,12 +936,14 @@ const harmonicaLayers = (n, rng, o = {}) => {
     a = o.attack ?? 0.12,
     e = swellEnv(a, Math.max(a + 0.05, dur - 0.25), o.release ?? 1.1, 0.7),
     c = (n.blur ?? 0) + spread(rng, 2);
+  // Panned once at voice level (spec.pan), not per layer: three fewer
+  // stereo panners per note.
   return [
-    tone(m, { glideTo: n.glideTo, glide: n.glide, env: e, gain: (o.gain ?? 0.12), cents: c, pan: n.pan }),
+    tone(m, { glideTo: n.glideTo, glide: n.glide, env: e, gain: (o.gain ?? 0.12), cents: c }),
     // The third harmonic, 20 dB down, gives the glass its hollow ring.
-    tone(m + 19.02, { partial: true, glideTo: n.glideTo != null ? n.glideTo + 19.02 : undefined, glide: n.glide, env: e, gain: (o.gain ?? 0.12) * 0.1, cents: c, pan: n.pan }),
+    tone(m + 19.02, { partial: true, glideTo: n.glideTo != null ? n.glideTo + 19.02 : undefined, glide: n.glide, env: e, gain: (o.gain ?? 0.12) * 0.1, cents: c }),
     // The wet-finger rub: 80 ms of pink noise at twice the fundamental.
-    noise({ filter: { type: "bandpass", freq: Math.min(12000, midiHz(m) * 2), q: 12 }, env: env.perc(0.02, 0.08), gain: (o.gain ?? 0.12) * 0.5, pan: n.pan }),
+    noise({ filter: { type: "bandpass", freq: Math.min(12000, midiHz(m) * 2), q: 12 }, env: env.perc(0.02, 0.08), gain: (o.gain ?? 0.12) * 0.5 }),
   ];
 };
 export const VOICES = {
@@ -950,16 +955,18 @@ export const VOICES = {
       const midis = n.midis ?? CHORDS.D.pad,
         dur = n.dur ?? 4 * BEAT,
         e = swellEnv(1.6, dur, 2.8);
+      // Rendered as grouped buses (renderPad): each tone's two saws feed the
+      // two sides in turn, the second 7-15 ms later so the sides decorrelate,
+      // under one envelope. The layers below describe the same sound (tests,
+      // tuning checks); the engine does not build a node graph per layer.
       const layers = [];
-      // Wide: each tone's two saws sit at independent places across the field
-      // and the second starts 7-15 ms later, so the sides decorrelate.
       midis.forEach((m, i) => {
         const u = midis.length > 1 ? i / (midis.length - 1) : 0.5;
-        layers.push(tone(m, { wave: "sawtooth", cents: 6, detuneBus: 1, env: e, gain: 0.028, pan: -0.9 + 1.2 * u }));
-        layers.push(tone(m, { wave: "sawtooth", cents: -6, detuneBus: -1, env: e, gain: 0.028, pan: 0.9 - 1.0 * u, at: 0.007 + 0.008 * u }));
+        layers.push(tone(m, { wave: "sawtooth", cents: 6, detuneBus: 1, env: e, gain: 0.028, pan: i % 2 ? 0.75 : -0.75 }));
+        layers.push(tone(m, { wave: "sawtooth", cents: -6, detuneBus: -1, env: e, gain: 0.028, pan: i % 2 ? -0.75 : 0.75, at: 0.007 + 0.008 * u }));
       });
       layers.push(tone(midis[0] - 12, { wave: "triangle", detuneBus: 1, env: e, gain: 0.06 }));
-      return voice({ gain: 0.8 * (n.gain ?? 1), send: 0.55, bed: true, hold: "pad", filter: { type: "lowpass", freq: 900, q: 0.4, lfo: { rate: 0.07, depth: 300 } }, autopan: { rate: 0.05, depth: 0.15 }, layers });
+      return voice({ gain: 0.64 * (n.gain ?? 1), send: 0.55, bed: true, hold: "pad", grouped: true, env: e, filter: { type: "lowpass", freq: 900, q: 0.4, lfo: { rate: 0.07, depth: 300 } }, layers });
     },
   },
   choir: {
@@ -976,8 +983,10 @@ export const VOICES = {
         bed: true,
         hold: "choir",
         // Formant band-passes (Q 6) keep only a little of the saws' energy,
-        // hence the high layer gain (balanced by offline renders).
-        layers: midis.map((m, i) => choirLayer(m, { env: e, gain: 0.2, pan: -0.4 + (0.8 * i) / Math.max(1, midis.length - 1), detuneBus: i % 2 ? -1 : 1, morph: 1.4 })),
+        // hence the high gain (balanced by offline renders). All notes share
+        // one pair of formant filters.
+        autopan: { rate: 0.06, depth: 0.35 },
+        layers: [choirLayer(midis[0], { midis, env: e, gain: 0.45 * Math.sqrt(midis.length / 3), detuneBus: 1, morph: 1.4 })],
       });
     },
   },
@@ -985,7 +994,7 @@ export const VOICES = {
     group: "bed",
     label: "Signal",
     about: "The far call: a distant glass harmonica playing the soundtrack's motif from the right, nearer with progress",
-    build: (rng, n = {}) => voice({ gain: 0.7 * (n.gain ?? 1), send: n.send ?? 0.5, bed: true, layers: harmonicaLayers({ ...n, pan: n.pan ?? 0.6 }, rng, { attack: 0.22, release: 1.4, gain: 0.1 }) }),
+    build: (rng, n = {}) => voice({ gain: 0.7 * (n.gain ?? 1), send: n.send ?? 0.5, bed: true, pan: n.pan ?? 0.6, layers: harmonicaLayers(n, rng, { attack: 0.22, release: 1.4, gain: 0.1 }) }),
   },
   pulse: {
     group: "bed",
@@ -993,12 +1002,13 @@ export const VOICES = {
     about: "A felt heartbeat on beats 1 and 3, the half-time pulse (unpitched)",
     build: (rng, n = {}) =>
       voice({
-        gain: 0.56 * (n.gain ?? 1),
+        gain: 0.7 * (n.gain ?? 1),
         send: 0.12,
         bed: true,
         layers: [
           thump(74 * (1 + spread(rng, 0.03)), 44, 0.16, { env: env.perc(0.004, 0.26), gain: 0.32 }),
-          noise({ color: "brown", filter: { type: "lowpass", freq: 420, q: 0.5 }, env: env.perc(0.002, 0.04), gain: 0.12 }),
+          // The felt of the beater: what makes the beat heard on small speakers.
+          noise({ color: "brown", filter: { type: "lowpass", freq: 520, q: 0.5 }, env: env.perc(0.002, 0.04), gain: 0.14 }),
         ],
       }),
   },
@@ -1012,6 +1022,9 @@ export const VOICES = {
         send: 0.1,
         bed: true,
         pan: 0.3 + spread(rng, 0.1),
+        // The engine plays shakers on one persistent noise voice (per-tick
+        // envelopes, no new nodes); this recipe is its description.
+        persistent: "shaker",
         layers: [noise({ color: "white", filter: { type: "bandpass", freq: 7000 * (1 + spread(rng, 0.05)), q: 1.5 }, highpass: 4000, env: env.perc(0.002, 0.035), gain: 0.05 })],
       }),
   },
@@ -1051,7 +1064,7 @@ export const VOICES = {
     group: "player",
     label: "Glass harmonica",
     about: "Diana's breath made glass: jumps glide root to fifth, doubles fifth to ninth, dives an octave down, wind runs rise",
-    build: (rng, n = {}) => voice({ gain: 1.0 * (n.gain ?? 1), send: n.send ?? 0.35, layers: harmonicaLayers(n, rng) }),
+    build: (rng, n = {}) => voice({ gain: 1.0 * (n.gain ?? 1), send: n.send ?? 0.35, pan: n.pan, layers: harmonicaLayers(n, rng) }),
   },
   vowel: {
     group: "player",
@@ -1128,7 +1141,7 @@ export const VOICES = {
     build: (rng, n = {}) => {
       const m = n.midi ?? 38;
       return voice({
-        gain: 0.67 * (n.gain ?? 1),
+        gain: 1.0 * (n.gain ?? 1),
         send: 0.12,
         pan: n.pan ?? -0.25,
         layers: [
@@ -1840,17 +1853,21 @@ export function createAudioEngine(options = {}) {
       sum.gain.value = 1 / L.count;
       list.push(sum);
       const params = [];
-      for (let i = 0; i < L.count; i++) {
-        const o = node("Oscillator");
-        o.type = "sawtooth";
-        o.frequency.setValueAtTime(midiHz(L.midi + L.cents / 100), start);
-        o.detune.setValueAtTime((i - (L.count - 1) / 2) * L.spread, start);
-        detuneInto(o.detune, L.detuneBus);
-        flatInto(o.detune);
-        params.push(o.detune);
-        o.connect(sum);
-        go(o);
-      }
+      const notes = L.midis ?? [L.midi];
+      sum.gain.value = 1 / (L.count * notes.length);
+      notes.forEach((m, j) => {
+        for (let i = 0; i < L.count; i++) {
+          const o = node("Oscillator");
+          o.type = "sawtooth";
+          o.frequency.setValueAtTime(midiHz(m + L.cents / 100), start);
+          o.detune.setValueAtTime((i - (L.count - 1) / 2) * L.spread, start);
+          detuneInto(o.detune, j % 2 ? -L.detuneBus : L.detuneBus);
+          flatInto(o.detune);
+          params.push(o.detune);
+          o.connect(sum);
+          go(o);
+        }
+      });
       if (L.vibrato) vibratoInto(params, L.vibrato, start, end, list, sources);
       L.formants.forEach((freq, i) => {
         const f = node("BiquadFilter"),
@@ -1980,6 +1997,7 @@ export function createAudioEngine(options = {}) {
       prune(now);
       const want = forceAt ?? clock.toAudio(n.t) + (LAYERS[n.layer]?.bed ? BED_DELAY : 0);
       const at = Math.max(now + LOOKAHEAD, want);
+      if (n.voice === "shaker") return shake(at, n);
       const late = at - want;
       if (late > 0.002) {
         sc.lateCount++;
@@ -2042,7 +2060,7 @@ export function createAudioEngine(options = {}) {
         send.connect(score.spaceIn);
         list.push(send);
       }
-      const sources = [...spec.layers.flatMap((L) => renderLayer(L, at, out, list, { bed: !!spec.bed })), ...(spec.extra ?? [])];
+      const sources = [...(spec.grouped ? renderPad(spec, at, out, list) : spec.layers.flatMap((L) => renderLayer(L, at, out, list, { bed: !!spec.bed }))), ...(spec.extra ?? [])];
       const v = { voice: n.voice, layer: n.layer, bed: !!spec.bed, hold: spec.hold, start: at, end: at + spec.dur, out, sources, nodes: list, stolen: false };
       // A sustained voice hands over: the previous sky (or choir) releases
       // as the next one swells, so the bed never has a gap or a click.
@@ -2059,9 +2077,105 @@ export function createAudioEngine(options = {}) {
       return null;
     }
   }
+  /** The sky pad as grouped buses: oscillators feed a left, a right and a
+   * centre (sub) gain directly, under one envelope. About 18 nodes a pad
+   * instead of about 35 (audio critic, finding 11: per-note graphs cost CPU). */
+  function renderPad(spec, at, out, list) {
+    const env = node("Gain");
+    env.gain.value = 0;
+    automate(env.gain, spec.env, at, 1);
+    env.connect(out);
+    const sides = [-0.75, 0.75, 0].map((pan, i) => {
+      const g = node("Gain");
+      g.gain.value = i < 2 ? 0.028 : 0.06;
+      if (pan && ctx.createStereoPanner) {
+        const p = node("StereoPanner");
+        p.pan.value = pan;
+        g.connect(p);
+        p.connect(env);
+        list.push(p);
+      } else g.connect(env);
+      list.push(g);
+      return g;
+    });
+    list.push(env);
+    const end = at + envEnd(spec.env) + 0.05;
+    const sources = [];
+    for (const L of spec.layers) {
+      const o = node("Oscillator");
+      o.type = L.wave;
+      o.frequency.setValueAtTime(L.freq[0][1], at);
+      detuneInto(o.detune, L.detuneBus);
+      if (score) score.flat.connect(o.detune);
+      o.connect(L.wave === "triangle" ? sides[2] : L.pan < 0 ? sides[0] : sides[1]);
+      o.start(at + L.at);
+      o.stop(end);
+      sources.push(o);
+      list.push(o);
+    }
+    return sources;
+  }
+  /** Shakers on one persistent noise voice: each tick is an envelope on its
+   * gain, so a sixteenth of shaker creates no node at all. */
+  function shake(at, n) {
+    try {
+      if (!sc.shaker) {
+        const src = node("BufferSource"),
+          bp = node("BiquadFilter"),
+          hp = node("BiquadFilter"),
+          g = node("Gain"),
+          p = node("StereoPanner");
+        src.buffer = buffers.white;
+        src.loop = true;
+        bp.type = "bandpass";
+        bp.frequency.value = 7000;
+        bp.Q.value = 1.5;
+        hp.type = "highpass";
+        hp.frequency.value = 4000;
+        g.gain.value = 0;
+        p.pan.value = 0.3;
+        src.connect(bp);
+        bp.connect(hp);
+        hp.connect(g);
+        g.connect(p);
+        p.connect(score.bedIn);
+        src.start(t());
+        sc.shaker = { src, g, nodes: [src, bp, hp, g, p] };
+      }
+      const g = sc.shaker.g.gain,
+        peak = 0.5 * 0.05 * (n.gain ?? 1) * dbToGain(spread(rng, 1));
+      g.setValueAtTime(0, at);
+      g.linearRampToValueAtTime(peak, at + 0.002);
+      g.exponentialRampToValueAtTime(Z, at + 0.037);
+      g.setValueAtTime(0, at + 0.04);
+      sc.scheduled++;
+      return { voice: "shaker", start: at, end: at + 0.04 };
+    } catch {
+      return null;
+    }
+  }
+  function destroyShaker() {
+    if (!sc.shaker) return;
+    try {
+      sc.shaker.src.stop();
+      for (const n of sc.shaker.nodes) n.disconnect();
+    } catch {
+      /* ignore */
+    }
+    sc.shaker = null;
+  }
   function silenceScore(at, fade = 0.05) {
     for (const v of music) fadeOut(v, fade, at);
     held.pad = held.choir = null;
+    // Cancel shaker ticks already scheduled past this point.
+    if (sc.shaker)
+      try {
+        const g = sc.shaker.g.gain;
+        g.cancelScheduledValues(at);
+        g.setValueAtTime(0, at);
+      } catch {
+        /* ignore */
+      }
   }
   /** The fall (brief 5.6): 0-0.45 s the score's tape slows to a stop (pitch
    * falls two octaves as the delay's growth rate reaches 0.75, the lowpass
@@ -2502,6 +2616,7 @@ export function createAudioEngine(options = {}) {
     for (const v of voices) fadeOut(v, fade);
     for (const v of music) fadeOut(v, fade);
     held.pad = held.choir = null;
+    if (sc.shaker) silenceScore(t(), fade);
     if (bed) setAirSilent();
   }
   function setAirSilent() {
@@ -2607,6 +2722,7 @@ export function createAudioEngine(options = {}) {
         held.pad = held.choir = null;
         destroyBed();
         destroyWhistle();
+        destroyShaker();
         try {
           musicEl?.pause();
         } catch {
