@@ -39,13 +39,13 @@ Status uses the rubric's meaning. **WARN** means the value is within 25% of the 
 | D2 | Skill gradient (≥ 15%) | PASS | PASS |
 | D3 | Recovery | PASS | PASS |
 | E1 | Action feedback on the same frame | PASS | PASS |
-| E2 | Resource state shown on Diana | WARN (double jump) | WARN (double jump) |
+| E2 | Resource state shown on Diana | WARN (double jump) | WARN (double jump); **PASS** since the leaf glint (2026-11-10) |
 | E3 | Telegraphs ≥ 1.5 s, lookahead ≥ 2 s | PASS | PASS |
 | F | Windows ≥ 120 ms | PASS | PASS (wider) |
 | F | Decision lead ≥ 1.5 s | WARN | WARN (landings of chains) |
 | F | Beat alignment ±35 ms | PASS | PASS |
 
-Before: 5 FAIL, 6 WARN. After: 0 FAIL, 7 WARN, because C1 moved from FAIL to WARN. Each remaining WARN has its reason in the last section.
+Before: 5 FAIL, 6 WARN. After: 0 FAIL, 7 WARN, because C1 moved from FAIL to WARN. Each remaining WARN has its reason in the last section. **Update 2026-11-10 (art squad):** the leaf glint gives the double jump a lasting cue on Diana, so E2 passes: 0 FAIL, 6 WARN. The no-cape frames (level I in the eight-level campaign) meet C1 too.
 
 ## The complaint: "it looks like you made it, but you don't go up"
 
@@ -122,6 +122,7 @@ The levels' physics in real units:
 | # | Measured | Target | Status | Evidence |
 | --- | --- | --- | --- | --- |
 | C1 vertical | 89 clip frames in play. The 31 airborne frames (jump, air, flight, dive) have the lowest drawn pixel within **1.3 px** of the feet; the 51 grounded frames are within **1.3 px**. Before: flight body 2.5–3.8 px, and 0–26 px eased transients at high refresh rates. Seven stride-float frames are 5.9–7.1 px above (see WARN). | ±2 px | PASS (stride WARN) | `C1: every frame…`; browser C1 |
+| C1 vertical, no cape (2026-11-10) | 62 no-cape clip frames in play (level I wears no cape). The 13 airborne non-stride frames are within **0.5 px** of the feet (the no-cape hard landing has one more airborne frame, sheet frame 5, and the drop roll lifted 2.5–3.8 px: both baked), the 42 grounded ones within **1.3 px**, and the same seven stride floats are 5.9–7.1 px. The body is never smaller than the collider, except the stop's deepest crouch (45 px tall without the cape), which plays only in the door after the win. | ±2 px | PASS (stride WARN) | `C1 (no cape)…` |
 | C1 horizontal | The collider is a fixed 32 × 58 box (±16 px). Drawn feet span −20…+37 px (air) and −17…+34 px (run stride); the airborne toe is centred (±1.7 px). | ±2 px | WARN | `sprites` report |
 | C1 hurtbox | Nothing hurts on contact, so the collider is only a support box. It is never wider or taller than the drawn body. | ≤ drawn body | PASS | `C1` |
 | C2 | No hazards or enemies: only falling below the death line ends a run. | — | N/A | — |
@@ -141,7 +142,7 @@ The levels' physics in real units:
 | # | Measured | Status | Evidence |
 | --- | --- | --- | --- |
 | E1 | Every movement verb emits its event inside the press call. Each has a body sound (`cuesForEvent`) and a same-frame visual: a pose change, plus dust or sparks for jump, double, super, hard landing and smash. | PASS | `E1/E2` |
-| E2 | The cape is the meter: a spent cape is tinted on Diana. The double jump only shows a spark burst when it is spent, and no lasting cue. | Cape PASS, double WARN | `E1/E2` |
+| E2 | The cape is the meter: a spent cape is tinted on Diana (four steps with the breath bar: 60/45/30/15% dim, clear at full). The double jump has the leaf glint: one small original star just above her leaves while it is in hand (owned and unspent in this airtime), bursting when spent and back on landing (`hud.mjs` `doubleInHand`; Chrome with real keys: in hand, still after the first jump, gone after the double, back on landing). | PASS | `E1/E2`, `tests/hud.test.mjs`, browser |
 | E3 | Lookahead ≥ 2.5 s landscape and ≥ 2.0 s portrait at every level's speed. Glyphs are on screen ≥ 1.5 s before their latest valid input. | PASS | model tests `lookahead…`, `every glyph prompt…` |
 
 ### F. Solarum
@@ -209,7 +210,7 @@ Both of the last two were rechecked in Chrome, where I 12.41, II 25.93, III 31.8
   - The support box is a fixed ±16 px. The drawn stride's feet swing from −17 to +34 px, and the airborne toe is centred.
   - A pose-dependent box would make walk-off and landing timing depend on the stride phase, which is unfair. A narrower one would remove the ±16 px lip margin, which is deliberate hidden forgiveness, as with Canabalt's building edges extending 8 px past the art (RESEARCH_LEVELS F3): she lands with the toe up to 16 px short of a lip, and the landing pose then plants both feet on it (+16…+24 px).
   - The seven stride-float frames (run 4 and 9, their soft-landing copies, hard landing 7 and 12, start 3) show both feet 6–7 px up by design. Drawing them lower would invert the run's bob.
-- **E2, double jump.** It has no lasting cue on Diana, only the spark burst when it is spent. The rule never varies (one per airtime, and any landing restores it), whereas the cape, the resource that refills in mid-air, is drawn on her. Adding a mark means new art in the original monochrome identity, which is the art lead's call.
+- **E2, double jump: resolved 2026-11-10.** It had no lasting cue on Diana, only the spark burst when it was spent. RESEARCH_PROGRESSION 2.1 made the mark part of the fiction (the first star settles in her leaves at I's GET), and the art squad drew it with the original star sprite: the leaf glint. Its height lags her by 60 ms falling and landing; rising, it rides her head (a 60 ms lag of a 635 px/s jump would sink it 38 px into her leaves).
 - **F, landing lead under 1.5 s at the committing press.** These are II's glide bridge (0.35 s landscape: the shore appears during the glide, which is the point) and the finale chains' last flight in II and IV (0.92 / 1.04 s). Also, in portrait at the 2.0 s floor, a few dashes are at 1.2–1.5 s.
   - The obstacle (the gap) is in view at least 1.77 s ahead in every level. The constellations trace the flight line, and the landing is in view before the press that commits to it (tested).
   - A level-design fix that keeps the grid would be either of two changes. One is to start the far shores 150–200 px further left. The other is to put a constellation star over the landing so it reads earlier. Both would need re-baking `score-path`, so they are left to the level designer.

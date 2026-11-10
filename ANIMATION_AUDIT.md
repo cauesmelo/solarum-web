@@ -30,7 +30,7 @@ This audit checked the supplied Unity archive rather than inferring states from 
 - The original start/stop sheet likewise contains distinct four-frame start and nine-frame stopping sequences.
 - The undercape sheet is preserved, but neither the main dash body clip nor the cape clip references it. Adding it as a third layer would duplicate art without source evidence.
 - The sprout/title animation is retained and mapped, but the gameplay character begins with the cape and uses the actual idle state.
-- No-cape override clips are source variants for pre-cape presentation. They were audited, but gameplay does not remove Diana’s cape, so those variants are not arbitrarily inserted into normal running. The no-cape dash body is the intentional exception required by the original layered dash.
+- No-cape override clips are source variants for pre-cape presentation. They were audited, but gameplay did not remove Diana’s cape, so those variants were not arbitrarily inserted into normal running. The no-cape dash body is the intentional exception required by the original layered dash. **Since 2026-11-10** the eight-level campaign takes the cape away in level I, so the override clips are extracted and drawn there (see the last section).
 
 ## All original Diana clips inspected
 
@@ -129,3 +129,66 @@ A level chooses its set with `sprites: "nocape"` in its definition (or QA with `
 ### Unchanged
 
 The approved clips, pivots, frame order, body-first / cape-second layering, `animation.mjs` and the model's animation state machine are all unchanged. The renderer draws the `idle` body clip itself during the emergence, and the model's `start` clip begins with the run.
+
+## Revision five (2026-11-10): no-cape Diana, the breath bar and the GET moments
+
+RESEARCH_PROGRESSION 2.1–2.3 and 3.3: Diana has no cape in level I and gets it at II's GET, the cape gets a "breath" charge bar drawn with the original HUD art, and the double jump gets a lasting cue. The level-builder's model (branch `rev5-progression`) adds `verbs`, `capeCharge` and the `get` event; this build reads them defensively and falls back to revision seven where they are absent.
+
+### Extraction
+
+`scripts/extract-assets.py` now also copies, byte for byte:
+
+| Manifest sheet | Original | Slices | Pivots |
+| --- | --- | --- | --- |
+| `nocapeRun` | `Sprites/Diana/No Cape/no-cape-diana-run.png` (1000 × 400) | 10 | centre |
+| `nocapeIdle` | `…/no-cape-diana-idle.png` (1000 × 601) | 12 | centre |
+| `nocapeAir` | `…/no-cape-diana-airbourne.png` (1000 × 600) | 6 | 0.5 / 0.333 |
+| `nocapeDrop` | `…/no-cape-diana-drop.png` (1000 × 400) | 6 | centre |
+| `nocapeJumpLanding` | `…/no-cape-diana-jump-hard-landing.png` (1000 × 1000) | 19 | 0.5 / 0.333 for the ten 300 px cells, centre for the rest |
+| `nocapeSoftLanding` | `…/no-cape-diana-soft-landing.png` (1000 × 450) | 10 | 0.5 / 0.4 for the first (250 px) cell, centre for the rest |
+| `nocapeStartStop` | `…/no-cape-diana-start-stop.png` (1000 × 601) | 15 | centre |
+| `breathDisc`, `breathFrame`, `breathFill`, `meteor` | `Sprites/UI/DianaCooldownCircle.png`, `barrinha.png`, `recheioBarra.png`, `meteoroCheio.png` | single sprites | — (drawn by CSS) |
+
+and the ten override clips with their keyframe times (the clips name sprites by fileID; the extractor now also checks each clip's guid against its sheet):
+
+| Model state | Clip (`Animations/Diana/No Cape/`) | Frames | Caped clip for comparison |
+| --- | --- | --- | --- |
+| run | `nocape-running` → `nocapeRun` | 10 at 12 fps, loop | 10 |
+| idle | `nocape-idle` → `nocapeIdle` | **1**, loop | 12 |
+| air | `nocape-airbourne` → `nocapeAir` | **2**, loop | 6 |
+| jump | `nocape-jump1` → `nocapeJump` | 5 | 5 |
+| softLanding | `nocape-soft-landing` → `nocapeSoftLanding` | 10 | 10 |
+| hardLanding | `nocape-hard-landing` → `nocapeHardLanding` | **14** (starts on the still-airborne sheet frame 5) | 13 |
+| start | `nocape-start` → `nocapeStart` | 4 | 4 |
+| stop | `nocape-stop` → `nocapeStop` | **10** | 9 |
+| dive | `nocape-drop-roll` → `nocapeDive` | 6 | 6 |
+| dash | `nocape-dash` → `nocapeDash` | 14 on `bodyDash` (the flight body without its cape layer) | 14 + cape |
+
+Findings:
+- The override controller (`no-cape-diana.overrideController`) maps ten clips. `Sprites/Diana/No Cape/running.anim` is a stray copy of `nocape-running` in the sprite folder, referenced by nothing; it is not extracted.
+- The no-cape idle is a single frame and the no-cape air two, as authored. The model keeps its state durations (start 1/3 s, hard landing 13/12 s, stop 0.75 s), so the no-cape hard landing's and stop's last frame are cut, as a Unity transition would cut them.
+- Feet (MOVEMENT_AUDIT C1): the airborne frames got baked `foot` offsets like the caped ones (`scripts/measure-feet.mjs`). The no-cape hard landing's first two frames are airborne, and the no-cape drop roll lifts the toe 2.5–3.8 px in frames 3–4 (the caped one 0.8–1.3), so the whole roll is baked. All 62 no-cape frames in play are within ±2 px of the collider's feet except the same seven stride floats (5.9–7.1 px), tested.
+
+### Where each is used on screen
+
+| Moment | Art | How |
+| --- | --- | --- |
+| Level I (no cape owned) | the no-cape clips | `animation.mjs` `clipFor` maps each model state to its override clip whenever the state's `verbs` lack the cape (`hud.mjs` `spriteSetName`); the emergence uses `nocapeIdle` / `nocapeStart` / `nocapeRun` |
+| II's GET: the cape settles | caped clip over the no-cape clip | The caped clip fades in over the no-cape one for 0.6 s (same pose, pivot and body lines, so only the cape appears), with the star sheet's burst frames at the cape's tip |
+| Breath bar (HUD, top-left) | `breathFrame`, `breathFill`, `breathDisc`, `meteor` | CSS crops of the unchanged PNGs: the frame 100 × 24 px, the fill clipped to `capeCharge`, three ink notches at the quarters, the disc becoming the meteor stone with one ring pulse when full. Absent until the cape is owned (or without `capeCharge`) |
+| The cape on Diana | any caped clip, tinted | Four steps: 60 / 45 / 30 / 15% `--dim`, clear at full (60% when spent without a bar, as before) |
+| Leaf glint (double jump in hand) | `star` frames 2–3 | One small star just above her leaves; height lagging 60 ms; burst frames 4–7 when spent; pops back on landing |
+| I's GET | `star` frame 2 | The landed star circles on the run line, then rises into the glint |
+| III's GET: the mysterious helper | `star` frame 2, `tailStar`, a code ring | Drifts down a long slope of air to Diana's run line, loops round her, flies off ahead and up; her cape ripples (three code strokes) on each beat of one bar |
+| IV's GET: the necklace wakes | `star` frame 2, code rings | A glint at her chest and three rings of light on the beats; the next lid in view glints (`star` burst) |
+| VIII's GET (super) | as III | The helper runs ahead and leaps |
+
+The breath bar's original meaning is not all kept: in the original HUD the full meteor marked the star quota (a flight cost collected stars). Here it only means "the cape is full"; stars never gate a flight. `manifest.json → usage.meaningsNotUsed` records this, and that DianaCooldownCircle was the cooldown timer's disc.
+
+### Still archive-only
+
+`title` (fulltitle), `undercape`, the duplicate `jump-landing.png`, the archived WAVs and the stray `No Cape/running.anim`. The no-cape drop roll and dash clips are extracted but only play if a level grants the dive or a flight before the cape, which the campaign never does.
+
+### Unchanged
+
+Every caped clip, pivot, frame order, the body-first / cape-second layering and the model's animation state machine. The per-level backdrops (`backdrop.mjs`) are drawn in code, except Saturn's ring strokes (the original `saturn.png`) and home's bright star (the original star sprite).
