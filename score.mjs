@@ -446,8 +446,6 @@ const PRESETS = {
       "gap-song": [76, 78, 81, 85],
       // bar 18 (G): the shore's run and the rise, B4 D5 G5 B5.
       "spark-song": [71, 74, 79, 83],
-      // bars 18-19 (G | A): along the first flight and on the crack, D6 | C#6 A5 E5.
-      "red-song": [86, 85, 81, 76],
       // bars 23-24 (Bm): home, F#5 E5 D5 B4.
       "home-song": [78, 76, 74, 71],
     },
@@ -1157,6 +1155,16 @@ export function createConductor(options = {}) {
         const p = pos(t);
         st.sus = { until: Math.ceil((p + 1) / 8) * 8 };
         st.lastChord = null;
+        break;
+      }
+      case "refill-star": {
+        // RESEARCH_REFILLS 1.1: one quantised voice of Diana's on the grid.
+        // The cape star is the refill's A6 glint; the leaf star a glass tick
+        // on the ninth, the double jump's own interval.
+        const q = quantize(pos(t), { grid: 1, cap: CAPS.input, timeScale: st.timeScale });
+        const c2 = chordAt(q.pos);
+        const m = e.kind === "leaf" ? nearestSafe(c2, rootIn(c2, 74) + 14) : nearestSafe(c2, 93);
+        push(note({ layer: "stars", voice: "glass", midi: m, pos: q.pos, t: transport.timeOf(q.pos), kind: q.kind, delay: q.delay, cap: CAPS.input, dur: 0.6, gain: 0.6, pan: 0.15 }));
         break;
       }
       case "great-star": {
