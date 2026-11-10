@@ -17,10 +17,10 @@
     <link rel="stylesheet" href="./embed.css" />
   </head>
   <body>
-    <!-- One game surface. Landscape: the sky fills it. Portrait: a HUD bar,
-         the letterboxed sky (never cropped below 960 logical px of width) and
-         a control deck below. Every overlay is positioned from the stage box
-         that game.js publishes as CSS variables. -->
+    <!-- One game surface, keyboard only: no mouse, no touch controls. Landscape:
+         the sky fills it. A tall window letterboxes the sky (never cropped below
+         960 logical px of width) under a HUD bar. Every overlay is positioned
+         from the stage box that game.js publishes as CSS variables. -->
     <main class="solarum" id="solarum" data-state="loading" data-layout="landscape">
       <section class="stage" id="stage" aria-label="Solarum, chapter one">
         <canvas
@@ -39,26 +39,29 @@
         <img class="logo" src="./assets/logo.png" alt="Solarum" width="1217" height="254" />
         <div class="wake-block" id="wake-block">
           <div class="title-panel" id="title-panel">
-            <button id="start" class="wake" type="button" disabled>
+            <!-- Keyboard only: this is a caption for the Space key, not a control. -->
+            <p id="start" class="wake" data-ink="pill" data-ready="false" role="status">
               <span id="start-label">Gathering the stars…</span>
-            </button>
+            </p>
             <nav class="level-map" id="level-map" aria-label="Levels">
               <ol class="stations" id="stations"></ol>
               <p class="station-info" id="station-info" aria-live="polite"></p>
             </nav>
-            <!-- v1.0: the release label and the credits stay one tap away from
-                 the title, on the footer line of the panel. -->
+            <!-- v1.0: the release label and the credits stay one key away from
+                 the title, on the footer line of the panel. The key hints are
+                 drawn (key caps, arrows) by ink-ui.mjs. -->
             <div class="title-foot">
-              <p class="keys" id="title-keys" aria-hidden="true">↑ jump · → cape · ↓ dive</p>
+              <p class="keys" id="title-keys" aria-hidden="true"></p>
               <p class="edition">
                 <span class="version" id="version">v1.0</span>
-                <button id="credits-open" class="link-btn" type="button" aria-haspopup="dialog" aria-controls="credits-card">Credits</button>
+                <kbd class="cap" data-ink="cap">C</kbd>
+                <span class="word" id="credits-open" data-ink="underline">Credits</span>
               </p>
             </div>
           </div>
           <p class="load-error" id="load-error" hidden>
             The stars could not be gathered.
-            <button id="reload" class="ink-btn small" type="button">Try again</button>
+            <span class="hint" id="reload"><kbd class="cap" data-ink="cap">R</kbd> try again</span>
           </p>
         </div>
       </div>
@@ -73,7 +76,7 @@
           <span class="breath" id="breath" role="meter" aria-label="Cape" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
             <span class="breath-track"><span class="breath-window" id="breath-window"><span class="breath-fill"></span></span></span>
             <span class="breath-frame" aria-hidden="true"></span>
-            <span class="breath-notches" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="breath-notches" aria-hidden="true"><i data-ink="notch" data-n="1"></i><i data-ink="notch" data-n="2"></i><i data-ink="notch" data-n="3"></i></span>
             <span class="breath-disc" id="breath-disc" aria-hidden="true"></span>
           </span>
           <i class="star-icon" aria-hidden="true"></i>
@@ -83,9 +86,6 @@
           </span>
         </div>
         <svg class="orbit" id="orbit" viewBox="0 0 264 44" aria-hidden="true"></svg>
-        <button id="pause" class="round-btn pause-btn" type="button" aria-label="Pause">
-          <span class="bars" aria-hidden="true"></span>
-        </button>
       </div>
 
       <div class="movement-card" id="movement-card" aria-hidden="true">
@@ -100,18 +100,6 @@
         <span class="banner-control" id="banner-control"></span>
       </div>
       <p class="tip-line" id="tip" aria-hidden="true"></p>
-
-      <!-- Touch: the left half jumps; the right thumb opens the cape and dives.
-           In portrait the same layout becomes a control deck below the sky. -->
-      <div class="controls" id="controls">
-        <button id="touch-jump" class="zone jump-zone" type="button" aria-label="Jump; press again in the air to jump again">
-          <span class="hint" aria-hidden="true">↑</span>
-        </button>
-        <div class="swipe" id="touch-swipe" aria-hidden="true"></div>
-        <button id="touch-dive" class="round-btn dive-btn" type="button" aria-label="Dive">↓</button>
-        <button id="touch-cape" class="round-btn cape-btn" type="button" aria-label="Open the cape; hold to glide">→</button>
-        <p class="turn-hint" id="turn-hint" hidden>Turn sideways for a wider sky</p>
-      </div>
 
       <!-- The end-of-level tally (RESEARCH_TRANSITIONS 2.4): part of the
            automatic transition, never a card. No buttons, no focus,
@@ -132,16 +120,15 @@
         </div>
         <p class="tally-line" id="tally-line" aria-hidden="true" hidden></p>
       </div>
-      <p class="tally-hint" id="tally-hint" aria-hidden="true" hidden><span class="key">R</span> again <span class="sep">·</span> <span class="key">Esc</span> menu</p>
-      <button id="tally-again" class="ink-btn tally-again" type="button" aria-label="Play this level again" hidden>↺ again</button>
+      <p class="tally-hint" id="tally-hint" aria-hidden="true" hidden><kbd class="cap" data-ink="cap">R</kbd> again <span class="sep">·</span> <kbd class="cap" data-ink="cap">Esc</kbd> menu</p>
       <!-- The journey's end: the credits, one card at a time (first completion only). -->
       <div class="credits" id="credits" aria-hidden="true" hidden>
         <img id="credits-logo" src="./assets/logo.png" alt="" width="1217" height="254" />
         <p id="credits-text"></p>
       </div>
 
-      <!-- The credits (v1.0): reachable from the title; Esc, Back or a tap
-           outside the card closes them. Paper card like the pause card. -->
+      <!-- The credits (v1.0): C opens them on the title; Esc, C, Backspace or
+           Enter closes them. Paper card like the pause card. -->
       <div class="veil" id="credits-veil" hidden>
         <div class="card credits-card" id="credits-card" role="dialog" aria-modal="true" aria-labelledby="credits-title" tabindex="-1">
           <h2 id="credits-title">Credits</h2>
@@ -176,7 +163,8 @@
               <dd><span>v1.0 · 2026</span></dd>
             </div>
           </dl>
-          <button id="credits-back" class="ink-btn primary" type="button">Back</button>
+          <button id="credits-back" class="ink-btn primary" type="button" data-ink="btn">Back</button>
+          <p class="keyhints" aria-hidden="true"><kbd class="cap" data-ink="cap">Esc</kbd> close</p>
         </div>
       </div>
 
@@ -188,45 +176,64 @@
             <!-- The journey so far: always one key away (the tally may be skipped). -->
             <p class="journey" id="pause-journey"><span class="journey-label">Journey</span> <i class="star-icon" aria-hidden="true"></i><b id="pause-journey-stars">0</b> <span class="sep" aria-hidden="true">·</span> <i class="slot filled" aria-hidden="true"></i><b id="pause-journey-great">0/0</b> <span class="sep" aria-hidden="true">·</span> <b id="pause-journey-falls">0 falls</b></p>
             <div class="stack">
-              <button id="resume" class="ink-btn primary" type="button">Continue</button>
-              <button id="back-to-light" class="ink-btn" type="button">Back to last light</button>
-              <button id="restart-chapter" class="ink-btn" type="button">Restart level</button>
-              <button id="main-menu" class="ink-btn" type="button">Main menu</button>
+              <button id="resume" class="ink-btn primary" type="button" data-ink="btn">Continue</button>
+              <button id="back-to-light" class="ink-btn" type="button" data-ink="btn">Back to last light</button>
+              <button id="restart-chapter" class="ink-btn" type="button" data-ink="btn">Restart level</button>
+              <button id="main-menu" class="ink-btn" type="button" data-ink="btn">Main menu</button>
             </div>
             <div class="row">
-              <button id="pause-sound" class="ink-btn small" type="button" aria-pressed="true">♫ Sound</button>
-              <button id="assist-open" class="ink-btn small" type="button" aria-controls="pause-assist">Assist…</button>
+              <button id="pause-sound" class="ink-btn small" type="button" aria-pressed="true" data-ink="btn">♫ Sound</button>
+              <button id="assist-open" class="ink-btn small" type="button" aria-controls="pause-assist" data-ink="btn">Assist…</button>
             </div>
             <!-- Music: the sky, its pulse and choir, the title and door song.
                  Sounds: Diana's own sounds and notes, the stars, the menus. -->
             <div class="volumes" role="group" aria-label="Volume">
-              <label class="volume"><span>Music</span><input id="vol-music" type="range" min="0" max="100" step="5" value="100" /></label>
-              <label class="volume"><span>Sounds</span><input id="vol-sounds" type="range" min="0" max="100" step="5" value="100" /></label>
+              <div class="volume" data-ink="row" data-n="music">
+                <label class="vlabel" for="vol-music">Music</label>
+                <span class="vtrack" data-ink="track" data-for="vol-music" data-n="music" aria-hidden="true"></span>
+                <input id="vol-music" class="vinput" type="range" min="0" max="100" step="5" value="100" />
+              </div>
+              <div class="volume" data-ink="row" data-n="sounds">
+                <label class="vlabel" for="vol-sounds">Sounds</label>
+                <span class="vtrack" data-ink="track" data-for="vol-sounds" data-n="sounds" aria-hidden="true"></span>
+                <input id="vol-sounds" class="vinput" type="range" min="0" max="100" step="5" value="100" />
+              </div>
             </div>
+            <p class="keyhints" aria-hidden="true"><i class="kk" data-ink="arrow" data-dir="up" data-n="u"></i><i class="kk" data-ink="arrow" data-dir="down" data-n="d"></i> choose <span class="sep">·</span> <kbd class="cap" data-ink="cap">Enter</kbd> press <span class="sep">·</span> <kbd class="cap" data-ink="cap">Esc</kbd> continue</p>
           </div>
           <div class="card-page" id="pause-assist" hidden>
             <h2>Assist</h2>
             <p class="kind">Play the way that feels good. Nothing is locked or lost.</p>
             <div class="toggles">
-              <button class="toggle" type="button" data-assist="gentle" aria-pressed="false">
+              <button class="toggle" type="button" data-assist="gentle" aria-pressed="false" data-ink="toggle">
                 <b>Gentle pace</b><span>The world moves a little slower.</span>
               </button>
-              <button class="toggle" type="button" data-assist="endlessCape" aria-pressed="false">
+              <button class="toggle" type="button" data-assist="endlessCape" aria-pressed="false" data-ink="toggle">
                 <b>Endless cape</b><span>The cape never needs to rest.</span>
               </button>
-              <button class="toggle" type="button" data-assist="starNet" aria-pressed="false">
+              <button class="toggle" type="button" data-assist="starNet" aria-pressed="false" data-ink="toggle">
                 <b>Star net</b><span>Once per light, a fall returns you to your last ground.</span>
               </button>
-              <button class="toggle" type="button" id="gentle-music" data-assist="gentleMusic" aria-pressed="false">
+              <button class="toggle" type="button" id="gentle-music" data-assist="gentleMusic" aria-pressed="false" data-ink="toggle">
                 <b>Gentle music</b><span>Mistakes never put the music out of tune.</span>
               </button>
             </div>
-            <button id="assist-back" class="ink-btn primary" type="button">Back</button>
+            <button id="assist-back" class="ink-btn primary" type="button" data-ink="btn">Back</button>
+            <p class="keyhints" aria-hidden="true"><kbd class="cap" data-ink="cap">Esc</kbd> back <span class="sep">·</span> <kbd class="cap" data-ink="cap">Enter</kbd> switch</p>
           </div>
         </div>
       </div>
 
-      <button id="sound" class="round-btn sound-btn" type="button" aria-pressed="true" aria-label="Sound">♫</button>
+      <!-- Keyboard hints in the title's corners (they are not controls): M mutes,
+           F goes fullscreen (embed.js). -->
+      <p class="corner-hint left" aria-label="M toggles the sound">
+        <span id="sound" class="badge" data-ink="badge" role="status" aria-label="Sound on">♫</span>
+        <kbd class="cap" data-ink="cap">M</kbd>
+      </p>
+      <p class="corner-hint right" aria-label="F toggles fullscreen">
+        <kbd class="cap" data-ink="cap">F</kbd>
+        <span class="badge fs" data-ink="corners" aria-hidden="true"></span>
+      </p>
       <div id="announcement" class="sr-only" aria-live="polite"></div>
     </main>
     <svg width="0" height="0" class="defs" aria-hidden="true" focusable="false">

@@ -26,6 +26,10 @@
 html,
 body {
   margin: 0;
+  /* Keyboard only: there is no pointer to see over the game, and a finger
+   * can neither scroll nor zoom it. */
+  cursor: none;
+  touch-action: none;
 }
 body,
 button {
@@ -35,11 +39,7 @@ button {
 button {
   font: inherit;
   color: inherit;
-  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-}
-button:disabled {
-  cursor: wait;
 }
 .sr-only {
   position: absolute;
@@ -65,7 +65,7 @@ button:disabled {
   font-size: 18px;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: manipulation;
+  touch-action: none;
 }
 .stage {
   position: absolute;
@@ -82,8 +82,12 @@ button:disabled {
   background: var(--ink);
   outline: none;
 }
-#game:focus-visible {
-  box-shadow: inset 0 0 0 3px var(--hill);
+/* The browser's own focus ring is off everywhere: the drawn cursor loop
+ * (.is-cursor, ink-ui.mjs) is how the keys' target is shown. */
+.solarum :focus,
+.solarum :focus-visible,
+#game:focus {
+  outline: none;
 }
 
 /* ---------- shared marks ---------- */
@@ -151,68 +155,104 @@ button:disabled {
     opacity: 0.85;
   }
 }
-.round-btn {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--paper);
-  color: var(--ink);
-  font-size: 24px;
-  line-height: 1;
+/* ---------- the hand-drawn marks (ink-mark.mjs, ink-ui.mjs) ----------
+ * A host with data-ink holds one SVG behind its content: filled outlines of a
+ * pen stroke, never CSS borders or circles. The host is its own stacking
+ * context so the drawing sits above the host's background and under its text. */
+[data-ink] {
   position: relative;
-  box-shadow: 0 0 0 2px var(--ink);
+  isolation: isolate;
 }
-.round-btn::after {
-  /* A hand-drawn inner ink ring keeps paper buttons in the art's line style. */
-  content: "";
+.ink {
   position: absolute;
-  inset: 4px;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-  filter: var(--wobble);
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  z-index: -1;
   pointer-events: none;
 }
-.round-btn:focus-visible,
-.ink-btn:focus-visible,
-.wake:focus-visible,
-.toggle:focus-visible,
-.itch-fullscreen:focus-visible {
-  outline: 3px solid var(--hill);
-  outline-offset: 3px;
+.ink path {
+  fill: currentColor;
 }
-.pause-btn .bars {
-  width: 14px;
-  height: 18px;
-  border-left: 4px solid var(--ink);
-  border-right: 4px solid var(--ink);
-  border-radius: 1px;
+.ink .ink-paper {
+  fill: var(--paper);
+}
+.ink .ink-paper-card {
+  fill: var(--paper);
+}
+.ink .ink-ink {
+  fill: var(--ink);
+}
+.ink .ink-dim {
+  fill: var(--dim);
+}
+.ink .ink-hill {
+  fill: var(--hill);
+}
+.ink .ink-earth {
+  fill: var(--earth);
+}
+.ink .ink-cur {
+  fill: currentColor;
+}
+/* The keyboard cursor: a looser second loop drawn round the control the keys
+ * act on. It shows on whichever element has .is-cursor, and nowhere else. */
+.ink .ink-focus {
+  display: none;
+}
+.is-cursor > .ink .ink-focus {
+  display: inline;
 }
 .ink-btn {
-  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
   padding: 4px 20px;
-  border: 2.5px solid var(--ink);
-  border-radius: 16px 19px 14px 18px / 18px 14px 19px 15px;
-  background: var(--paper);
+  border: 0;
+  background: transparent;
   color: var(--ink);
   font-size: 22px;
   line-height: 1.1;
-  transition: transform 0.12s ease;
-}
-.ink-btn:hover {
-  transform: translateY(-1px) rotate(-0.4deg);
 }
 .ink-btn.primary {
-  background: var(--ink);
   color: var(--paper);
 }
 .ink-btn.small {
-  min-height: 44px;
+  min-height: 42px;
   font-size: 18px;
   padding: 2px 14px;
+}
+/* Key hints: key names in a hand-drawn cap, arrows drawn as arrows. */
+.cap {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 6px;
+  margin: 0 2px;
+  font: inherit;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+  color: inherit;
+  vertical-align: 1px;
+}
+.kk {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin: 0 2px;
+  vertical-align: -3px;
+  color: inherit;
+}
+.keyhints {
+  margin: 0;
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+.keyhints .sep {
+  margin: 0 4px;
 }
 
 /* ---------- title ---------- */
@@ -257,7 +297,6 @@ button:disabled {
   transition: opacity 0.3s ease;
 }
 .title-panel {
-  pointer-events: auto;
   position: relative;
   display: grid;
   justify-items: center;
@@ -283,58 +322,66 @@ button:disabled {
   pointer-events: none;
 }
 .wake {
+  /* A caption for the Space key, drawn by ink-ui.mjs (a paper plate, a ring
+   * outside it and a second ring that breathes); the margin leaves room for
+   * the rings. It is text on the plate, not a control. */
   position: relative;
+  display: grid;
+  place-items: center;
+  margin: 6px 0 3px;
   min-height: 48px;
-  padding: 6px 26px 7px;
-  border: 0;
-  border-radius: 24px 26px 22px 25px;
-  background: var(--paper);
+  padding: 7px 26px 8px;
   color: var(--ink);
   font-size: 22px;
   line-height: 1.1;
   white-space: nowrap;
-  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--paper);
 }
-.wake::after {
-  /* A slow breath of light around the button instead of fading its text. */
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border-radius: inherit;
-  box-shadow: 0 0 0 0 rgba(251, 251, 234, 0.5);
-  animation: breathe 1.6s ease-in-out infinite alternate;
-  pointer-events: none;
-}
-.wake:disabled {
+.wake[data-ready="false"] {
   opacity: 0.75;
 }
-.wake:disabled::after {
+.wake .ink-breath {
+  opacity: 0.3;
+  animation: breathe 1.6s ease-in-out infinite alternate;
+}
+.wake[data-ready="false"] .ink-breath {
   animation: none;
+  opacity: 0;
 }
 @keyframes breathe {
   from {
-    box-shadow: 0 0 0 0 rgba(251, 251, 234, 0.45);
+    opacity: 0.08;
   }
   to {
-    box-shadow: 0 0 0 7px rgba(251, 251, 234, 0);
+    opacity: 0.5;
   }
 }
 .keys {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
   margin: 0;
   color: var(--mute);
   font-size: 16px;
 }
+.keys .hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.keys .sep {
+  margin: 0 7px;
+}
 /* The panel's footer (v1.0): the controls on the left, the release label and
- * the Credits link on the right; on a narrow phone they wrap onto two
- * centred lines. The link keeps a 44 px tap target through padding that its
- * negative margin takes back, so the panel does not grow. */
+ * the Credits key on the right; on a narrow window they wrap onto two
+ * centred lines. */
 .title-foot {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   column-gap: 18px;
-  row-gap: 0;
+  row-gap: 2px;
 }
 .edition {
   display: inline-flex;
@@ -346,25 +393,11 @@ button:disabled {
 }
 .version {
   color: var(--paper);
+  margin-right: 6px;
 }
-.link-btn {
-  min-height: 44px;
-  margin: -12px 0;
-  padding: 0 8px;
-  border: 0;
-  background: none;
+.edition .word {
+  padding: 0 2px 4px;
   color: var(--mute);
-  font-size: 16px;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-.link-btn:hover {
-  color: var(--paper);
-}
-.link-btn:focus-visible {
-  outline: 3px solid var(--hill);
-  outline-offset: 2px;
-  color: var(--paper);
 }
 /* The orbit line: one numbered station per level (built from LEVELS, so it
  * holds 8-10 as well as 4), joined by the dotted orbit and ending at Earth.
@@ -393,54 +426,50 @@ button:disabled {
   align-items: center;
 }
 /* The dotted orbit between stations; solid where both ends are done. */
-.stations li + li:not(.row-start)::before {
-  content: "";
+/* The orbit between stations (an <i class="link"> drawn by ink-ui.mjs): dotted
+ * ahead of the journey, a pen line where both ends are done. A row's first
+ * station has no link before it. */
+.stations .link {
+  display: block;
+  flex: none;
   width: var(--link, 14px);
-  border-top: 2px dotted var(--dim);
+  height: 14px;
   margin: 0 2px;
 }
-.stations li.travelled:not(.row-start)::before {
-  border-top-style: solid;
-  border-top-color: var(--hill);
+.stations li.row-start .link {
+  display: none;
 }
 .earth-end {
   display: flex;
   align-items: center;
 }
-.earth-end::before {
-  content: "";
+.earth-end .link {
   width: 12px;
-  border-top: 2px dotted var(--dim);
-  margin: 0 2px;
 }
-.earth-end i {
+.earth-end .earth-dot {
   display: block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--earth);
-  box-shadow: 0 0 0 2px var(--paper);
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0 -4px 0 -1px;
 }
 .stop {
+  /* A level's mark (a drawn ring: ink-ui.mjs "stop"). Not a control: the
+   * keys choose levels. */
   position: relative;
   display: grid;
   place-items: center;
   width: 44px;
   height: 44px;
-  padding: 0;
-  border: 2.5px solid var(--paper);
-  border-radius: 50%;
-  background: var(--ink);
   color: var(--paper);
   font-size: 18px;
   line-height: 1;
 }
-.stop[aria-pressed="true"] {
-  background: var(--paper);
+.stop[data-selected="true"] {
   color: var(--ink);
-  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--paper);
 }
-/* Diana's two leaves above the selected station (the HUD's marker). */
+/* Diana's two leaves above the selected station (the HUD's marker); each
+ * node's pair is its own drawing (ink-mark.mjs sprout). */
 .stop .leaves {
   position: absolute;
   left: 50%;
@@ -448,15 +477,17 @@ button:disabled {
   width: 22px;
   height: 14px;
   transform: translateX(-50%);
+  overflow: visible;
   fill: var(--paper);
   /* display, not visibility: a visible child would show through the title
    * UI after it is hidden. */
   display: none;
 }
-.stop[aria-pressed="true"] .leaves {
+.stop[data-selected="true"] .leaves {
   display: block;
 }
-/* A finished level keeps a small filled star at its rim. */
+/* A finished level keeps a small filled star at its rim, tilted by its own
+ * little angle (--tilt, from the level's seed) so no two sit alike. */
 .stop.done::after {
   content: "";
   position: absolute;
@@ -467,24 +498,11 @@ button:disabled {
   background: url("./assets/star.png") no-repeat;
   background-size: 88px 44px;
   background-position: -44px 0;
+  transform: rotate(var(--tilt, 0deg));
 }
-/* Locked: a dashed dim ring and a muted numeral. Still readable (--mute on
- * ink is 8.6:1) and focusable, so its name can be previewed, but it does not
- * open. */
-.stop[aria-disabled="true"] {
-  border-style: dashed;
-  border-color: var(--dim);
+/* Locked: a dashed dim ring and a muted numeral (--mute on ink is 8.6:1). */
+.stop[data-locked="true"] {
   color: var(--mute);
-  cursor: default;
-}
-.stop:focus-visible {
-  outline: 3px solid var(--hill);
-  outline-offset: 3px;
-}
-@media (hover: hover) {
-  .stop:not([aria-disabled="true"]):not([aria-pressed="true"]):hover {
-    background: #26262a;
-  }
 }
 .station-info {
   display: flex;
@@ -500,6 +518,16 @@ button:disabled {
 .station-info .numeral {
   color: var(--mute);
 }
+/* A small chevron on either side of the level's name: another open level lies
+ * that way (Left / Right). Hidden at the ends of the open levels. */
+.station-info .side {
+  flex: none;
+  width: 14px;
+  height: 22px;
+}
+.station-info .side.off {
+  visibility: hidden;
+}
 .station-info .lock {
   font-size: 16px;
   color: var(--mute);
@@ -513,11 +541,13 @@ button:disabled {
   margin: -3px;
   background-size: 112px 56px;
 }
+.station-info .slot {
+  transform: rotate(var(--tilt, 0deg));
+}
 .station-info .slot.filled {
   background-position: -56px 0;
 }
 .load-error {
-  pointer-events: auto;
   margin: 6px 0 0;
   font-size: 18px;
   display: grid;
@@ -538,27 +568,40 @@ button:disabled {
 .solarum.waking .wake-block {
   opacity: 0;
 }
-.solarum.waking .title-panel {
-  pointer-events: none;
-}
-.sound-btn.off::before {
-  content: "";
+/* The title's corner hints: M for the sound, F for fullscreen. Ink on the
+ * cream ground, drawn like everything else; they are hints, not buttons. */
+.corner-hint {
   position: absolute;
-  width: 58%;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--ink);
-  transform: rotate(-45deg);
-}
-.sound-btn {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
   z-index: 8;
-  font-size: 22px;
-}
-.solarum:not([data-state="title"]) .sound-btn {
+  bottom: 16px;
   display: none;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+}
+.corner-hint.left {
+  left: 18px;
+}
+.corner-hint.right {
+  right: 18px;
+}
+.solarum[data-state="title"] .corner-hint {
+  display: flex;
+}
+.badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  font-size: 22px;
+  line-height: 1;
+}
+.badge.fs {
+  width: 30px;
+  height: 30px;
 }
 
 /* ---------- HUD ---------- */
@@ -572,7 +615,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 4px 128px 0 14px;
+  padding: 4px 14px 0 14px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.4s ease;
@@ -727,7 +770,11 @@ button:disabled {
   flex: none;
   width: 264px;
   height: 44px;
-  margin: 0 auto;
+  margin: 0;
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
   opacity: 0.55;
   overflow: visible;
   transition: opacity 0.4s ease;
@@ -735,36 +782,34 @@ button:disabled {
 .orbit.bright {
   opacity: 1;
 }
+/* The orbit line is drawn by hand (ink-mark.mjs): filled outlines, not
+ * strokes. Irregular dots for the road still to go, one pen line clipped to
+ * the progress for the road done, small ringed checkpoints, Earth. */
 .orbit .arc {
-  fill: none;
-  stroke: var(--paper);
-  stroke-width: 2;
-  stroke-dasharray: 2 6;
-  stroke-linecap: round;
+  fill: var(--paper);
 }
 .orbit .travelled {
-  fill: none;
-  stroke: var(--paper);
-  stroke-width: 2.5;
-  stroke-linecap: round;
+  fill: var(--paper);
 }
-.orbit .tick {
+.orbit .tick-fill {
   fill: var(--ink);
-  stroke: var(--paper);
-  stroke-width: 1.6;
 }
-.orbit .tick.lit {
+.orbit .tick.lit .tick-fill {
+  fill: var(--paper);
+}
+.orbit .tick-ring {
   fill: var(--paper);
 }
 .orbit .home {
   fill: var(--paper);
 }
-.orbit .earth-dot {
+.orbit .earth-fill {
   fill: var(--ink);
-  stroke: var(--paper);
-  stroke-width: 2;
 }
-.orbit .earth-dot.memory {
+.orbit .earth-ring {
+  fill: var(--paper);
+}
+.orbit .earth-dot.memory .earth-fill {
   fill: var(--earth);
 }
 .orbit .leaf {
@@ -776,44 +821,6 @@ button:disabled {
   fill: var(--ink);
   font-family: Solarum, sans-serif;
   font-size: 16px;
-}
-.hud .pause-btn {
-  position: absolute;
-  right: 12px;
-  top: 4px;
-  pointer-events: auto;
-}
-.itch-fullscreen {
-  position: absolute;
-  z-index: 9;
-  right: 68px;
-  top: calc(var(--stage-top) + 4px);
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 0 0 2px var(--ink);
-  cursor: pointer;
-  touch-action: manipulation;
-}
-.itch-fullscreen svg {
-  width: 22px;
-  height: 22px;
-  stroke: var(--ink);
-  stroke-width: 2.6;
-  fill: none;
-  stroke-linecap: round;
-}
-.solarum[data-state="title"] .itch-fullscreen,
-.solarum[data-state="loading"] .itch-fullscreen {
-  top: auto;
-  right: 16px;
-  bottom: 16px;
 }
 
 /* ---------- in-world words: movement cards, story, tips ---------- */
@@ -874,162 +881,12 @@ button:disabled {
 }
 
 /* ---------- touch ---------- */
-.controls {
-  position: absolute;
-  z-index: 3;
-  left: 0;
-  right: 0;
-  top: var(--stage-top);
-  height: var(--stage-h);
-  display: none;
-  pointer-events: none;
-}
-@media (pointer: coarse) {
-  .controls {
-    display: block;
-  }
-}
-.solarum[data-layout="portrait"] .controls,
-.solarum.touch .controls {
-  display: block;
-}
-.solarum[data-state="title"] .controls > :not(.turn-hint),
-.solarum[data-state="loading"] .controls > *,
-.solarum[data-state="won"] .controls > *,
-.solarum[data-controls="off"] .controls > * {
-  visibility: hidden;
-}
-.controls > * {
-  pointer-events: auto;
-  touch-action: none;
-}
-.jump-zone {
-  position: absolute;
-  left: 0;
-  top: var(--hud-h);
-  bottom: 0;
-  width: 50%;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--paper);
-}
-.jump-zone .hint {
-  position: absolute;
-  left: 14px;
-  bottom: 10px;
-  width: 60px;
-  height: 60px;
-  display: grid;
-  place-items: center;
-  font-size: 40px;
-  border-radius: 22px;
-  border: 2.5px solid var(--paper);
-  opacity: 0.35;
-}
-.jump-zone.pressed .hint {
-  opacity: 1;
-}
-.swipe {
-  position: absolute;
-  left: 50%;
-  right: 0;
-  top: var(--hud-h);
-  bottom: 0;
-}
-.cape-btn,
-.dive-btn {
-  position: absolute;
-  opacity: 0.35;
-  font-size: 30px;
-  transition: opacity 0.08s linear;
-}
 /* Landscape: both thumb buttons sit low in the corner strip, under the line
  * where landings appear, so the lower-right lookahead stays visible. */
-.cape-btn {
-  width: 62px;
-  height: 62px;
-  right: 12px;
-  bottom: 10px;
-  font-size: 30px;
-}
-.dive-btn {
-  width: 50px;
-  height: 50px;
-  right: 86px;
-  bottom: 10px;
-  font-size: 26px;
-}
-.cape-btn.pressed,
-.dive-btn.pressed {
-  opacity: 1;
-}
-.cape-btn.spent {
-  background: var(--dim);
-}
 /* The cape's rim fills as a paper arc with the breath bar's charge and
  * lights once when full (only while the bar is shown: data-breath). */
-.cape-btn::before {
-  content: "";
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  background: conic-gradient(var(--paper) calc(var(--charge, 0) * 1turn), rgba(119, 119, 113, 0.55) 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 4px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 4px));
-  pointer-events: none;
-  display: none;
-}
-.solarum[data-breath] .cape-btn::before {
-  display: block;
-}
-.cape-btn.lit {
-  animation: rim-light 0.7s ease-out 1;
-}
-@keyframes rim-light {
-  from {
-    opacity: 1;
-    box-shadow: 0 0 0 2px var(--ink), 0 0 14px 4px rgba(251, 251, 234, 0.7);
-  }
-  to {
-    box-shadow: 0 0 0 2px var(--ink);
-  }
-}
 /* Verbs not yet owned (eight-level model): their touch buttons are absent,
  * and fade in with one pulse at the GET. Without data-verbs both show. */
-.solarum[data-verbs]:not([data-verbs~="cape"]) .cape-btn,
-.solarum[data-verbs]:not([data-verbs~="dive"]) .dive-btn {
-  display: none;
-}
-.cape-btn.arrive,
-.dive-btn.arrive {
-  animation: arrive-btn 0.9s ease-out 1;
-}
-@keyframes arrive-btn {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  45% {
-    opacity: 1;
-    transform: scale(1.12);
-  }
-  to {
-    opacity: 0.35;
-    transform: scale(1);
-  }
-}
-.turn-hint {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 10px;
-  margin: 0;
-  text-align: center;
-  font-size: 16px;
-  color: var(--mute);
-  pointer-events: none;
-}
 
 /* ---------- portrait: HUD bar, letterboxed sky, control deck ---------- */
 .solarum[data-layout="portrait"] .hud {
@@ -1053,77 +910,14 @@ button:disabled {
   transform: translateX(-50%);
   margin: 0;
 }
-.solarum[data-layout="portrait"] .itch-fullscreen {
-  top: 6px;
-}
-.solarum[data-layout="portrait"][data-state="title"] .itch-fullscreen {
-  top: 6px;
-  bottom: auto;
-}
-.solarum[data-layout="portrait"] .hud .pause-btn {
-  top: 6px;
-}
-.solarum[data-layout="portrait"] .controls {
-  top: calc(var(--stage-top) + var(--stage-h));
-  height: auto;
-  bottom: 0;
-  border-top: 2px dashed rgba(174, 174, 163, 0.35);
-}
 /* Deck: orbit and story lines on top, a framed jump panel on the left, the
  * cape / dive cluster in the right thumb's reach. Targets stay >= 44 px. */
 .solarum[data-layout="portrait"] .hud .orbit {
   top: calc(var(--stage-top) + var(--stage-h) + 8px);
 }
-.solarum[data-layout="portrait"] .jump-zone {
-  top: 112px;
-  bottom: 12px;
-  left: 12px;
-  width: calc(50% - 18px);
-  border: 2px dashed rgba(206, 206, 193, 0.28);
-  border-radius: 26px 30px 24px 28px;
-}
-.solarum[data-layout="portrait"] .jump-zone.pressed {
-  border-color: rgba(251, 251, 234, 0.6);
-}
-.solarum[data-layout="portrait"] .swipe {
-  top: 112px;
-}
-.solarum[data-layout="portrait"] .jump-zone .hint {
-  left: 50%;
-  top: 50%;
-  bottom: auto;
-  transform: translate(-50%, -50%);
-  width: 88px;
-  height: 88px;
-  font-size: 48px;
-}
-.solarum[data-layout="portrait"] .cape-btn {
-  right: 24px;
-  bottom: 24px;
-  width: 88px;
-  height: 88px;
-}
-.solarum[data-layout="portrait"] .dive-btn {
-  right: 124px;
-  bottom: 100px;
-  width: 72px;
-  height: 72px;
-}
-.solarum[data-layout="portrait"] .turn-hint {
-  top: 84px;
-  bottom: auto;
-}
 /* On the portrait title the hint sits at the very bottom, under the panel
  * (and is dropped where the deck is too short to hold both). */
-.solarum[data-layout="portrait"][data-state="title"] .turn-hint {
-  top: auto;
-  bottom: 10px;
-}
 @media (max-height: 700px) and (max-aspect-ratio: 1/1) {
-  .solarum[data-layout="portrait"][data-state="title"] .turn-hint,
-  .solarum[data-layout="portrait"] .title-panel .keys {
-    display: none;
-  }
   .solarum[data-layout="portrait"] .stations {
     row-gap: 10px;
   }
@@ -1136,29 +930,8 @@ button:disabled {
 }
 /* Short decks (small phones): drop the panel top under the orbit. */
 @media (max-height: 640px) and (max-aspect-ratio: 1/1) {
-  .solarum[data-layout="portrait"] .jump-zone,
-  .solarum[data-layout="portrait"] .swipe {
-    top: 60px;
-  }
-  .solarum[data-layout="portrait"] .jump-zone .hint {
-    width: 64px;
-    height: 64px;
-    font-size: 36px;
-  }
-  .solarum[data-layout="portrait"] .cape-btn {
-    width: 76px;
-    height: 76px;
-    bottom: 14px;
-  }
-  .solarum[data-layout="portrait"] .dive-btn {
-    width: 60px;
-    height: 60px;
-    right: 108px;
-    bottom: 80px;
-  }
   .solarum[data-layout="portrait"] .story-line,
-  .solarum[data-layout="portrait"] .tip-line,
-  .solarum[data-layout="portrait"] .turn-hint {
+.solarum[data-layout="portrait"] .tip-line {
     top: calc(var(--stage-top) + var(--stage-h) + 52px);
   }
 }
@@ -1183,11 +956,6 @@ button:disabled {
 }
 .solarum[data-layout="portrait"] .stations {
   --link: 10px;
-}
-.solarum[data-layout="portrait"][data-state="title"] .sound-btn,
-.solarum[data-layout="portrait"][data-state="loading"] .sound-btn {
-  top: 6px;
-  bottom: auto;
 }
 .solarum[data-layout="portrait"] .movement-card .name {
   font-size: 30px;
@@ -1381,48 +1149,18 @@ button:disabled {
   pointer-events: none;
   opacity: 0;
 }
-.tally-hint .key {
+.tally-hint .cap {
   color: var(--paper);
 }
 .tally-hint .sep {
   margin: 0 6px;
 }
-/* Touch: one 44 px ink button "↺ again" under the panel; the HUD's own II
- * is the menu. A tap anywhere else skips. */
-.tally-again {
-  position: absolute;
-  z-index: 7;
-  left: 50%;
-  top: calc(var(--stage-top) + var(--stage-h) * 0.58 + var(--tally-h, 104px) + 10px);
-  transform: translateX(-50%);
-  min-width: 44px;
-  min-height: 44px;
-  display: none;
-  opacity: 0;
-}
-.solarum.touch .tally-again,
-.solarum[data-layout="portrait"] .tally-again {
-  display: block;
-}
-.solarum.touch .tally-hint,
-.solarum[data-layout="portrait"] .tally-hint {
-  display: none;
-}
-@media (pointer: coarse) {
-  .tally-again {
-    display: block;
-  }
-  .tally-hint {
-    display: none;
-  }
-}
-.tally-again[hidden],
 .tally-hint[hidden],
 .tally[hidden] {
   display: none !important;
 }
-/* Landscape phones: a little higher, never more than 60% of the stage's
- * width or 34% of its height; numbers stay 22 px and labels 16. */
+/* Short windows: a little higher, never more than 60% of the stage's width
+ * or 34% of its height; numbers stay 22 px and labels 16. */
 @media (max-height: 460px) {
   .tally {
     top: calc(var(--stage-top) + var(--stage-h) * 0.56);
@@ -1430,7 +1168,6 @@ button:disabled {
     padding: 8px 16px 8px;
     gap: 2px 12px;
   }
-  .tally-again,
   .tally-hint {
     top: auto;
     bottom: 8px;
@@ -1441,9 +1178,6 @@ button:disabled {
 .solarum[data-layout="portrait"] .tally {
   top: calc(var(--stage-top) + var(--stage-h) + 24px);
   max-width: calc(100% - 24px);
-}
-.solarum[data-layout="portrait"] .tally-again {
-  top: calc(var(--stage-top) + var(--stage-h) + 24px + var(--tally-h, 104px) + 14px);
 }
 /* 320 px wide: the three items of a row may wrap; the panel stays in the deck. */
 @media (max-width: 360px) {
@@ -1574,12 +1308,12 @@ button:disabled {
   min-height: 320px;
   max-height: 100%;
   overflow: auto;
-  padding: 22px 28px 22px;
+  padding: 20px 28px 18px;
   text-align: center;
 }
 .card-page {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   justify-items: center;
 }
 /* The credits card (v1.0): the team, the music, the font and the note that
@@ -1637,26 +1371,33 @@ button:disabled {
 }
 .orbit.big {
   width: 100%;
-  max-width: 360px;
+  max-width: 300px;
   height: auto;
   margin: 0;
   opacity: 1;
+  position: static;
+  transform: none;
 }
 .orbit.big .arc,
-.orbit.big .travelled {
-  stroke: var(--ink);
-}
-.orbit.big .tick {
-  fill: var(--paper);
-  stroke: var(--ink);
-}
-.orbit.big .tick.lit,
+.orbit.big .travelled,
 .orbit.big .home {
   fill: var(--ink);
 }
-.orbit.big .earth-dot {
+.orbit.big .tick-fill {
   fill: var(--paper);
-  stroke: var(--ink);
+}
+.orbit.big .tick.lit .tick-fill {
+  fill: var(--ink);
+}
+.orbit.big .tick-ring,
+.orbit.big .earth-ring {
+  fill: var(--ink);
+}
+.orbit.big .earth-fill {
+  fill: var(--paper);
+}
+.orbit.big .earth-dot.memory .earth-fill {
+  fill: var(--earth);
 }
 .stack {
   display: grid;
@@ -1669,59 +1410,36 @@ button:disabled {
   justify-content: center;
   flex-wrap: wrap;
 }
-/* Music and Sounds: ink tracks with a paper thumb in an ink ring. */
+/* Music and Sounds: a drawn track and thumb (ink-ui.mjs "track"). The native
+ * range input is the value and takes Left / Right; it is visually hidden and
+ * never reached by a pointer. */
 .volumes {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
 }
 .volume {
+  position: relative;
   display: grid;
   grid-template-columns: 80px 1fr;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: 40px;
   font-size: 18px;
   text-align: left;
 }
-.volume input {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 44px;
+.vtrack {
+  display: block;
+  height: 40px;
+}
+.vinput {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
   margin: 0;
-  background: transparent;
-  cursor: pointer;
-}
-.volume input::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--ink);
-}
-.volume input::-moz-range-track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--ink);
-}
-.volume input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 26px;
-  height: 26px;
-  margin-top: -11px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2.5px solid var(--ink);
-}
-.volume input::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2.5px solid var(--ink);
-}
-.volume input:focus-visible {
-  outline: 3px solid var(--hill);
-  outline-offset: 2px;
 }
 .kind {
   margin: 0;
@@ -1742,9 +1460,8 @@ button:disabled {
   min-height: 48px;
   padding: 8px 14px 8px 10px;
   text-align: left;
-  border: 2px solid var(--ink);
-  border-radius: 14px 18px 12px 16px;
-  background: var(--paper);
+  border: 0;
+  background: transparent;
   color: var(--ink);
 }
 .toggle::before {
@@ -1757,10 +1474,9 @@ button:disabled {
   background-size: 144px 72px;
   background-position: 0 0;
 }
+/* On: the star is the filled one, over a drawn ink disc (ink-ui.mjs). */
 .toggle[aria-pressed="true"]::before {
-  background-image: url("./assets/star.png"), radial-gradient(circle, var(--ink) 0 36%, transparent 38%);
-  background-size: 144px 72px, 100% 100%;
-  background-position: -72px 0, 0 0;
+  background-position: -72px 0;
 }
 .toggle b {
   font-weight: 400;
@@ -1804,9 +1520,6 @@ button:disabled {
   .title-panel.wide-line .station-info {
     grid-row: 2;
     grid-column: 2;
-  }
-  .title-panel .keys {
-    display: none;
   }
   .wake {
     font-size: 20px;
@@ -1854,10 +1567,22 @@ button:disabled {
     grid-row: 3;
   }
 }
+/* ---------- keyboard only ----------
+ * Solarum has no mouse or touch input. Nothing on the surface can be hit, the
+ * pointer is hidden, and inert.mjs cancels whatever pointer events still
+ * reach the page (a click only hands the page keyboard focus, which the
+ * browser does by itself). */
+.solarum,
+.solarum *,
+.solarum *::before,
+.solarum *::after {
+  pointer-events: none !important;
+  cursor: none !important;
+}
 @media (prefers-reduced-motion: reduce) {
   *,
-  *::before,
-  *::after {
+*::before,
+*::after {
     animation: none !important;
     transition: none !important;
   }

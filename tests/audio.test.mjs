@@ -341,7 +341,9 @@ test("every event name model.mjs emits maps to at least one cue", async () => {
   assert.match(js, /audio\.event\(e, \{ render: loud, timeScale: simScale\(\) \}\);/, "processEvents voices every event (and quiet steps still tell the score)");
   assert.doesNotMatch(js, /\bsfx\(/, "no pitch-shifted WAV calls remain");
   // Presentation-only cues the renderer triggers directly.
-  for (const cue of ["crumble-shake", "crumble-fall", "ui-hover", "ui-select", "ui-resume"]) assert.match(js, new RegExp(`audio\\.play\\("${cue}"`), cue);
+  // (ui-hover was the pointer-hover tick on the HUD buttons; the game is keyboard
+  // only now, so only the cues a key can reach are triggered from the renderer.)
+  for (const cue of ["crumble-shake", "crumble-fall", "ui-select", "ui-resume"]) assert.match(js, new RegExp(`audio\\.play\\("${cue}"`), cue);
 });
 
 /* ---------- recipes ---------- */
@@ -800,8 +802,9 @@ test("Music and Sounds volumes: guarded storage, defaults 1, clamped", async () 
   const html = await read("index.html"),
     js = await read("game.js");
   const pause = html.slice(html.indexOf('id="pause-main"'), html.indexOf('id="pause-assist"'));
-  assert.match(pause, /id="vol-music" type="range"/);
-  assert.match(pause, /id="vol-sounds" type="range"/);
+  // (the native range inputs hold the value and take Left / Right; the drawn track follows them)
+  assert.match(pause, /id="vol-music"[^>]*type="range"/);
+  assert.match(pause, /id="vol-sounds"[^>]*type="range"/);
   assert.match(js, /volumes: readVolumes\(\(\) => window\.localStorage\)/);
 });
 
@@ -819,11 +822,11 @@ test("the map's count-in schedules one bar of felt beats; a door without the rec
 });
 // (Glyph rows no longer lift over Diana: they are still signs, placed clear
 // of her while she reads them; tests/signage.test.mjs T1-T2.)
-test("browser layer: touch controls appear on the first real touch", async () => {
+test("browser layer: keyboard only (no touch controls, no pointer handlers); the transition's count-in plays at B0", async () => {
   const js = await read("game.js"),
     css = await read("style.css");
-  assert.match(js, /e\.pointerType !== "touch" \|\| root\.classList\.contains\("touch"\)/);
-  assert.match(css, /\.solarum\.touch \.controls \{\n  display: block;/);
+  assert.doesNotMatch(js, /pointerType|setPointerCapture|"pointerdown"|root\.classList\.add\("touch"\)/);
+  assert.doesNotMatch(css, /\.solarum\.touch|\.controls \{/);
   // (The count-in now plays at B0 of the automatic transition, under
   // reduced motion too: tests/transition.test.mjs and the root QA, T6/T9.)
   assert.match(js, /handle = audio\.countIn\(\{ bpm: next\.bpm \* pace, delay: plan\.B\[0\] \}\);/);

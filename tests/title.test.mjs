@@ -91,7 +91,8 @@ test("pause card offers Main menu, which returns to the title through toTitle()"
   const pause = html.slice(html.indexOf('id="pause-main"'), html.indexOf('id="pause-assist"'));
   for (const id of ["resume", "back-to-light", "restart-chapter", "main-menu"]) assert.match(pause, new RegExp(`id="${id}"`));
   assert.match(pause, />Main menu</);
-  assert.match(js, /\$\("main-menu"\)\.addEventListener\("click", toTitle\)/);
+  // (Keyboard only: Enter / Space on the focused card button runs PRESS["main-menu"].)
+  assert.match(js, /"main-menu": \(\) => \(toTitle\(\), audio\.play\("ui-select"\)\)/);
   // toTitle un-pauses the engine before it starts the title song.
   const body = js.slice(js.indexOf("function toTitle()"), js.indexOf("/* ---------- input ---------- */"));
   assert.ok(body.indexOf("syncAudio();") < body.indexOf("audio.playMusic("), "resume, then the title song");
@@ -105,11 +106,12 @@ test("title: the level select is built from LEVELS, opaque, and the world is hid
   assert.match(js, /for \(const d of LEVELS\) \{\n    const li = document\.createElement\("li"\)/);
   const panel = css.slice(css.indexOf(".title-panel {"), css.indexOf("}", css.indexOf(".title-panel {")));
   assert.match(panel, /background: var\(--ink\);/, "the panel is solid ink");
+  // A stop is a drawn ring on the opaque panel (ink-ui.mjs), not a CSS border or circle.
   const stop = css.slice(css.indexOf("\n.stop {"), css.indexOf("}", css.indexOf("\n.stop {")));
-  assert.match(stop, /background: var\(--ink\);/, "stops are solid");
+  assert.ok(!/border|border-radius/.test(stop), "no CSS ring: the ring is drawn");
   assert.ok(!/rgba\(12, 12, 15, 0\.55\)/.test(css), "the see-through station fill is gone");
-  // Locked stops stay legible: a dashed ring and the --mute numeral, no fade.
-  const locked = css.slice(css.indexOf('.stop[aria-disabled="true"] {'), css.indexOf("}", css.indexOf('.stop[aria-disabled="true"] {')));
+  // Locked stops stay legible: a dashed (drawn) ring and the --mute numeral, no fade.
+  const locked = css.slice(css.indexOf('.stop[data-locked="true"] {'), css.indexOf("}", css.indexOf('.stop[data-locked="true"] {')));
   assert.match(locked, /color: var\(--mute\)/);
   assert.ok(!/opacity/.test(locked));
   // The world layer (stars, glyphs, beacons) is not drawn on the title.

@@ -39,6 +39,10 @@ import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, bodyTop, earthB
 import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt, SIXTEENTH_SIM, MOMENT_KINDS, scriptedMoments, fallAt, flashAt, asteroidAt, plumeAt, farPlace, eyeAt, eyeSeconds, eyeTimes, rideAt, slopeAt } from "./moments.mjs";
 import { ISLAND_LOOKS, islandShape, markable, paintMarks, paintParticles } from "./islands.mjs";
 import { platformStyleFrom, isPlatformStyle, createRockCache, rockShape, traceRock, paintRock, paintDrift } from "./platform-style.mjs";
+import * as inkMark from "./ink-mark.mjs";
+import { createInk, setCursor, clearCursor } from "./ink-ui.mjs";
+import { makeInert } from "./inert.mjs";
+import { titleKey, pauseKey, menuStep, canChoose, WAKE_KEYS, PAGE_KEYS, CREDITS_CLOSE_KEYS } from "./keymap.mjs";
 
 /* Renderer, input and UI. All gameplay rules live in model.mjs / level.mjs;
  * this file only draws the simulation, forwards input and plays sound. */
@@ -47,7 +51,13 @@ const root = $("solarum"),
   canvas = $("game"),
   ctx = canvas.getContext("2d");
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const coarse = matchMedia("(pointer: coarse)").matches;
+// Keyboard only: whatever pointer or touch event reaches the page is cancelled
+// before any handler sees it (inert.mjs); a click still gives the page focus.
+const inert = makeInert(window, { afterPointer: () => restoreKeyFocus() });
+// The hand-drawn UI marks (ink-mark.mjs geometry, ink-ui.mjs hosts): they boil
+// with the panel's wobble filter and stand still under reduced motion.
+const ink = createInk({ reduced });
+ink.scan(document); // the static hosts (pill, buttons, key caps, sliders, badges)
 const INK = "#0c0c0f",
   PAPER = "#fbfbea",
   HILL = "#cecec1",
@@ -145,8 +155,7 @@ const sound = {
   volumes: readVolumes(() => window.localStorage),
   music: new Audio(),
 };
-// Phones get a shorter space reverb (at most 4 s) to save CPU.
-const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, spaceSeconds: coarse ? 4 : 5.5, level: state.level, volumes: sound.volumes });
+const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, spaceSeconds: 5.5, level: state.level, volumes: sound.volumes });
 /** Simulation seconds per real second: the level's clock (BPM / 107) times
  * Gentle pace, so the arcs stay identical and only time is scaled. */
 const simScale = () => pace * (state.clock ?? 1);
@@ -163,8 +172,11 @@ function setSound(on) {
     $(id).setAttribute("aria-pressed", String(on));
     $(id).classList.toggle("off", !on);
   }
-  $("pause-sound").textContent = on ? "♫ Sound on" : "♫ Sound off";
+  setLabel($("pause-sound"), on ? "♫ Sound on" : "♫ Sound off");
   $("sound").setAttribute("aria-label", on ? "Sound on" : "Sound off");
+  // The badge's drawn slash and the card button's outline follow the state.
+  ink.refresh($("sound"));
+  ink.refresh($("pause-sound"));
   audio.setEnabled(on);
   if (on && state.status !== "ready") {
     unlockAudio();
@@ -214,6 +226,9 @@ function setVolumes(v) {
       pct = Math.round(sound.volumes[key] * 100);
     if (Number(input.value) !== pct) input.value = String(pct);
     input.setAttribute("aria-valuetext", `${pct}%`);
+    // The drawn thumb sits where the value is.
+    const track = document.querySelector(`[data-for="${id}"]`);
+    if (track) ink.refresh(track);
   }
   return { ...sound.volumes };
 }
@@ -222,6 +237,7 @@ function setGentleMusic(on) {
   writeGentleSetting(() => window.localStorage, sound.gentle);
   audio.setGentle(sound.gentle);
   $("gentle-music")?.setAttribute("aria-pressed", String(sound.gentle));
+  if ($("gentle-music")) ink.refresh($("gentle-music"));
 }
 
 /* ---------- layout: landscape fills, portrait letterboxes above a deck ---------- */
@@ -1058,8 +1074,7 @@ function glyph(x, y, kind, alpha, scale) {
   ctx.strokeStyle = INK;
   ctx.lineWidth = 2.6;
   ctx.beginPath();
-  if (coarse && dir === "up") ctx.roundRect(x - r, y - r, r * 2, r * 2, r * 0.55);
-  else ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.strokeStyle = PAPER;
@@ -1086,7 +1101,7 @@ let signLayout = 1, // the layout constant (signage.mjs layoutScale), set on res
   signsDrawn = []; // the rows drawn in the last frame (QA, Diana's keyline)
 function drawSigns() {
   signsDrawn = [];
-  for (const row of signsAt(state.prompts, camera.x, W, refWidthOf(state.def), signLayout, coarse)) {
+  for (const row of signsAt(state.prompts, camera.x, W, refWidthOf(state.def), signLayout, false)) {
     if (row.alpha <= 0) continue;
     signsDrawn.push(row);
     for (const t of row.thens) diamond(t.x, t.y, 3, PAPER, row.alpha);
@@ -1374,9 +1389,6 @@ function startMoment(verb, { sim = state.time, loud = true, get = null } = {}) {
     const lid = state.platforms.find((q) => q.type === "lid" && !q.collapsed && q.x + q.width > p.x && q.x < p.x + W);
     if (lid) fx.push({ kind: "burst", x: lid.x + lid.width / 2, y: lid.y + 6, vx: 0, vy: 0, life: 1, span: 0.9, scale: 0.34 });
   }
-  // The touch button of the new verb fades in with one pulse.
-  const button = { cape: "touch-cape", dive: "touch-dive" }[verb];
-  if (button) pulseClass($(button), "arrive", 900);
   if (verb === "cape") pulseClass($("breath"), "arrive", 900);
   return m;
 }
@@ -1574,11 +1586,11 @@ function drawRipple(p, amount) {
  * level model adds `relics`/`refills` (or `refillStars`) and the `relic` and
  * `refill-star` events. QA previews draw the art without either. */
 const RELIC_ART = Object.freeze({
-  double: { name: "Double jump", key: ["up", "W"], line: "again in the air", touch: "tap again in the air", say: "Double jump. Press up again in the air." },
-  cape: { name: "Cape flight", key: ["right", "D"], line: "in the air", touch: "the cape button, in the air", say: "Cape flight. Press right in the air." },
-  glide: { name: "Float", key: ["hold-right", "D"], line: "hold", touch: "hold the cape button", say: "Float. Hold right." },
-  dive: { name: "Dive", key: ["down", "S"], line: "", touch: "the dive button", say: "Dive. Press down." },
-  super: { name: "Super jump", key: ["up", "W"], line: "during a flight", touch: "tap during a flight", say: "Super jump. Press up during a flight." },
+  double: { name: "Double jump", key: ["up", "W"], line: "again in the air", say: "Double jump. Press up again in the air." },
+  cape: { name: "Cape flight", key: ["right", "D"], line: "in the air", say: "Cape flight. Press right in the air." },
+  glide: { name: "Float", key: ["hold-right", "D"], line: "hold", say: "Float. Hold right." },
+  dive: { name: "Dive", key: ["down", "S"], line: "", say: "Dive. Press down." },
+  super: { name: "Super jump", key: ["up", "W"], line: "during a flight", say: "Super jump. Press up during a flight." },
 });
 let previewRefills = [];
 const relicHolds = []; // { verb, at (clock), beat, from: {x, y} }: the one-beat hold over Diana
@@ -1850,12 +1862,11 @@ function showBanner(verb) {
     progress.relics = [...(progress.relics ?? []), verb];
     writeProgress();
   }
-  const touch = coarse || root.classList.contains("touch");
   $("banner-name").textContent = art.name;
   const control = $("banner-control");
   control.hidden = !full;
-  control.innerHTML = touch ? "" : `${discSvg(art.key[0])}<span class="or">${art.key[1]}</span>`;
-  control.append(document.createTextNode(touch ? art.touch : art.line ? ` ${art.line}` : ""));
+  control.innerHTML = `${discSvg(art.key[0])}<span class="or">${art.key[1]}</span>`;
+  control.append(document.createTextNode(art.line ? ` ${art.line}` : ""));
   // The title card and the banner share the top of the view: a banner that
   // would meet the card waits until it has faded (the owner saw II's
   // "Cape flight" on "II The Gift"); a GET anywhere in a level works the same.
@@ -2627,33 +2638,59 @@ function el(name, attrs, parent) {
   return e;
 }
 const progressOf = (x) => Math.max(0, Math.min(1, (x - WORLD().startX) / (WORLD().finishX - WORLD().startX)));
+/** The orbit line, drawn by hand (ink-mark.mjs): irregular dots for the road
+ * still to go, one pen line along the road done (the same line, clipped at
+ * Diana's progress), ringed checkpoints, home, Earth, and her sprout as the
+ * marker. The seed holds the level, so each level has its own line; `draw`
+ * re-draws it at a boil phase (the pause card's copy boils with the card;
+ * the HUD's stands still while the run is on). */
 function buildOrbit(svg, w, h, big) {
   svg.innerHTML = "";
-  const [x0, y0] = bezier(0, w, h),
-    [x2, y2] = bezier(1, w, h),
-    d = `M${x0} ${y0} Q${w / 2} ${-h * 0.25} ${x2} ${y2}`;
-  el("path", { d, class: "arc" }, svg);
-  const travelled = el("path", { d, class: "travelled" }, svg);
-  el("circle", { cx: x0, cy: y0, r: big ? 5 : 4, class: "home" }, svg);
+  const seed = inkMark.hashSeed("orbit", big ? "big" : "hud", state.level),
+    clipId = `orbit-clip-${big ? "big" : "hud"}`,
+    p0 = bezier(0, w, h),
+    p2 = bezier(1, w, h),
+    points = inkMark.quadPoints(p0, [w / 2, -h * 0.25], p2, 48);
+  const defs = el("defs", {}, svg),
+    clip = el("clipPath", { id: clipId }, defs),
+    clipRect = el("rect", { x: -20, y: -h, width: w + 40, height: h * 3 }, clip);
+  const arc = el("path", { class: "arc" }, svg),
+    travelled = el("path", { class: "travelled", "clip-path": `url(#${clipId})` }, svg),
+    home = el("path", { class: "home" }, svg);
   const ticks = state.def.checkpoints.map((c) => {
-    const [x, y] = bezier(progressOf(c.x), w, h);
-    return el("circle", { cx: x, cy: y, r: big ? 4.5 : 3.5, class: "tick", "data-id": c.id }, svg);
+    const g = el("g", { class: "tick", "data-id": c.id }, svg);
+    return { g, fill: el("path", { class: "tick-fill" }, g), ring: el("path", { class: "tick-ring" }, g), at: bezier(progressOf(c.x), w, h), seed: inkMark.hashSeed(seed, "tick", c.id) };
   });
-  const earth = el("circle", { cx: x2, cy: y2, r: big ? 8 : 6.5, class: "earth-dot" }, svg);
-  const leaf = el("g", { class: "leaf-marker" }, svg);
-  // Two leaves: Diana's own sprout, the same mark as the title.
-  el("path", { d: "M0 0 C-7 -2 -9 -9 -6 -13 C-1 -11 1 -5 0 0Z", class: "leaf" }, leaf);
-  el("path", { d: "M0 0 C5 -1 9 -6 9 -11 C4 -11 0 -6 0 0Z", class: "leaf" }, leaf);
+  const earth = el("g", { class: "earth-dot" }, svg),
+    earthFill = el("path", { class: "earth-fill" }, earth),
+    earthRing = el("path", { class: "earth-ring" }, earth);
+  const leaf = el("g", { class: "leaf-marker" }, svg),
+    leafPath = el("path", { class: "leaf" }, leaf);
   if (big) {
     const [x, y] = bezier(0.08, w, h);
     el("text", { x, y: y - 12, "text-anchor": "middle", class: "label" }, svg).textContent = state.def.numeral;
   }
-  return { travelled, ticks, earth, leaf, w, h, length: null };
+  const o = { travelled: clipRect, clipRect, ticks: ticks.map((t) => t.g), earth, leaf, w, h, length: null };
+  o.draw = (phase = 0) => {
+    arc.setAttribute("d", inkMark.dotsAlong({ seed, points, r: big ? 1.8 : 1.45, spacing: big ? 7 : 5.6, phase }).d);
+    travelled.setAttribute("d", inkMark.stroke({ seed: inkMark.hashSeed(seed, "road"), points, width: big ? 3 : 2.5, amp: 0.55, phase }).d);
+    home.setAttribute("d", inkMark.blob({ seed: inkMark.hashSeed(seed, "home"), cx: p0[0], cy: p0[1], r: big ? 5 : 4, phase }).d);
+    for (const t of ticks) {
+      t.fill.setAttribute("d", inkMark.blob({ seed: t.seed, cx: t.at[0], cy: t.at[1], r: big ? 4.2 : 3.2, phase }).d);
+      t.ring.setAttribute("d", inkMark.ring({ seed: t.seed, cx: t.at[0], cy: t.at[1], r: big ? 4.6 : 3.7, width: big ? 1.7 : 1.5, phase }).d);
+    }
+    earthFill.setAttribute("d", inkMark.blob({ seed: inkMark.hashSeed(seed, "earth"), cx: p2[0], cy: p2[1], r: big ? 7.4 : 5.8, phase }).d);
+    earthRing.setAttribute("d", inkMark.ring({ seed: inkMark.hashSeed(seed, "earth-ring"), cx: p2[0], cy: p2[1], r: big ? 8.6 : 6.8, width: big ? 2 : 1.7, phase }).d);
+    // Two leaves: Diana's own sprout, the same mark as the title (each its own drawing).
+    leafPath.setAttribute("d", inkMark.sprout({ seed: inkMark.hashSeed(seed, "leaf"), scale: big ? 1 : 0.9 }).d);
+  };
+  o.draw(0);
+  return o;
 }
 let hudOrbit, pauseOrbit;
 function syncOrbit(o, progress) {
-  o.length ??= o.travelled.getTotalLength?.() || 300;
-  o.travelled.style.strokeDasharray = `${o.length * progress} ${o.length}`;
+  // The road done is the drawn line clipped at Diana's x (the curve's x only grows).
+  o.clipRect.setAttribute("width", String(progress >= 0.9995 ? o.w + 40 : Math.max(0, bezier(progress, o.w, o.h)[0] + 20 + 1.5)));
   const [x, y] = bezier(progress, o.w, o.h);
   o.leaf.setAttribute("transform", `translate(${x.toFixed(1)} ${(y - 1).toFixed(1)})`);
   for (const t of o.ticks) t.classList.toggle("lit", state.checkpointsReached.includes(t.dataset.id));
@@ -2687,14 +2724,8 @@ function sync() {
     syncOrbit(hudOrbit, progress);
   }
   $("orbit").classList.toggle("bright", clock < ui.orbitBrightUntil);
-  const ready = capeReady(state);
-  if (ready !== ui.cape) {
-    ui.cape = ready;
-    $("touch-cape").classList.toggle("spent", !ready);
-  }
   syncBreath();
-  // Owned verbs (eight-level model): the touch cape and dive are absent
-  // until theirs; without the field every control shows, as before.
+  // Owned verbs (eight-level model); the root's data-verbs lists them.
   const verbs = state.verbs ? Object.keys(state.verbs).filter((k) => state.verbs[k]).join(" ") : null;
   if (verbs !== ui.verbs) {
     ui.verbs = verbs;
@@ -2725,11 +2756,10 @@ function sync() {
 /** The breath bar (RESEARCH_PROGRESSION 3.3): the original disc, frame and
  * fill, top-left, only once the cape is hers. The fill is the continuous
  * charge; three ink notches mark the quarters; full turns the disc into the
- * asteroid stone with one ring pulse. The touch cape's rim follows it. */
+ * asteroid stone with one ring pulse. */
 function syncBreath() {
   const m = state.status === "ready" ? null : meterNow(),
-    bar = $("breath"),
-    cape = $("touch-cape");
+    bar = $("breath");
   if (!!m !== ui.breathShown) {
     ui.breathShown = !!m;
     bar.hidden = !m;
@@ -2743,18 +2773,13 @@ function syncBreath() {
   if (charge !== ui.breath) {
     ui.breath = charge;
     bar.style.setProperty("--charge", String(charge));
-    cape.style.setProperty("--charge", String(charge));
     bar.setAttribute("aria-valuenow", String(Math.floor(charge * 4 + 1e-9) * 25));
   }
   if (m.full !== ui.breathFull) {
     const was = ui.breathFull;
     ui.breathFull = m.full;
     bar.classList.toggle("full", m.full);
-    cape.classList.toggle("full", m.full);
-    if (m.full && was === false) {
-      pulseClass(bar, "pulse", 800);
-      pulseClass(cape, "lit", 700);
-    }
+    if (m.full && was === false) pulseClass(bar, "pulse", 800);
   }
 }
 function showStory(text) {
@@ -2992,14 +3017,15 @@ function showPauseCard() {
   // Restart level button relabelled, and there is no last light to return to.
   const finished = trans ? LEVELS[trans.from - 1] : null;
   $("back-to-light").hidden = !!finished;
-  $("restart-chapter").textContent = finished ? `Play ${finished.numeral} · ${finished.title} again` : "Restart level";
+  setLabel($("restart-chapter"), finished ? `Play ${finished.numeral} · ${finished.title} again` : "Restart level");
+  ink.refresh($("restart-chapter"));
   $("pause-main").hidden = false;
   $("pause-assist").hidden = true;
   $("pause-veil").hidden = false;
   syncOrbit(pauseOrbit, trans && !trans.swapped ? 1 : progressOf(state.player.x));
   syncJourney();
   $("pause-title").textContent = "Paused";
-  $("resume").focus({ preventScroll: true });
+  focusItem($("resume"));
   sync();
 }
 function closePause() {
@@ -3007,6 +3033,7 @@ function closePause() {
     trans.paused = false;
     syncAudio();
     $("pause-veil").hidden = true;
+    dropCursor();
     canvas.focus({ preventScroll: true });
     sync();
     return;
@@ -3016,6 +3043,7 @@ function closePause() {
   syncAudio();
   if (wasPaused) audio.play("ui-resume");
   $("pause-veil").hidden = true;
+  dropCursor();
   canvas.focus({ preventScroll: true });
   sync();
 }
@@ -3025,6 +3053,37 @@ function pause() {
 }
 function hideCards() {
   $("pause-veil").hidden = true;
+  dropCursor();
+}
+/** Put the keyboard cursor on a control: DOM focus (for assistive tech and
+ * the native slider keys) and the drawn loop round it. */
+function focusItem(el) {
+  if (!el) return;
+  keyTarget = el;
+  el.focus({ preventScroll: true });
+  setCursor(el);
+}
+/** The control the keys act on, whether or not the browser still has focus on
+ * it: a click on the page blurs it, and the next key must still find it. */
+let keyTarget = null;
+function dropCursor() {
+  keyTarget = null;
+  clearCursor();
+}
+function restoreKeyFocus() {
+  if (keyTarget?.isConnected && keyTarget.offsetParent && document.activeElement !== keyTarget) keyTarget.focus({ preventScroll: true });
+}
+/** Set a button's words without touching the hand-drawn SVG that lives in it
+ * (a plain textContent would delete the drawing). */
+function setLabel(el, text) {
+  let label = el.querySelector(":scope > .lbl");
+  if (!label) {
+    label = document.createElement("span");
+    label.className = "lbl";
+    for (const node of [...el.childNodes]) if (node.nodeType === 3) node.remove();
+    el.append(label);
+  }
+  label.textContent = text;
 }
 function backToLight() {
   if (!ready || state.status === "ready") return;
@@ -3123,22 +3182,27 @@ function startLevel(n, { wake: wakeNow = true, force = true, fromMap = false } =
   }
   return snapshot(state);
 }
-/** The title's orbit line: one numbered stop per level, built from LEVELS so
- * that 8-10 levels fit as well as four. Open stops select; locked ones stay
- * focusable so their name can be previewed. The selected (or previewed)
- * level's name and Great Star slots are shown once, below the line. */
-const LEAVES = '<svg class="leaves" viewBox="-11 -14 22 14" aria-hidden="true"><path d="M0 0 C-7 -2 -9 -9 -6 -13 C-1 -11 1 -5 0 0Z"/><path d="M0 0 C5 -1 9 -6 9 -11 C4 -11 0 -6 0 0Z"/></svg>';
-let preview = null; // a level hovered or focused on the title
+/** The title's orbit line: one numbered ring per level, built from LEVELS so
+ * that 8-10 levels fit as well as four, joined by the orbit (dotted ahead,
+ * a pen line behind) and ending at Earth. Nothing here is a control: the keys
+ * choose a level (Left / Right) and wake it. The selected level's name and
+ * Great Star slots are shown once, below the line, between two chevrons that
+ * say which way another open level lies. Every ring, link, sprout and the
+ * Earth dot is drawn from its own seed (ink-mark.mjs), so no two are alike. */
+const sproutSvg = (n) => `<svg class="leaves" viewBox="-11 -14 22 14" aria-hidden="true"><path d="${inkMark.sprout({ seed: inkMark.hashSeed("sprout", n) }).d}"/></svg>`;
+let legendHtml = "";
 /** The title's legend lists only the verbs owned at the selected level's
- * start (RESEARCH_PROGRESSION U8): a first launch shows "↑ jump" alone. */
+ * start (RESEARCH_PROGRESSION U8): a first launch shows "jump" alone. The
+ * arrows are drawn marks; the words are the verbs. */
 function syncLegend() {
   const d = LEVELS[state.level - 1],
     has = (v) => !d?.verbs || !!d.verbs[v];
-  const touch = coarse || root.classList.contains("touch");
-  const thumb = ["cape", "dive"].filter(has);
-  $("title-keys").textContent = touch
-    ? `tap left to jump${thumb.length ? ` · right thumb: ${thumb.join(", ")}` : ""}`
-    : ["↑ jump", has("cape") && "→ cape", has("dive") && "↓ dive"].filter(Boolean).join(" · ");
+  const items = [["up", "jump"], has("cape") && ["right", "cape"], has("dive") && ["down", "dive"]].filter(Boolean);
+  const html = items.map(([dir, word]) => `<span class="hint"><i class="kk" data-ink="arrow" data-dir="${dir}" data-n="${dir}"></i>${word}</span>`).join('<span class="sep" aria-hidden="true">·</span>');
+  if (html === legendHtml) return;
+  legendHtml = html;
+  $("title-keys").innerHTML = html;
+  ink.scan($("title-keys"));
 }
 function syncLevelMap() {
   syncLegend();
@@ -3148,31 +3212,46 @@ function syncLevelMap() {
     const n = Number(li.dataset.level),
       b = li.querySelector(".stop"),
       open = n <= progress.unlocked;
-    b.setAttribute("aria-disabled", String(!open));
-    b.setAttribute("aria-pressed", String(n === state.level));
+    b.dataset.locked = String(!open);
+    b.dataset.selected = String(n === state.level);
+    if (n === state.level) b.setAttribute("aria-current", "true");
+    else b.removeAttribute("aria-current");
     b.classList.toggle("done", !!progress.done[n]);
-    // The orbit is solid from one finished level to the next.
+    // The orbit is a pen line from one finished level to the next.
     li.classList.toggle("travelled", n > 1 && !!progress.done[n - 1]);
+    const link = li.querySelector(":scope > .link");
+    if (link) {
+      link.dataset.kind = li.classList.contains("travelled") ? "solid" : "dotted";
+      ink.refresh(link);
+    }
     const got = progress.great[n] ?? 0;
     b.setAttribute("aria-label", `${LEVELS[n - 1].numeral}. ${LEVELS[n - 1].title}${open ? `, ${got} of 3 Great Fallen Stars` : ", locked"}`);
+    ink.refresh(b);
   }
-  showStationInfo(preview ?? state.level);
+  showStationInfo(state.level);
 }
 function showStationInfo(n) {
   const info = $("station-info"),
     d = LEVELS[n - 1];
   if (!info || !d) return;
+  if (!info.firstElementChild) {
+    info.innerHTML = '<i class="side" data-ink="chevron" data-dir="left" data-n="left"></i><span class="numeral"></span><span class="name"></span><span class="extra"></span><i class="side" data-ink="chevron" data-dir="right" data-n="right"></i>';
+    ink.scan(info);
+  }
   const open = n <= progress.unlocked,
     got = progress.great[n] ?? 0;
   info.classList.toggle("locked", !open);
-  info.innerHTML = `<span class="numeral"></span><span class="name"></span>${
-    open ? `<span class="great-slots" role="img" aria-label="${got} of 3 Great Fallen Stars">${[0, 1, 2].map((i) => `<i class="slot${i < got ? " filled" : ""}"></i>`).join("")}</span>` : `<span class="lock">opens after ${LEVELS[n - 2]?.numeral ?? ""}</span>`
-  }`;
   info.querySelector(".numeral").textContent = d.numeral;
   info.querySelector(".name").textContent = d.title;
+  info.querySelector(".extra").innerHTML = open
+    ? `<span class="great-slots" role="img" aria-label="${got} of 3 Great Fallen Stars">${[0, 1, 2].map((i) => `<i class="slot${i < got ? " filled" : ""}" style="--tilt:${(inkMark.rng(inkMark.hashSeed("slot", n, i))() * 2 - 1) * 8}deg"></i>`).join("")}</span>`
+    : `<span class="lock">opens after ${LEVELS[n - 2]?.numeral ?? ""}</span>`;
+  // Another open level to the left or the right: the keys that reach it.
+  info.querySelector('[data-dir="left"]').classList.toggle("off", n <= 1);
+  info.querySelector('[data-dir="right"]').classList.toggle("off", n >= Math.min(progress.unlocked, LEVELS.length));
 }
 /** Lay the stops out in as few rows as the panel allows (one row for up to
- * ten at 960 px; two balanced rows on a phone in portrait). */
+ * ten at 960 px; two balanced rows in a narrow window). */
 function layoutStations() {
   const list = $("stations");
   if (!list) return;
@@ -3182,12 +3261,12 @@ function layoutStations() {
     compact = layout === "landscape" && canvas.clientHeight > 0 && canvas.clientHeight < 460,
     link = parseFloat(getComputedStyle(list).getPropertyValue("--link")) || 14,
     row = (cols) => cols * 44 + (cols - 1) * (link + 4), // stops and the dotted links between
-    earth = 34, // Earth's link and dot after the last stop
+    earth = 42, // Earth's link and dot after the last stop
     pad = layout === "portrait" ? 2 * 10 : 2 * 22,
     full = Math.max(160, panel.parentElement.clientWidth - 24 - pad - 4);
   panel.classList.remove("wide-line");
   const beside = full - $("start").offsetWidth - 16;
-  // Short landscape: the line sits beside the wake button while it fits in
+  // Short landscape: the line sits beside the wake caption while it fits in
   // one row there, otherwise it takes the whole first row of the panel.
   const wide = compact && row(n) + earth > beside;
   panel.classList.toggle("wide-line", wide);
@@ -3206,36 +3285,28 @@ function buildLevelMap() {
   for (const d of LEVELS) {
     const li = document.createElement("li");
     li.dataset.level = String(d.id);
-    const b = document.createElement("button");
-    b.type = "button";
+    if (d.id > 1) li.insertAdjacentHTML("beforeend", `<i class="link" data-ink="link" data-kind="dotted" data-n="${d.id}" aria-hidden="true"></i>`);
+    // Not a control: a mark. Each ring and each done-star's tilt has its own seed.
+    const b = document.createElement("span");
     b.className = "stop";
-    b.innerHTML = `${LEAVES}<span class="numeral"></span>`;
+    b.setAttribute("role", "img");
+    b.dataset.ink = "stop";
+    b.dataset.n = String(d.id);
+    b.style.setProperty("--tilt", `${((inkMark.rng(inkMark.hashSeed("tilt", d.id))() * 2 - 1) * 10).toFixed(1)}deg`);
+    b.innerHTML = `${sproutSvg(d.id)}<span class="numeral"></span>`;
     b.querySelector(".numeral").textContent = d.numeral;
-    b.addEventListener("click", () => {
-      if (state.status !== "ready" || emergence || d.id > progress.unlocked) return;
-      audio.play("ui-select");
-      loadLevel(d.id);
-      sync();
-      draw();
-      $("start").focus({ preventScroll: true });
-    });
-    const peek = () => ((preview = d.id), showStationInfo(d.id));
-    const unpeek = () => ((preview = null), showStationInfo(state.level));
-    b.addEventListener("pointerenter", peek);
-    b.addEventListener("pointerleave", unpeek);
-    b.addEventListener("focus", peek);
-    b.addEventListener("blur", unpeek);
     li.append(b);
     if (d === LEVELS.at(-1)) {
       // Earth closes the orbit (the only colour, as everywhere).
       const earth = document.createElement("span");
       earth.className = "earth-end";
       earth.setAttribute("aria-hidden", "true");
-      earth.innerHTML = "<i></i>";
+      earth.innerHTML = '<i class="link" data-ink="link" data-kind="dotted" data-n="earth"></i><i class="earth-dot" data-ink="earth" data-n="earth"></i>';
       li.append(earth);
     }
     list.append(li);
   }
+  ink.scan(list);
   layoutStations();
   syncLevelMap();
 }
@@ -3273,7 +3344,7 @@ function toTitle() {
   // The title song: keep it if the door already started it, else begin it.
   if (!audio.stats().soundtrackPlaying) audio.playMusic({ fromStart: true, fadeIn: 1.2 });
   sync();
-  $("start").focus({ preventScroll: true });
+  canvas.focus({ preventScroll: true });
 }
 
 /* ---------- the automatic end-of-level transition (RESEARCH_TRANSITIONS §2) ----------
@@ -3295,9 +3366,7 @@ let trans = null,
   skyOffset = { x: 0, y: 0 },
   lastTransition = null; // the last finished transition's frame-time stats (QA)
 const downKeys = new Set(), // keys down now (e.code)
-  staleKeys = new Set(), // down at the run's start or used to skip: swallowed until released
-  pointersDown = new Set(),
-  stalePointers = new Set();
+  staleKeys = new Set(); // down at the run's start or used to skip: swallowed until released
 const skyX = () => camera.x + skyOffset.x + (trans?.f?.skyTravel ?? 0) * W;
 const skyY = () => camera.y + skyOffset.y;
 /** Simulation seconds on the run's clock: negative before bar 1 of an
@@ -3516,9 +3585,8 @@ function arrive(skipped) {
   audio.hush(skipped ? 0.015 : 0.12, { hold: 1.4 });
   audio.clearMoments();
   if (arrival) arrival.at = clock;
-  // Keys and pointers down now are stale until released (no input lost or doubled).
+  // Keys down now are stale until released (no input lost or doubled).
   for (const k of downKeys) staleKeys.add(k);
-  for (const id of pointersDown) stalePointers.add(id);
   held.glide = false;
   processEvents();
   canvas.focus({ preventScroll: true });
@@ -3533,7 +3601,6 @@ function finishTransition(t = trans) {
   lastTransition = { from: t.from, to: t.to, skipped: t.skipAt != null, frames: t.frames.length ? frameStats(t.frames) : null, warmMs: t.warmMs ?? warmedMs, countIn: t.countIn ? { scheduled: t.countIn.scheduled, cancelled: t.countIn.cancelled } : null, ended: clock - t.at };
   trans = null;
   hideTally();
-  delete root.dataset.controls;
   root.style.removeProperty("--level-hud");
 }
 function frameStats(list) {
@@ -3598,11 +3665,11 @@ function fillTally() {
   $("tally").hidden = false;
   $("tally-hint").hidden = false;
   $("tally-hint").style.opacity = "0";
-  // The hint and the ↺ button sit under the panel (one layout read per transition).
+  // The key hint sits under the panel (one layout read per transition).
   root.style.setProperty("--tally-h", `${$("tally").offsetHeight}px`);
 }
 function hideTally() {
-  for (const id of ["tally", "tally-hint", "tally-again", "credits"]) {
+  for (const id of ["tally", "tally-hint", "credits"]) {
     $(id).hidden = true;
     $(id).style.opacity = "0";
   }
@@ -3613,9 +3680,6 @@ function syncTransitionDom(f) {
   $("tally").style.opacity = a.toFixed(3);
   $("tally").style.transform = reduced || a >= 1 ? "" : `translate(-50%, ${((1 - a) * 6).toFixed(1)}px)`;
   $("tally-hint").style.opacity = a.toFixed(3);
-  const again = $("tally-again");
-  again.hidden = a <= 0.01;
-  again.style.opacity = a.toFixed(3);
   if (a > 0 && !t.said) {
     t.said = true;
     $("tally-say").textContent = t.tally.say;
@@ -3629,8 +3693,6 @@ function syncTransitionDom(f) {
     $("tally-journey-great").textContent = String((t.counted.great = great));
   }
   root.style.setProperty("--level-hud", (f.swapped ? f.hudNew : f.hudOld).toFixed(3));
-  if (f.controls) delete root.dataset.controls;
-  else root.dataset.controls = "off";
   // The ending's credits: one card at a time.
   const c = $("credits");
   if (f.credit) {
@@ -3894,20 +3956,25 @@ function drawMotes(f, o) {
   }
 }
 
-/* ---------- input ---------- */
+/* ---------- input: the keyboard, and only the keyboard ----------
+ * Solarum has no mouse or touch input (inert.mjs cancels every pointer event,
+ * style.css makes everything unhittable and hides the pointer). Every screen
+ * is run from here by key: keymap.mjs lists them. Handlers hang on the window
+ * and never depend on which element has focus, so keys keep working after a
+ * click gave the page focus, a card closed under the cursor, or a level
+ * changed. */
 const GAME_KEYS = ["Space", "ArrowUp", "ArrowRight", "ArrowDown", "KeyW", "KeyD", "KeyS"];
-// Which keys and pointers are down (stale-press bookkeeping, §2.5).
+// Which keys are down (stale-press bookkeeping, §2.5).
 window.addEventListener("keydown", (e) => downKeys.add(e.code), true);
 window.addEventListener("keyup", (e) => downKeys.delete(e.code), true);
-window.addEventListener("pointerdown", (e) => pointersDown.add(e.pointerId), true);
-for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, (e) => pointersDown.delete(e.pointerId), true);
 const MODIFIERS = ["Tab", "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight", "CapsLock"];
 /** Keys during the transition: R plays the finished level again, Esc/P
- * pauses, any other fresh press skips after the one-beat lockout. The
- * press is consumed: it never reaches jump, cape or dive, nor the jump
- * buffer, and its release is swallowed. */
+ * pauses, any other fresh press skips after the one-beat lockout (M and F
+ * belong to the page: sound and fullscreen). The press is consumed: it never
+ * reaches jump, cape or dive, nor the jump buffer, and its release is
+ * swallowed. */
 function transitionKey(e) {
-  if (MODIFIERS.includes(e.code)) return;
+  if (MODIFIERS.includes(e.code) || PAGE_KEYS.includes(e.code)) return;
   e.preventDefault();
   if (e.repeat) return; // a key held through the door never skips
   if (e.code === "KeyR") return replayFinished();
@@ -3915,58 +3982,99 @@ function transitionKey(e) {
   staleKeys.add(e.code);
   requestSkip();
 }
-// A click or tap on the stage skips too, except the HUD's own buttons; it
-// never reaches the jump zone or the canvas (captured here, first).
-root.addEventListener(
-  "pointerdown",
-  (e) => {
-    if (!trans || trans.paused) return;
-    if (e.target instanceof Element && e.target.closest("#pause, .itch-fullscreen, #sound, #tally-again, #pause-veil")) return;
-    e.preventDefault();
-    e.stopPropagation();
-    stalePointers.add(e.pointerId);
-    requestSkip();
-  },
-  true,
-);
+/** Choose another open level on the title (Left / Right). */
+function chooseLevel(n) {
+  if (!ready || state.status !== "ready" || emergence || !canChoose(n, progress.unlocked, LEVELS.length)) return false;
+  loadLevel(n);
+  audio.play("ui-select");
+  sync();
+  draw();
+  return true;
+}
+/** A volume slider's own keys: one step left or right, ten for Page, the ends
+ * for Home and End; the input event is the one a drag would send. */
+function nudgeSlider(input, code) {
+  const step = Number(input.step) || 1,
+    lo = Number(input.min) || 0,
+    hi = Number(input.max) || 100,
+    v = Number(input.value),
+    to = { ArrowLeft: v - step, ArrowRight: v + step, PageDown: v - 2 * step, PageUp: v + 2 * step, Home: lo, End: hi }[code];
+  if (to == null) return;
+  input.value = String(Math.max(lo, Math.min(hi, to)));
+  if (input.value !== String(v)) input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+/** One assist switch (the Assist page's toggles). */
+function toggleAssist(b) {
+  const name = b.dataset.assist,
+    on = b.getAttribute("aria-pressed") !== "true";
+  b.setAttribute("aria-pressed", String(on));
+  if (name === "gentle") pace = on ? 0.8 : 1;
+  else if (name === "gentleMusic") setGentleMusic(on);
+  else setAssist(state, name, on);
+  ink.refresh(b);
+}
+// What Enter / Space does on each control of the cards (nothing is clickable).
+const PRESS = {
+  resume: () => closePause(),
+  "back-to-light": () => backToLight(),
+  "restart-chapter": () => restartChapter(),
+  // Pause -> Main menu: the level's score stops, the title song returns and
+  // the saved progress (open levels, best Great Stars) is kept.
+  "main-menu": () => (toTitle(), audio.play("ui-select")),
+  "pause-sound": () => setSound(!sound.on),
+  "assist-open": () => showAssist(true),
+  "assist-back": () => showAssist(false),
+  "credits-back": () => showCredits(false),
+};
+function press(el) {
+  if (!el) return;
+  if (el.dataset.assist) toggleAssist(el);
+  else PRESS[el.id]?.();
+}
+/** The controls of the pause card's visible page, in reading order. */
+const pauseItems = () => [...$("pause-card").querySelectorAll(".card-page:not([hidden]) :is(button, input)")].filter((b) => b.offsetParent);
 window.addEventListener("keydown", (e) => {
-  const onButton = e.target instanceof HTMLElement && e.target.matches("button");
-  // The credits (v1.0) sit over the title: Esc, Backspace or C close them,
-  // Tab stays on their one button, and nothing else reaches the game, so
-  // Space cannot wake Diana behind the card (Enter and Space on Back act
-  // natively). Arrows, Page and Home/End scroll a short phone's card.
+  // The browser's own shortcuts (reload, find, zoom) stay the browser's.
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // Sound: M, on every screen.
+  if (e.code === "KeyM") {
+    e.preventDefault();
+    if (!e.repeat && ready) setSound(!sound.on);
+    return;
+  }
+  // The stars could not be gathered: R (or Enter / Space) tries again.
+  if (!$("load-error").hidden) {
+    if (["KeyR", "Enter", "Space"].includes(e.code)) (e.preventDefault(), location.reload());
+    return;
+  }
+  // The credits (v1.0) sit over the title: Esc, C, Backspace, Enter or Space
+  // close them, Tab stays on their one control, and nothing else reaches the
+  // game, so Space cannot wake Diana behind the card. Arrows, Page and
+  // Home/End scroll a short window's card.
   if (!$("credits-veil").hidden) {
-    if (["Escape", "KeyC", "Backspace"].includes(e.code)) (e.preventDefault(), showCredits(false));
-    else if (e.code === "Tab") (e.preventDefault(), $("credits-back").focus({ preventScroll: true }));
-    else if (!(onButton && ["Space", "Enter"].includes(e.code)) && !["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.code)) e.preventDefault();
+    if (CREDITS_CLOSE_KEYS.includes(e.code)) (e.preventDefault(), !e.repeat && showCredits(false));
+    else if (!["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.code)) e.preventDefault();
     return;
   }
   if (state.status === "paused" || trans?.paused) {
-    const onSlider = e.target instanceof HTMLInputElement && e.target.type === "range";
-    if (e.code === "Tab") {
-      // Keep keyboard focus inside the pause card (aria-modal).
-      const buttons = [...$("pause-card").querySelectorAll("button, input")].filter((b) => b.offsetParent);
-      const i = buttons.indexOf(document.activeElement),
-        d = e.shiftKey ? -1 : 1;
-      e.preventDefault();
-      buttons[(i + d + buttons.length) % buttons.length]?.focus();
-      return;
-    }
-    if (["KeyP", "Escape"].includes(e.code)) {
-      e.preventDefault();
+    const items = pauseItems(),
+      // The cursor's control, even when a click has blurred it (keyTarget).
+      active = items.includes(document.activeElement) ? document.activeElement : items.includes(keyTarget) ? keyTarget : null,
+      slider = active instanceof HTMLInputElement && active.type === "range",
+      act = pauseKey(e.code, { slider, shift: e.shiftKey });
+    e.preventDefault();
+    if (!act) return;
+    // On a volume slider Left/Right (and Home, End, Page keys) move it by hand,
+    // so it works whether or not the browser still has focus on the input.
+    if (act.native) return nudgeSlider(active, e.code);
+    if (act.back) {
+      if (e.repeat) return;
       if (!$("pause-assist").hidden) showAssist(false);
       else closePause();
-      return;
-    }
-    // On a volume slider ←/→ move the slider (natively); ↑/↓ still move focus.
-    if (onSlider && ["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.code)) return;
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
-      e.preventDefault();
-      const buttons = [...$("pause-card").querySelectorAll("button, input")].filter((b) => b.offsetParent);
-      const i = buttons.indexOf(document.activeElement);
-      const d = ["ArrowUp", "ArrowLeft"].includes(e.code) ? -1 : 1;
-      buttons[(i + d + buttons.length) % buttons.length]?.focus();
-    }
+    } else if (act.move) {
+      const i = items.indexOf(active);
+      focusItem(items[i < 0 ? (act.move > 0 ? 0 : items.length - 1) : menuStep(items.length, i, act.move)]);
+    } else if (act.press && !e.repeat) press(items.includes(active) ? active : items[0]);
     return;
   }
   if (trans) return transitionKey(e);
@@ -3977,24 +4085,19 @@ window.addEventListener("keydown", (e) => {
     if (e.repeat) return e.preventDefault();
     staleKeys.delete(e.code);
   }
-  if (onButton && ["Space", "Enter"].includes(e.code)) return; // native activation
   if (GAME_KEYS.includes(e.code)) e.preventDefault();
   if (e.repeat) return;
-  if (state.status === "ready" && ["Space", "Enter", "ArrowUp", "KeyW"].includes(e.code)) return pressWake();
   if (state.status === "won") {
     if (e.code === "KeyR") restartChapter();
     return;
   }
-  // On the title, ←/→ choose among the open levels of the orbit map.
-  if (state.status === "ready" && emergence) return; // she is waking: only a press skips
-  if (state.status === "ready" && ["ArrowLeft", "ArrowRight"].includes(e.code) && ready) {
-    const n = state.level + (e.code === "ArrowRight" ? 1 : -1);
-    if (n >= 1 && n <= progress.unlocked) {
-      loadLevel(n);
-      audio.play("ui-select");
-      sync();
-      draw();
-    }
+  // The title: wake, choose among the open levels of the orbit line, credits.
+  if (state.status === "ready") {
+    const act = titleKey(e.code);
+    if (act === "wake") return pressWake();
+    if (emergence) return; // she is waking: only a press skips
+    if (act === "credits") return showCredits(true);
+    if (act === "level-prev" || act === "level-next") chooseLevel(state.level + (act === "level-next" ? 1 : -1));
     return;
   }
   if (GAME_KEYS.includes(e.code)) atInput(e);
@@ -4004,38 +4107,16 @@ window.addEventListener("keydown", (e) => {
   if (["KeyP", "Escape"].includes(e.code)) pause();
   if (e.code === "KeyR") e.shiftKey ? restartChapter() : backToLight();
 });
-// The title song after a blocked autoplay: the first gesture that is not the
-// wake itself (the sound or fullscreen button, Tab, a click beside the logo)
-// starts it; the wake fades it out under the sky anyway.
+// The title song after a blocked autoplay: the first key that is not the wake
+// itself (an arrow, C, Tab) starts it; the wake fades it out under the sky anyway.
 function titleSong(e) {
   if (state.status !== "ready" || !sound.on || audio.stats().soundtrackPlaying) return;
-  const wakes = e.type === "keydown" ? ["Space", "Enter", "ArrowUp", "KeyW"].includes(e.code) : !!e.target?.closest?.("#start, #game, .controls");
-  if (!wakes) audio.playMusic({ fromStart: true, fadeIn: 0.8 });
+  if (!WAKE_KEYS.includes(e.code)) audio.playMusic({ fromStart: true, fadeIn: 0.8 });
 }
-window.addEventListener("pointerdown", titleSong, true);
 window.addEventListener("keydown", titleSong, true);
-// The browser can suspend audio on its own (device change, iOS interruption);
-// any gesture outside a pause brings it back.
-window.addEventListener("pointerdown", () => audio.nudge(), true);
+// The browser can suspend audio on its own (device change, an interruption);
+// any key outside a pause brings it back.
 window.addEventListener("keydown", () => audio.nudge(), true);
-{
-  // Soft paper ticks on menu buttons (never the touch controls: those are
-  // gameplay and already voiced). The pause card stays silent: the engine
-  // refuses new sounds while paused, so its buttons need no exception.
-  const canHover = matchMedia("(hover: hover)").matches;
-  const menu = "#tally-again, #sound, #pause, .itch-fullscreen";
-  document.addEventListener("pointerover", (e) => {
-    const b = canHover && e.target instanceof Element ? e.target.closest(menu) : null;
-    if (b && !b.contains(e.relatedTarget)) audio.play("ui-hover");
-  });
-  document.addEventListener("focusin", (e) => {
-    if (e.target instanceof Element && e.target.matches(menu) && e.target.matches(":focus-visible")) audio.play("ui-hover");
-  });
-  document.addEventListener("click", (e) => {
-    const b = e.target instanceof Element ? e.target.closest("#main-menu, .itch-fullscreen") : null;
-    if (b) audio.play("ui-select");
-  });
-}
 window.addEventListener("keyup", (e) => {
   // A stale key's release is swallowed: it never releases a fresh jump.
   if (staleKeys.delete(e.code)) return;
@@ -4057,142 +4138,48 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden && (state.status === "running" || trans)) openPause();
   if (document.hidden) ((held.glide = false), releaseJump(state));
 });
-function bindTouch(id, down, up) {
-  const b = $(id);
-  b.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    try {
-      b.setPointerCapture(e.pointerId);
-    } catch {
-      /* synthetic events may not own a pointer */
-    }
-    b.classList.add("pressed");
-    atInput(e);
-    down();
-  });
-  const end = (e) => {
-    b.classList.remove("pressed");
-    // The tap that skipped a transition (or was down at its end) never
-    // reaches the jump zone: its release is swallowed.
-    if (stalePointers.delete(e.pointerId) || trans) return;
-    atInput(e);
-    up?.();
-  };
-  b.addEventListener("pointerup", end);
-  b.addEventListener("pointercancel", end);
-  b.addEventListener("lostpointercapture", end);
-  // Keyboard / assistive activation emits a click without pointer detail.
-  b.addEventListener("click", (e) => {
-    if (e.detail === 0) {
-      down();
-      up?.();
-    }
-  });
-}
-// A device that reports a fine pointer but also has a touchscreen (a
-// convertible laptop) gets the touch controls from its first real touch.
-window.addEventListener(
-  "pointerdown",
-  (e) => {
-    if (e.pointerType !== "touch" || root.classList.contains("touch")) return;
-    root.classList.add("touch");
-    if (state.status === "ready" && !coarse) syncLegend();
-  },
-  true,
-);
-bindTouch("touch-jump", doJump, () => releaseJump(state));
-bindTouch("touch-cape", doCape, () => (held.glide = false));
-bindTouch("touch-dive", doDive);
-{
-  // Swiping down on the right half also dives.
-  const zone = $("touch-swipe");
-  let startY = null;
-  zone.addEventListener("pointerdown", (e) => {
-    startY = e.clientY;
-    if (state.status === "ready") pressWake();
-  });
-  zone.addEventListener("pointermove", (e) => {
-    if (startY != null && e.clientY - startY > 36) {
-      startY = null;
-      doDive();
-    }
-  });
-  zone.addEventListener("pointerup", () => (startY = null));
-  zone.addEventListener("pointercancel", () => (startY = null));
-}
-canvas.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  if (e.pointerType === "mouse") atInput(e);
-  if (e.pointerType === "mouse" || state.status === "ready") doJump();
-});
-canvas.addEventListener("pointerup", (e) => {
-  if (stalePointers.delete(e.pointerId) || trans) return;
-  atInput(e);
-  releaseJump(state);
-});
-$("start").addEventListener("click", pressWake);
-$("pause").addEventListener("click", openPause);
-$("resume").addEventListener("click", closePause);
-$("back-to-light").addEventListener("click", backToLight);
-$("restart-chapter").addEventListener("click", restartChapter);
-$("tally-again").addEventListener("click", () => trans && replayFinished());
-// Pause → Main menu: the level's score stops, the title song returns and the
-// saved progress (open levels, best Great Stars) is kept.
-$("main-menu").addEventListener("click", toTitle);
-$("reload").addEventListener("click", () => location.reload());
-$("sound").addEventListener("click", () => setSound(!sound.on));
-$("pause-sound").addEventListener("click", () => setSound(!sound.on));
 function showAssist(open) {
   $("pause-main").hidden = open;
   $("pause-assist").hidden = !open;
-  (open ? $("pause-assist").querySelector(".toggle") : $("assist-open")).focus({ preventScroll: true });
+  focusItem(open ? $("pause-assist").querySelector(".toggle") : $("assist-open"));
 }
-$("assist-open").addEventListener("click", () => showAssist(true));
 for (const [id, key] of [["vol-music", "music"], ["vol-sounds", "sounds"]])
   $(id).addEventListener("input", (e) => setVolumes({ [key]: Number(e.target.value) / 100 }));
-$("assist-back").addEventListener("click", () => showAssist(false));
 /* The credits (v1.0): a paper card over the title with the original team, the
- * soundtrack, the font and the note that the level audio is synthesised. It
- * opens from the title's footer link; focus moves to Back and returns to the
- * link on close, as a dialog should. Nothing here touches the game state. */
-let creditsFrom = null;
+ * soundtrack, the font and the note that the level audio is synthesised. C
+ * opens it from the title; the cursor loop sits on Back. Nothing here touches
+ * the game state. */
 function showCredits(open) {
   const veil = $("credits-veil");
   if (open === !veil.hidden) return;
   if (open && state.status !== "ready") return; // reachable from the title only
   veil.hidden = !open;
   if (open) {
-    creditsFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     $("credits-card").scrollTop = 0;
-    $("credits-back").focus({ preventScroll: true });
+    focusItem($("credits-back"));
   } else {
-    const back = creditsFrom?.isConnected && creditsFrom.offsetParent ? creditsFrom : $("credits-open");
-    back.focus({ preventScroll: true });
-    creditsFrom = null;
+    dropCursor();
+    canvas.focus({ preventScroll: true });
   }
 }
-$("credits-open").addEventListener("click", () => showCredits(true));
-$("credits-back").addEventListener("click", () => showCredits(false));
-// A tap on the dimmed sky outside the card closes it.
-$("credits-veil").addEventListener("pointerdown", (e) => {
-  if (e.target === $("credits-veil")) showCredits(false);
+// Whatever takes focus within the cards wears the drawn cursor loop.
+document.addEventListener("focusin", (e) => {
+  if (!(e.target instanceof Element) || e.target === canvas) return;
+  if (e.target.closest(".card")) keyTarget = e.target;
+  setCursor(e.target);
 });
-for (const b of document.querySelectorAll("[data-assist]")) {
-  b.addEventListener("click", () => {
-    const name = b.dataset.assist,
-      on = b.getAttribute("aria-pressed") !== "true";
-    b.setAttribute("aria-pressed", String(on));
-    if (name === "gentle") pace = on ? 0.8 : 1;
-    else if (name === "gentleMusic") setGentleMusic(on);
-    else setAssist(state, name, on);
-  });
-}
-// Ink line boil: re-seed the wobble filter at 8 fps (never under reduced motion).
+// Ink line boil: re-seed the wobble filter at 8 fps (never under reduced
+// motion), and step the drawn marks to their next variant on the same beat
+// and in the same places: the title and the pause card. In play the HUD's
+// marks, like the world, stand still.
 if (!reduced) {
   let seed = 3;
   setInterval(() => {
-    if (!$("pause-veil").hidden || state.status === "ready")
-      $("ink-noise")?.setAttribute("seed", String((seed = (seed % 4) + 1)));
+    const paused = !$("pause-veil").hidden;
+    if (!paused && state.status !== "ready") return;
+    $("ink-noise")?.setAttribute("seed", String((seed = (seed % 4) + 1)));
+    ink.boil(paused ? $("pause-veil") : root);
+    if (paused) pauseOrbit?.draw(ink.phase);
   }, 125);
 }
 
@@ -4261,6 +4248,13 @@ window.__game = {
   // only, so it switches at once and back losslessly; returns the style.
   setPlatformStyle: (style) => (isPlatformStyle(style) && (platformStyle = style), ready && draw(), platformStyle),
   getPlatformStyle: () => platformStyle,
+  // Keyboard only: every pointer, mouse and touch event the page received and
+  // cancelled (by type, plus a total). A click that "did nothing" shows here.
+  getInert: () => ({ ...inert.swallowed, total: inert.total() }),
+  // The drawn marks: how many hosts, the boil phase, and one host's seed and paths.
+  getInk: (selector) => ({ count: ink.count, phase: ink.phase, reduced, host: selector ? ink.info(document.querySelector(selector)) : null }),
+  // The key cursor: the element wearing the drawn focus loop, and DOM focus.
+  getCursor: () => ({ cursor: document.querySelector(".is-cursor")?.id || document.querySelector(".is-cursor")?.dataset.assist || document.querySelector(".is-cursor")?.dataset.n || null, focus: document.activeElement?.id || document.activeElement?.tagName || null }),
   // The credits card (v1.0): { open, version, text } for QA; open/close for previews.
   getCredits: () => ({ open: !$("credits-veil").hidden, version: $("version").textContent, text: $("credits-card").innerText }),
   showCredits,
@@ -4343,7 +4337,6 @@ window.__game = {
       set = manifest ? dianaSet() : null;
     return {
       breath: { shown: !bar.hidden, charge: ui.breath, full: bar.classList.contains("full"), disc: getComputedStyle($("breath-disc")).backgroundImage.includes("meteor") ? "meteor" : "disc", window: track.width, fill: fill.width },
-      rim: { charge: Number(getComputedStyle($("touch-cape")).getPropertyValue("--charge")) || 0, full: $("touch-cape").classList.contains("full") },
       tint: Math.round(tint * 1000) / 1000,
       clock, // the renderer's real-time clock (frozen while paused)
       glint: { shown: glint.shown, inHand: doubleInHand(state), x: glint.x, y: glint.y },
@@ -4562,8 +4555,9 @@ async function load() {
     if (progress.unlocked > 1) loadLevel(progress.unlocked);
     ready = true;
     window.__game.ready = true;
-    $("start").disabled = false;
-    $("start-label").textContent = coarse ? "Tap to wake" : "Press space or tap to wake";
+    $("start").dataset.ready = "true";
+    $("start-label").textContent = "Press space to wake";
+    ink.refresh($("start"));
     syncLegend();
     setSound(sound.on);
     setGentleMusic(sound.gentle);

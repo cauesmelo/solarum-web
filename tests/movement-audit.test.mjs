@@ -227,7 +227,8 @@ test("A3: presses at landing, respawn, pause and level start are honoured or ign
   const js = await read("game.js");
   assert.match(js, /if \(e\.repeat\) return;/);
   // (The wake press starts Diana's emergence; a second press only skips it.)
-  assert.match(js, /state\.status === "ready" && \["Space", "Enter", "ArrowUp", "KeyW"\]\.includes\(e\.code\)\) return pressWake\(\)/);
+  // (keymap.mjs titleKey: Space, Enter, Up and W are the wake keys, pinned in tests/keyboard-only.test.mjs.)
+  assert.match(js, /const act = titleKey\(e\.code\);\n    if \(act === "wake"\) return pressWake\(\);/);
   assert.match(js, /addEventListener\("blur", \(\) => \{[^}]*releaseJump\(state\)/);
 });
 

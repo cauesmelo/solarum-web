@@ -1374,7 +1374,8 @@ test("inputs act at their own timestamps: the frame clock and game.js catch the 
   assert.equal(at(1000 / 30), at(1000 / 120));
   const js = await read("game.js");
   assert.match(js, /function atInput\(e\)[^]*?advanceTo\(e\.timeStamp\)/);
-  assert.ok((js.match(/atInput\(e\)/g) ?? []).length >= 6, "keys, touch buttons and the mouse");
+  // (Keyboard only: the touch buttons and the mouse paths are gone; keys down and up remain.)
+  assert.ok((js.match(/atInput\(e\)/g) ?? []).length >= 3, "the definition, keys down and keys up");
 });
 test("the first gap forgives a first input (a held jump or a 0 ms tap clears it) but still needs one", async () => {
   const { followGlyph } = await import("./glyphs.mjs");
@@ -1442,8 +1443,10 @@ test("UI: no small type, no olive palette, no canvas text and none of the remove
   assert.ok(!/fillText|strokeText/.test(js), "world labels are glyphs, not canvas text");
   for (const removed of ["CAPE RECHARGE", "WIND GIVEN", "FRAGILE", "LIGHT REMEMBERED", "HIGH STAR TRAIL", "DIVE TO THE STAR WELL", "BEST JOURNEY", "EARTH IS OUT THERE", "FOLLOWING THE SIGNAL", "cape-fill", "distance"])
     assert.ok(!html.includes(removed) && !js.includes(`"${removed}`), removed);
-  for (const id of ['id="start"', 'id="game"', 'id="touch-jump"', 'id="touch-cape"', 'id="touch-dive"', 'id="pause"'])
+  for (const id of ['id="start"', 'id="game"', 'id="resume"', 'id="credits-open"', 'id="pause-sound"'])
     assert.ok(html.includes(id), id);
+  for (const gone of ['id="touch-jump"', 'id="touch-cape"', 'id="touch-dive"', 'id="pause"'])
+    assert.ok(!html.includes(gone), `${gone}: keyboard only`);
   assert.ok(!html.includes("✦") && !js.includes("✦"), "the font has no ✦; stars are drawn");
   assert.ok(js.includes("Need a hand? Assists are in the pause menu."));
 });

@@ -30,17 +30,21 @@ test("the release is 1.0.0 with a v1.0 label on the title and a changelog entry"
 test("the credits open from the title and name the team, the music, the font and the synthesised audio", async () => {
   const html = await read("index.html");
   const title = html.slice(html.indexOf('id="title-panel"'), html.indexOf('id="load-error"'));
-  assert.match(title, /<button id="credits-open"[^>]*aria-controls="credits-card"[^>]*>Credits<\/button>/, "a Credits button in the title panel");
+  // Keyboard only: C opens the credits; the panel names the key (a drawn cap) and the word.
+  assert.match(title, /<kbd class="cap" data-ink="cap">C<\/kbd>\s*<span class="word" id="credits-open"[^>]*>Credits<\/span>/, "the C key and the word Credits in the title panel");
+  assert.doesNotMatch(title, /<button/, "no button anywhere in the title panel");
   const card = html.slice(html.indexOf('id="credits-veil"'), html.indexOf('id="pause-veil"'));
   assert.match(card, /role="dialog" aria-modal="true" aria-labelledby="credits-title"/);
   const text = card.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   for (const s of ["Credits", "Cauê Melo", "Daniel Calônico", "raenkumi", "Lucas Santos", "LSdS", "Rafael Lima", "Kimoh", "Amanda", "meromei", "Bruno Mareto", "Bu Maré", "Solarum Basic", "title and at the far door", "synthesised live in your browser"])
     assert.ok(text.includes(s), `the credits say "${s}"`);
-  // game.js wires the opener, the closer and Escape, and keeps the keys away from the game.
+  // game.js wires the opener (C, from keymap.mjs), the closers and Escape, and keeps the keys away from the game.
   const js = await read("game.js");
-  assert.match(js, /\$\("credits-open"\)\.addEventListener\("click", \(\) => showCredits\(true\)\)/);
-  assert.match(js, /\$\("credits-back"\)\.addEventListener\("click", \(\) => showCredits\(false\)\)/);
-  assert.match(js, /if \(!\$\("credits-veil"\)\.hidden\) \{\s+if \(\["Escape"/);
+  assert.match(js, /if \(act === "credits"\) return showCredits\(true\);/);
+  assert.match(js, /"credits-back": \(\) => showCredits\(false\)/);
+  assert.match(js, /if \(!\$\("credits-veil"\)\.hidden\) \{\s+if \(CREDITS_CLOSE_KEYS\.includes\(e\.code\)\)/);
+  const keys = await read("keymap.mjs");
+  assert.match(keys, /CREDITS_CLOSE_KEYS = Object\.freeze\(\["Escape", "KeyC", "Backspace", "Enter", "Space"\]\)/);
 });
 
 test("itch.json: the viewport is the game surface, click to play and fullscreen are on, and mobile friendliness is decided", async () => {

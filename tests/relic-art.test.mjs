@@ -18,7 +18,8 @@ test("every verb's relic has its own art, a beam and the banner's name and contr
   const want = { double: ["Double jump", "again in the air"], cape: ["Cape flight", "in the air"], glide: ["Float", "hold"], dive: ["Dive", ""], super: ["Super jump", "during a flight"] };
   for (const [verb, [name, line]] of Object.entries(want)) {
     assert.match(art, new RegExp(`${verb}: \\{ name: "${name}", key: \\[[^\\]]+\\], line: "${line}"`), verb);
-    assert.match(art, new RegExp(`${verb}: \\{[^\\n]*touch: "[^"]+", say: "[^"]+"`), `${verb}: a touch line and an announcement`);
+    assert.match(art, new RegExp(`${verb}: \\{[^\\n]*say: "[^"]+"`), `${verb}: an announcement`);
+    assert.doesNotMatch(art, /touch:/, "keyboard only: no touch wording");
   }
   // One object per verb, from existing sprites only.
   const draw = body("drawRelicArt");
@@ -66,7 +67,7 @@ test("the banner: an ink plate under the HUD band, at most 64 px tall, 2.45 s th
   assert.match(show, /const full = !\(progress\.relics \?\? \[\]\)\.includes\(verb\);/, "full the first time a save takes the relic");
   assert.match(show, /say: full \? art\.say : `\$\{art\.name\}\.`/, "announced: in full, or the name");
   assert.match(body("syncBanner"), /announce\(banner\.say\)/, "when it shows");
-  assert.match(show, /touch \? art\.touch/, "a touch variant");
+  assert.doesNotMatch(show, /touch/, "keyboard only: one wording (the key's disc)");
   // It never meets the level's title card: it waits until the card has faded.
   assert.match(show, /at: clock \+ cardRemaining\(\)/);
   assert.match(body("cardRemaining"), /CARD\.fadeIn \+ CARD\.hold \+ CARD\.fadeOut/);

@@ -1,6 +1,6 @@
 /* The renderer's static contract for the progression HUD (game.js,
  * index.html, style.css): the breath bar is absent until a meter reads, the
- * stars move right for it, full shows the meteor, unowned touch verbs hide,
+ * stars move right for it, full shows the meteor, the notches are drawn,
  * a get event plays its moment, and the QA previews exist. The behaviour
  * itself is checked in Chrome (common/tests/browser.mjs, Solarum). */
 import test from "node:test";
@@ -18,13 +18,12 @@ test("static contract: the breath bar, verbs, the glint and the QA previews", as
   assert.match(bar, /role="meter"[^>]*hidden>/);
   assert.ok(html.indexOf('id="breath"') < html.indexOf('id="stars"'), "the stars shift right to make room");
   for (const part of ["breath-track", "breath-window", "breath-fill", "breath-frame", "breath-notches", "breath-disc"]) assert.ok(html.includes(part), part);
-  assert.equal((bar.match(/<i><\/i>/g) || []).length, 3, "three notches");
+  assert.equal((bar.match(/<i data-ink="notch" data-n="\d"><\/i>/g) || []).length, 3, "three notches, each drawn by hand (ink-ui.mjs)");
   assert.match(js, /bar\.hidden = !m;/);
   assert.match(js, /const m = state\.status === "ready" \? null : meterNow\(\)/);
-  // Full: the meteor stone and one ring pulse; the touch rim follows the charge.
+  // Full: the meteor stone and one ring pulse. (Keyboard only: no touch rim.)
   assert.match(css, /\.breath\.full \.breath-disc \{\s*background-image: url\("\.\/assets\/meteor\.png"\)/);
-  assert.match(css, /conic-gradient\(var\(--paper\) calc\(var\(--charge, 0\) \* 1turn\)/);
-  assert.match(css, /\.solarum\[data-verbs\]:not\(\[data-verbs~="cape"\]\) \.cape-btn/);
+  assert.doesNotMatch(css, /cape-btn|dive-btn|conic-gradient/);
   // The GET event and the previews.
   // A GET starts its moment on the simulation clock, quietly in a QA step (no particles).
   assert.match(js, /case "get":[\s\S]{0,400}startMoment\(e\.verb, \{ sim: e\.time, loud,/);
