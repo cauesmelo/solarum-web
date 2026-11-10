@@ -40,9 +40,9 @@ const read = (name) => readFile(new URL(`../${name}`, import.meta.url), "utf8");
 /** Real (audio) seconds of run between two x on level n's lattice, ignoring
  * flights (which only shorten it). */
 const t = (x, from, n = 2) => (x - from) / 270 / levelDef(n).clock;
-/** A game of level n (2, Borrowed Wind, has every verb at clock 1: the
- * default for rule fixtures). */
-const game = (n = LEVEL_ID.wind, o = {}) => createGame(2021, { level: n, ...o });
+/** A game of level n (the interim Far Door owns every verb under the old
+ * one-flight-per-airtime cape rule: the default for rule fixtures). */
+const game = (n = LEVEL_ID.door, o = {}) => createGame(2021, { level: n, ...o });
 
 function adapter(s, block) {
   return {
@@ -58,7 +58,7 @@ function adapter(s, block) {
     tap: () => (jump(s), releaseJump(s)),
   };
 }
-function traverse(route = "main", dt = 1 / 120, block, setup, level = LEVEL_ID.wind) {
+function traverse(route = "main", dt = 1 / 120, block, setup, level = LEVEL_ID.door) {
   const s = start(game(level));
   setup?.(s);
   const result = playRoute(adapter(s, block), { route, dt });
@@ -136,7 +136,7 @@ test("each main route reaches every beacon and uses its level's kit through publ
     2: { dash: 8, "double-jump": 2, constellations: 5 },
     [LEVEL_ID["still-water"]]: { dash: 9, "double-jump": 3, constellations: 6 },
     [LEVEL_ID["way-down"]]: { dash: 8, dive: 1, "double-jump": 2, constellations: 5 },
-    [LEVEL_ID.wind]: { dash: 5, "double-jump": 1, constellations: 3 },
+    [LEVEL_ID["borrowed-wind"]]: { dash: 3, "double-jump": 5, constellations: 6 },
     [LEVEL_ID.breaking]: { dash: 2, dive: 1, "double-jump": 2, constellations: 7 },
     [LEVEL_ID.door]: { dash: 4, "super-jump": 2, constellations: 1, cascade: true },
   };
@@ -156,14 +156,26 @@ test("each main route reaches every beacon and uses its level's kit through publ
     if (k.cascade) assert.ok(s.platforms.some((q) => q.cascade && q.collapsed), `L${n} cascade`);
   }
 });
-test("L2's ability route glides in the wind, smashes the cache lid and keeps two refills for the QA contract", () => {
-  const { s, result } = traverse("ability", 1 / 120, null, null, LEVEL_ID.wind);
+test("the wind refund on a real route: VI's ability route presses the cape just before the fly-out wind and still flies out of its top", () => {
+  // RESEARCH_PROGRESSION 3.2: a flight the wind cuts short within 0.15 s
+  // (real) gets its charge back, so the flight out of the top still has it.
+  const s = start(game(LEVEL_ID["borrowed-wind"]));
+  const m = createRouteMemory("ability");
+  const api = adapter(s);
+  const flights = [];
+  let refunds = 0,
+    seen = s.eventSerial;
+  for (let i = 0; i < 120 * 80 && s.status === "running"; i++) {
+    const a = chooseAction(snapshot(s), m);
+    if (a) api[a]();
+    update(s, 1 / 120, { glide: m.glide });
+    for (const e of s.events) if (e.serial > seen) ((seen = e.serial), e.name === "wind-refund" && refunds++, e.name === "dash" && flights.push(Math.round(s.player.x)));
+  }
   assert.equal(s.status, "won");
-  assert.ok(s.smashes >= 1);
-  assert.ok(s.greatBanked.includes("great-1"), "the star cache's Great Star");
-  assert.ok(result.actions.some((q) => q.action === "dive"));
-  assert.ok(result.actions.some((q) => q.action === "tap"), "a tap off the far rock");
-  assert.ok(s.ringsCrossed >= 2);
+  assert.equal(s.deaths, 0);
+  assert.equal(refunds, 1, "the early press is refunded once");
+  assert.ok(flights.length >= 4, `${flights.length} flights (the refunded one included)`);
+  assert.equal(s.stepUps ?? 0, 0, "no hidden forgiveness on the way");
   const l1 = traverse("ability", 1 / 120, null, null, 1);
   assert.ok(l1.result.actions.some((q) => q.action === "releaseJump" || q.action === "tap"), "L1's ability route taps");
 });
@@ -174,10 +186,11 @@ test("removing a level's new action fails exactly at the challenge that teaches 
   assert.equal(noDouble.status, "dead");
   assert.ok(noDouble.player.x > gx(152) && noDouble.player.x < gx(168), `L1 no double: ${noDouble.player.x}`);
   assert.equal(noDouble.checkpoint.id, "first-star");
-  const noCape = traverse("main", 1 / 120, "dash", null, LEVEL_ID.wind).s;
+  // VI: without the cape the flight out of the fly-out wind's top fails, after the bridge beacon.
+  const noCape = traverse("main", 1 / 120, "dash", null, LEVEL_ID["borrowed-wind"]).s;
   assert.equal(noCape.status, "dead");
-  assert.ok(noCape.player.x > 15060 && noCape.player.x < 15460, `L2 no cape: ${noCape.player.x}`);
-  assert.equal(noCape.checkpoint, null, "the hearth void comes before L2's first beacon");
+  assert.ok(noCape.player.x > gx(160) && noCape.player.x < gx(172) + 113.55, `VI no cape: ${noCape.player.x}`);
+  assert.equal(noCape.checkpoint.id, "bridge");
   // The school's super jump is optional (a floor runs under it): from the
   // storm beacon on, without it the void ends the run.
   const noSuper = pilotTo(start(game(LEVEL_ID.door)), "main", gx(60) + 70);
@@ -188,7 +201,8 @@ test("removing a level's new action fails exactly at the challenge that teaches 
 });
 test("missing a required midair constellation leaves the cape spent over the void", () => {
   for (const [n, star, beacon, lo, hi] of [
-    [LEVEL_ID.wind, "void-song-3", "voids", 16380 + 37.85 * 35, 16710 + 37.85 * 35],
+    // VI: the finale-song's last star is at the double, before the second flight.
+    [LEVEL_ID["borrowed-wind"], "finale-song-3", "storm", 220 + 37.85 * 244 + 113.55 * 2, 220 + 37.85 * 252 + 113.55 * 3 - 90],
     // V: the split-song's last star is on the jump off the cracked islet.
     [LEVEL_ID.breaking, "split-song-4", "split", 220 + 37.85 * 191 + 113.55, 220 + 37.85 * 201 + 113.55 * 2 - 90],
   ]) {
@@ -209,17 +223,18 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
   const built = CAMPAIGN.filter((q) => q.def);
   const interim = LEVELS.filter((d) => d.interim);
-  // V took revision five's Breaking Constellation; the wind and the door wait.
-  assert.deepEqual(interim.map((d) => d.key), ["wind", "door"]);
+  // V and VI took revision six's Breaking Constellation and Borrowed Wind;
+  // the Far Door waits for VIII.
+  assert.deepEqual(interim.map((d) => d.key), ["door"]);
   assert.equal(CAMPAIGN.length, 8);
   assert.deepEqual(CAMPAIGN.map((q) => q.bpm), [88, 94, 100, 107, 112, 118, 123, 128]);
-  assert.deepEqual(LEVELS.map((d) => d.bpm), [...built.map((q) => q.bpm), 107, 128]);
+  assert.deepEqual(LEVELS.map((d) => d.bpm), [...built.map((q) => q.bpm), 128]);
   assert.deepEqual(LEVELS.map((d) => d.numeral), ROMAN.slice(0, LEVELS.length));
   assert.deepEqual(LEVELS.map((d) => d.id), LEVELS.map((_, i) => i + 1));
   assert.deepEqual(interim.map((d) => d.id), interim.map((_, i) => built.length + 1 + i));
   assert.deepEqual(LEVELS.filter((d) => !d.interim).map((d) => d.key), CAMPAIGN.filter((q) => q.def).map((q) => q.key));
   assert.ok(LEVELS.findIndex((d) => d.interim) === LEVELS.filter((d) => !d.interim).length, "interim levels come after every built stage");
-  assert.deepEqual(LEVELS.map((d) => d.look), [...built.map((q) => q.look), "jupiter", "moon-earth"]);
+  assert.deepEqual(LEVELS.map((d) => d.look), [...built.map((q) => q.look), "moon-earth"]);
   assert.equal(new Set(LEVELS.filter((d) => !d.interim).map((d) => d.look)).size, built.length, "one look per built stage");
   for (const d of LEVELS) {
     assert.ok(Math.abs(d.clock - d.bpm / 107) < 1e-12, `L${d.id} clock`);
@@ -242,12 +257,14 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   assert.equal(kinds(LEVELS[0]).size, 0, "I: stable stone only");
   assert.equal(kinds(LEVELS[1]).size, 0, "II: stable stone only");
   assert.deepEqual([...kinds(levelDef(LEVEL_ID["still-water"]))], ["lid"], "III: stable stone and the dive lock's lid");
-  assert.deepEqual([...kinds(interim[0])], ["lid"], "interim wind: only the cache lid");
   assert.deepEqual([...kinds(levelDef(LEVEL_ID["way-down"]))], ["lid"], "IV: the necklace's lids");
   assert.deepEqual([...kinds(levelDef(LEVEL_ID.breaking))], ["crumble"], "V: cracked stone, no lid");
-  assert.ok(kinds(interim[1]).has("crumble") && kinds(interim[1]).has("cascade"));
-  assert.ok(interim[1].prompts.some((q) => q.action === "super-jump" && !q.optional));
-  assert.ok(!LEVELS.filter((d) => d !== interim[1]).some((d) => d.prompts.some((q) => q.action === "super-jump")));
+  assert.deepEqual([...kinds(levelDef(LEVEL_ID["borrowed-wind"]))], ["crumble"], "VI: cracks between the winds");
+  assert.ok(createLevel(LEVEL_ID["borrowed-wind"]).updrafts.length >= 8, "VI: the solar wind");
+  assert.ok(LEVELS.filter((d) => d.id < LEVEL_ID["borrowed-wind"]).every((d) => !createLevel(d).updrafts.length), "no wind before VI");
+  assert.ok(kinds(interim[0]).has("crumble") && kinds(interim[0]).has("cascade"));
+  assert.ok(interim[0].prompts.some((q) => q.action === "super-jump" && !q.optional));
+  assert.ok(!LEVELS.filter((d) => d !== interim[0]).some((d) => d.prompts.some((q) => q.action === "super-jump")));
   // Human-time forgiveness is constant in real seconds (RESEARCH_LEVELS 3).
   for (const d of LEVELS) {
     const ph = levelPhysics(d);
@@ -258,7 +275,7 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   // lower terminal speed (560 px/s real).
   const f = levelPhysics(LEVELS[0]);
   assert.ok(f.apexHang && Math.abs(f.apexHang.below * LEVELS[0].clock - 54.28) < 0.01 && Math.abs(f.maxFall * LEVELS[0].clock - 560) < 1e-9);
-  for (const d of [levelDef(LEVEL_ID.breaking), interim[1]]) assert.ok(Math.abs(levelPhysics(d).crumbleAfter - 5 * (15 / 107)) < 1e-12, `${d.numeral}: cracks break 5/16 after touch-down`);
+  for (const d of [levelDef(LEVEL_ID.breaking), levelDef(LEVEL_ID["borrowed-wind"]), interim[0]]) assert.ok(Math.abs(levelPhysics(d).crumbleAfter - 5 * (15 / 107)) < 1e-12, `${d.numeral}: cracks break 5/16 after touch-down`);
 });
 test("L1's float: a held jump hangs at the top and falls no faster than 560 px/s real", () => {
   const s = start(game(1));
@@ -321,7 +338,7 @@ test("stable ground refills the cape; cracked shelves do not", () => {
 });
 test("beacons and completed constellations refill the cape midair", () => {
   const s = start(game());
-  const cp = levelDef(LEVEL_ID.wind).checkpoints[0];
+  const cp = levelDef(LEVEL_ID.door).checkpoints[0];
   Object.assign(s.player, { x: cp.x + 10, y: cp.y, grounded: true });
   s.capeCharges = 0;
   s.capeRule = "cooldown"; // beacon refills even when ground would not
@@ -343,7 +360,7 @@ test("beacons and completed constellations refill the cape midair", () => {
   assert.ok(c.events.some((e) => e.name === "constellation"));
 });
 test("'cooldown' cape rule keeps the archived 6 s timer for comparison", () => {
-  const s = start(game(LEVEL_ID.wind, { capeRule: "cooldown" }));
+  const s = start(game(LEVEL_ID.door, { capeRule: "cooldown" }));
   jump(s);
   update(s, 0.2);
   assert.equal(dash(s), true);
@@ -479,9 +496,10 @@ test("constellation steps climb the pentatonic scale and time out after 1.2 s", 
   assert.equal(s.chains[0].broken, true);
 });
 test("no required crossing depends on a chain unless a beacon sits right before it", () => {
-  // The required chains are L2's void-song and V's split-song (tested
-  // above); each one's beacon is the last before it, within 6 s of run.
-  for (const [n, chain, beacon] of [[LEVEL_ID.wind, "void-song", "voids"], [LEVEL_ID.breaking, "split-song", "split"]]) {
+  // The required chains are V's split-song and VI's launch-song and
+  // finale-song (tested above); each one's beacon is the last before it,
+  // within 6 s of run.
+  for (const [n, chain, beacon] of [[LEVEL_ID.breaking, "split-song", "split"], [LEVEL_ID["borrowed-wind"], "launch-song", "storm"], [LEVEL_ID["borrowed-wind"], "finale-song", "storm"]]) {
     const stars = createLevel(n).pickups.filter((q) => q.chain === chain);
     const before = levelDef(n).checkpoints.filter((c) => c.x < stars[0].x).at(-1);
     assert.equal(before.id, beacon);
@@ -591,12 +609,14 @@ test("inside wind the cape glides upward instead of dashing level; a flight ente
   assert.ok(f.player.vy < 0);
   assert.ok(f.events.some((e) => e.name === "wind-catch"));
 });
-test("the first updraft is what carries the main route to the high shore", () => {
-  const withWind = traverse("main").s;
+test("the first wind is what carries VI's main route to the lifted shore", () => {
+  const VI = LEVEL_ID["borrowed-wind"];
+  const withWind = traverse("main", 1 / 120, null, null, VI).s;
   assert.equal(withWind.status, "won");
-  const calm = traverse("main", 1 / 120, null, (g) => (g.updrafts = [])).s;
+  const calm = traverse("main", 1 / 120, null, (g) => (g.updrafts = []), VI).s;
   assert.equal(calm.status, "dead");
-  assert.equal(calm.checkpoint.id, "updraft");
+  assert.equal(calm.checkpoint.id, "breeze");
+  assert.ok(calm.player.x > gx(84) && calm.player.x < gx(100), `calm VI falls at ${calm.player.x}`);
   for (const n of IDS) for (const u of createLevel(n).updrafts) assert.ok(u.width >= 120 && u.width <= 180);
 });
 
@@ -625,7 +645,8 @@ test("a jump during flight is a super jump, once per flight", () => {
 
 /* ---------- M7 Great Fallen Stars ---------- */
 test("a Great Star counts once Diana lands; a fall before that returns it to the sky", () => {
-  const s = start(game());
+  // (IV: clock 1, so the 1.1 s respawn is back within the 1.2 s below.)
+  const s = start(game(LEVEL_ID["way-down"]));
   const g = s.pickups.find((q) => q.id === "great-1");
   Object.assign(s.player, { x: g.x, y: g.y + 36, vy: 0, grounded: false, jumps: 2 });
   s.anchorY = g.y;
@@ -640,12 +661,12 @@ test("a Great Star counts once Diana lands; a fall before that returns it to the
   assert.equal(s.pickups.find((q) => q.id === "great-1").collected, false);
 });
 test("a banked Great Star survives a later fall and retry", () => {
-  const s = start(game());
+  const s = start(game(LEVEL_ID["way-down"]));
   const g = s.pickups.find((q) => q.id === "great-1");
   Object.assign(s.player, { x: g.x, y: g.y + 36, vy: 0, grounded: false, jumps: 2 });
   update(s, 1 / 120);
-  Object.assign(s.player, { x: g.x, y: 440, vy: 0 });
-  update(s, 0.2); // lands on the star cache's floor at y=470
+  Object.assign(s.player, { x: g.x, y: 270, vy: 0 });
+  update(s, 0.2); // lands on IV's star cache under the glinting lid (y 295)
   assert.deepEqual(s.greatBanked, ["great-1"]);
   s.status = "dead";
   retry(s);
@@ -690,7 +711,9 @@ test("a beacon (or the level's start) sits right before the first required use o
     2: { flight: 220 + 37.85 * 71 + 113.55, constellation: 220 + 37.85 * 167 + 113.55 * 3 + 39.5 },
     [LEVEL_ID["still-water"]]: { flight: gx(26), glide: 220 + 37.85 * 79 + 113.55, constellation: 220 + 37.85 * 266 + 113.55 * 6 + 39.5 },
     [LEVEL_ID["way-down"]]: { flight: gx(26), dive: 220 + 37.85 * 79 + 113.55 + 3 * 69.69, constellation: 220 + 37.85 * 138 + 113.55 + 94.9 + 39.5 },
-    [LEVEL_ID.wind]: { flight: 14982, constellation: 16157 + 37.85 * 35, updraft: 18047 + 37.85 * 35, glide: 21113.2, dive: 21491.7 + 37.85 * 64 },
+    // VI: the first wind, the flight out of the fly-out wind's top, the
+    // launch-song that charges the finale's first flight.
+    [LEVEL_ID["borrowed-wind"]]: { updraft: 220 + 37.85 * 84 + 30, flight: 220 + 37.85 * 162, constellation: 220 + 37.85 * 229 + 113.55 + 39.5 },
     // V: the second crack (the first that must be left), the split voids'
     // first flight and song, the dive through the first stone.
     [LEVEL_ID.breaking]: { fragile: 220 + 37.85 * 73 - 80, flight: 220 + 37.85 * 182, constellation: 220 + 37.85 * 182 + 69.69 + 39.5, dive: 220 + 37.85 * 249.6 + 113.55 * 2 },
@@ -724,7 +747,7 @@ test("main-route gaps and rises respect each level's authoring limits", () => {
   // L1's float allows a 180 px double rise; L4's super jump climbs 235 px;
   // L2's long void is crossed by two flights around a refill constellation.
   // V: the split voids are two flights around the split-song.
-  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.wind]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID.breaking]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
+  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.breaking]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["borrowed-wind"]]: { rise: 165, gap: 400, void: 800 }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
   for (const n of IDS) {
     const chains = createLevel(n).pickups.filter((q) => q.chain);
     for (const [a, b] of mainPairs(n)) {
@@ -747,7 +770,7 @@ test("no blind landings: every required landing is in view when the input that c
     2: [["crater-floor", "gift-stone"]],
     [LEVEL_ID["still-water"]]: [["islet-gs2", "islet-2"], ["islet-1", "islet-2"]],
     [LEVEL_ID["way-down"]]: [["star-cache", "broken-gate"], ["lid-well", "ring-3b"], ["ring-islet", "ring-3"]],
-    [LEVEL_ID.wind]: [["lid-2", "star-cache"], ["finale-rock", "low-a"]],
+    [LEVEL_ID["borrowed-wind"]]: [["bridge-ledge", "bridge-shore-2"]],
     [LEVEL_ID.breaking]: [["chain-c", "ridge-b"], ["crown-stair-2", "last-crack"]],
     [LEVEL_ID.door]: [["school-shore", "storm-step"], ["lid", "well-floor"], ["finale-crack", "low-a"]],
   };
@@ -907,7 +930,7 @@ test("a fall returns control at the beacon within 1.2 s (real) and keeps a buffe
   }
 });
 test("manual retry restores the beacon snapshot and repairs shelves; restart clears it", () => {
-  for (const n of [LEVEL_ID.wind, LEVEL_ID.breaking]) {
+  for (const n of [LEVEL_ID["borrowed-wind"], LEVEL_ID.breaking]) {
     const { s } = traverse("main", 1 / 120, null, null, n);
     const cp = s.checkpoint;
     s.status = "dead";
@@ -1311,7 +1334,7 @@ test("inputs act at their own timestamps: the frame clock and game.js catch the 
   // A press 13 ms into a 33 ms frame takes off on the tick it was made in,
   // as at 120 Hz, not at the frame's start.
   const at = (frameMs) => {
-    const s = start(game(LEVEL_ID.wind));
+    const s = start(game(LEVEL_ID.door));
     const clock = createFrameClock();
     clock.advance(0);
     for (let t = frameMs; t < 500; t += frameMs) update(s, clock.advance(t));
@@ -1358,15 +1381,16 @@ test("following each glyph at its first valid moment succeeds (required ones als
       }
     }
 });
-test("the updraft cluster never shows more than one glyph at once", () => {
-  const prompts = createLevel(LEVEL_ID.wind).prompts;
-  for (let x = 17400; x <= 18800; x += 5) {
-    const shown = shownPrompts(prompts, x).filter((q) => q.x > 17900 && q.x < 18800);
+test("the wind's glyphs never show more than one at once (VI)", () => {
+  const d = levelDef(LEVEL_ID["borrowed-wind"]);
+  const prompts = createLevel(d).prompts;
+  // On screen (from just behind Diana to the view's far edge).
+  for (let x = d.level.startX; x <= d.level.finishX; x += 5) {
+    const shown = shownPrompts(prompts, x).filter((q) => q.x > x - 200 && q.x < x + 900);
     assert.ok(shown.length <= 1, `${x}: ${shown.map((q) => q.id)}`);
   }
-  // Each later one appears once the earlier is done.
-  const done = prompts.map((q) => ({ ...q, done: q.id === "p-updraft" }));
-  assert.ok(shownPrompts(done, 18090).some((q) => q.id === "p-wind"));
+  // The optional breeze glyph waits while a required one is due.
+  assert.ok(prompts.some((q) => q.optional && q.id === "p-breeze"));
 });
 test("every star is reachable (some pilot collects it) and none sits inside an island, every level", () => {
   for (const n of IDS) {

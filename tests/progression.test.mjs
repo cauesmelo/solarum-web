@@ -10,7 +10,7 @@ import { levelDef, LEVEL_ID } from "../level.mjs";
 const BEAT = 60 / 107;
 /** A flat world: one long stable floor (optionally a crack) and nothing else. */
 function world({ verbs = {}, gets = [], capeRule = "breath", platforms = null, updrafts = [], stars = [], checkpoints = [] } = {}) {
-  const base = levelDef(LEVEL_ID.wind);
+  const base = levelDef(LEVEL_ID["way-down"]);
   const def = {
     ...base,
     capeRule,

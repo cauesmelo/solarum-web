@@ -212,7 +212,7 @@ test("A3: presses at landing, respawn, pause and level start are honoured or ign
   }
   // A press that waited for a touch-down which a held glide postponed still
   // fires (as the double jump) when the buffer runs out: never lost.
-  const g = world(LEVEL_ID.wind, [["floor", -400, 540, 5000]]);
+  const g = world(LEVEL_ID.door, [["floor", -400, 540, 5000]]);
   Object.assign(g.player, { y: 520, grounded: false, jumps: 1, vy: 300 });
   g.coyote = 0;
   g.launched = true;
@@ -233,7 +233,7 @@ test("A3: presses at landing, respawn, pause and level start are honoured or ign
 
 /* ---------- B. Jump, forgiveness, air resources ---------- */
 test("B5-B8: apex time, tap/hold ratio, release cut and fall per level (L1 floats on purpose)", () => {
-  const want = { 1: [0.5, 0.53], 2: [0.41, 0.44], [LEVEL_ID["still-water"]]: [0.39, 0.42], [LEVEL_ID["way-down"]]: [0.36, 0.39], [LEVEL_ID.wind]: [0.36, 0.39], [LEVEL_ID.breaking]: [0.34, 0.37], [LEVEL_ID.door]: [0.3, 0.33] };
+  const want = { 1: [0.5, 0.53], 2: [0.41, 0.44], [LEVEL_ID["still-water"]]: [0.39, 0.42], [LEVEL_ID["way-down"]]: [0.36, 0.39], [LEVEL_ID.breaking]: [0.34, 0.37], [LEVEL_ID["borrowed-wind"]]: [0.32, 0.35], [LEVEL_ID.door]: [0.3, 0.33] };
   for (const n of IDS) {
     const held = arc(n),
       tap = arc(n, { release: 0 }),
@@ -263,7 +263,7 @@ test("B9/B10: coyote and jump buffer are the same real time in every level, with
 });
 test("B13: air resources refresh only by the documented rules", () => {
   // Rising through a one-way top never refreshes the double jump or the cape.
-  const s = world(LEVEL_ID.wind, [["floor", -400, 600, 5000], ["thin", 0, 520, 3000]]);
+  const s = world(LEVEL_ID.door, [["floor", -400, 600, 5000], ["thin", 0, 520, 3000]]);
   Object.assign(s.player, { x: 300, y: 600, grounded: true });
   jump(s);
   update(s, 0.1);
@@ -282,7 +282,7 @@ test("B13: air resources refresh only by the documented rules", () => {
   update(c, 0.05);
   assert.equal(capeReady(c), false);
   // In wind the cape does not dash.
-  const w = world(LEVEL_ID.wind, [["floor", -400, 900, 5000]], { updrafts: [{ id: "u", x: 200, width: 300, top: 300, bottom: 700 }] });
+  const w = world(LEVEL_ID.door, [["floor", -400, 900, 5000]], { updrafts: [{ id: "u", x: 200, width: 300, top: 300, bottom: 700 }] });
   Object.assign(w.player, { x: 300, y: 600, grounded: false, jumps: 1 });
   assert.equal(dash(w), false);
 });
@@ -360,7 +360,7 @@ test("C1/B12: from below onto every platform type of every level, nothing looks 
   assert.ok(trials > 15000 && landed > 3000 && assisted > 700, `${trials} trials, ${landed} landed (${assisted} by the step-up)`);
   // The detector is real: the old renderer (foot offset eased over 17 ms)
   // drew the toe through tops at 240 Hz in this same sweep.
-  const old = belowSweep(LEVEL_ID.wind, manifest, table, { type: undefined, width: 190, rises: [60], dxs: [-30, 20], ease: { hz: 240 } });
+  const old = belowSweep(LEVEL_ID.door, manifest, table, { type: undefined, width: 190, rises: [60], dxs: [-30, 20], ease: { hz: 240 } });
   assert.ok(old.lookedLandedFell.length > 0, "the eased renderer showed through-the-top frames");
 });
 test("C3: no tunnelling at the fastest falls and flights, at any frame rate or frame size", () => {
@@ -382,7 +382,7 @@ test("C3: no tunnelling at the fastest falls and flights, at any frame rate or f
   // A flight (497 px/s) skimming 10 px over 30 px wide tops touches down on
   // the one under it when the cape closes, however big the frames are.
   for (const dt of [1 / 30, 1 / 240, 0.5]) {
-    const s = world(LEVEL_ID.wind, [["floor", -400, 900, 5000], ...range(0, 9, 1).map((i) => [`t${i}`, 600 + i * 70, 540, 30])]);
+    const s = world(LEVEL_ID.door, [["floor", -400, 900, 5000], ...range(0, 9, 1).map((i) => [`t${i}`, 600 + i * 70, 540, 30])]);
     s.physics = { ...s.physics, fallLimit: 1e9 };
     Object.assign(s.player, { x: 500, y: 530, grounded: false, jumps: 1, vy: 0 });
     s.launched = true;
@@ -409,14 +409,14 @@ test("D1: the optional techniques measurably change outcomes", () => {
     return 540 - min;
   };
   const two = Math.round((2 * 15) / 107 / TICK);
-  for (const n of [LEVEL_ID.wind, LEVEL_ID.door]) {
+  for (const n of [LEVEL_ID.door]) {
     const sup = apex(n, [[0, "jump"], [two, "dash"], [2 * two, "jump"]]);
     const dbl = apex(n, [[0, "jump"], [2 * two, "jump"]]);
     assert.ok(sup - dbl > 60, `L${n} super ${sup.toFixed(0)} vs double ${dbl.toFixed(0)} px`);
   }
   // Dive-cancel: a flight cut by the dive lands well short of a full one.
   const reach = (cut) => {
-    const s = world(LEVEL_ID.wind, [["floor", -400, 540, 5000]]);
+    const s = world(LEVEL_ID.door, [["floor", -400, 540, 5000]]);
     Object.assign(s.player, { x: 300, y: 400, grounded: false, jumps: 1, vy: 0 });
     s.launched = true;
     dash(s);
@@ -429,7 +429,7 @@ test("D1: the optional techniques measurably change outcomes", () => {
   assert.ok(reach(false) - reach(true) > 100, `dive-cancel lands ${(reach(false) - reach(true)).toFixed(0)} px sooner`);
   // Glide in wind: the held cape catches 40% more lift.
   const lift = (glide) => {
-    const s = world(LEVEL_ID.wind, [["floor", -400, 900, 5000]], { updrafts: [{ id: "u", x: 0, width: 4000, top: 0, bottom: 900 }] });
+    const s = world(LEVEL_ID.door, [["floor", -400, 900, 5000]], { updrafts: [{ id: "u", x: 0, width: 4000, top: 0, bottom: 900 }] });
     Object.assign(s.player, { x: 300, y: 700, grounded: false, jumps: 1, vy: 0 });
     update(s, 0.5, { glide });
     return 700 - s.player.y;
@@ -471,7 +471,7 @@ test("E1/E2: every movement action has a sound and a visual on its own tick; the
 
 /* ---------- F. Solarum: windows, leads ---------- */
 test("F: every required action in every level has a press window of at least 120 ms (real) and a readable cue", () => {
-  const minimum = { 1: 600, 2: 330, [LEVEL_ID["still-water"]]: 315, [LEVEL_ID["way-down"]]: 290, [LEVEL_ID.wind]: 330, [LEVEL_ID.breaking]: 240, [LEVEL_ID.door]: 280 };
+  const minimum = { 1: 600, 2: 330, [LEVEL_ID["still-water"]]: 315, [LEVEL_ID["way-down"]]: 290, [LEVEL_ID.breaking]: 240, [LEVEL_ID["borrowed-wind"]]: 190, [LEVEL_ID.door]: 280 };
   for (const n of IDS) {
     const nom = nominalRun(n);
     assert.equal(nom.status, "won");

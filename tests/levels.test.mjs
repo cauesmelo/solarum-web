@@ -1,5 +1,6 @@
 /** RESEARCH_PROGRESSION 8 for the built stages (I · Waking, II · The Gift,
- * III · Still Water, IV · The Way Down, V · The Breaking Constellation, ...;
+ * III · Still Water, IV · The Way Down, V · The Breaking Constellation, VI ·
+ * Borrowed Wind;
  * V on have no GET: cracks and wind are the world's): unlocks (U1, U3, U5), the cape's breath on real
  * routes (C1-C4), the level rules (L2, L4, L5, L8), the GET spacing of
  * section 7, the difficulty ladder of 4.2 (L3: windows, inputs per bar,
@@ -29,9 +30,10 @@ const START_VERBS = [
   { double: true, cape: true, glide: false, dive: false, super: false },
   { double: true, cape: true, glide: true, dive: false, super: false },
   { double: true, cape: true, glide: true, dive: true, super: false },
+  { double: true, cape: true, glide: true, dive: true, super: false },
 ];
 /** V (cracks) and VI (wind) bring no verb: the world introduces them. */
-const GET_VERBS = [["double"], ["cape"], ["glide"], ["dive"], []];
+const GET_VERBS = [["double"], ["cape"], ["glide"], ["dive"], [], []];
 /** A held-cape onset that is a press of its own (no flight at that x). */
 const pureGlide = (plan, i) => plan[i][1] === "glide" && !(plan[i - 1] && plan[i - 1][1] === "dash" && Math.abs(plan[i - 1][0] - plan[i][0]) < 1);
 function api(s, hooks = {}) {
@@ -423,13 +425,14 @@ test("M1: Diana's own notes on the perfect run rise at least 10% stage over stag
   // Restraint (revision five feedback): fewer bed onsets than Diana's own.
   rates.forEach((r, i) => assert.ok(r.bed < r.own, `${BUILT[i].numeral} bed ${r.bed.toFixed(2)} vs own ${r.own.toFixed(2)} per s`));
 });
-/** RESEARCH_PROGRESSION 4.2 for I-V (real units, main route). */
+/** RESEARCH_PROGRESSION 4.2 for I-VI (real units, main route). */
 const LADDER = [
   { narrow: [400, Infinity], median: 500, inputs: [1.1, 1.5], peak: 2, gap: 14 },
   { narrow: [320, 420], median: 450, inputs: [1.3, 1.7], peak: 3, gap: 13 },
   { narrow: [280, 370], median: 410, inputs: [1.5, 1.9], peak: 3, gap: 12.5 },
   { narrow: [250, 330], median: 370, inputs: [1.7, 2.1], peak: 4, gap: 12 },
   { narrow: [220, 290], median: 330, inputs: [1.9, 2.4], peak: 4, gap: 11.5 },
+  { narrow: [190, 260], median: 300, inputs: [2.2, 2.7], peak: 5, gap: 11 },
 ];
 test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon gaps in each stage's band; windows never widen and inputs never thin out", () => {
   const rows = BUILT.map((d) => {

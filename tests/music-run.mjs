@@ -24,7 +24,8 @@ const CHALLENGE = {
   [LEVEL_ID["still-water"]]: { still: [220 + 37.85 * 117 + 113.55 * 2, 220 + 37.85 * 122 + 113.55 * 2] },
   // IV: the flight over the cut islet after the down beacon.
   [LEVEL_ID["way-down"]]: { down: [220 + 37.85 * 78 + 113.55, 220 + 37.85 * 81 + 113.55] },
-  [LEVEL_ID.wind]: { voids: [16000 + 37.85 * 35, 16700 + 37.85 * 35] },
+  // VI: the flight out of the fly-out wind's top after the bridge beacon.
+  [LEVEL_ID["borrowed-wind"]]: { bridge: [220 + 37.85 * 161, 220 + 37.85 * 164] },
   // V: the first flight of the split voids after the split beacon.
   [LEVEL_ID.breaking]: { split: [220 + 37.85 * 181, 220 + 37.85 * 184] },
   [LEVEL_ID.door]: { storm: [gx(68), gx(76) + 130] },
@@ -37,15 +38,15 @@ export const SLOPPY_RUNS = Object.freeze({
   2: { level: 2, failAt: ["void"], removeStars: ["first-flight-2"], late: [[gx(23) - 1, gx(23) + 1, 12], [gx(252) + 908.4 - 1, gx(252) + 908.4 + 1, 10]] },
   [LEVEL_ID["still-water"]]: { level: LEVEL_ID["still-water"], failAt: ["still"], removeStars: ["drift-song-1"], late: [[220 + 37.85 * 156 + 113.55 * 3 - 1, 220 + 37.85 * 156 + 113.55 * 3 + 1, 10]] },
   [LEVEL_ID["way-down"]]: { level: LEVEL_ID["way-down"], failAt: ["down"], removeStars: ["warm-song-2"], late: [[220 + 37.85 * 124 + 113.55 + 94.9 - 1, 220 + 37.85 * 124 + 113.55 + 94.9 + 1, 10]] },
-  [LEVEL_ID.wind]: { level: LEVEL_ID.wind, failAt: ["voids"], removeStars: ["flight-line-2"], late: [[19860, 19870, 10]] },
+  [LEVEL_ID["borrowed-wind"]]: { level: LEVEL_ID["borrowed-wind"], failAt: ["bridge"], removeStars: ["storm-song-2"], late: [[220 + 37.85 * 228 + 113.55 - 1, 220 + 37.85 * 228 + 113.55 + 1, 8]] },
   [LEVEL_ID.breaking]: { level: LEVEL_ID.breaking, failAt: ["split"], removeStars: ["crack-song-2"], late: [[220 + 37.85 * 85 - 1, 220 + 37.85 * 85 + 1, 10]] },
   [LEVEL_ID.door]: { level: LEVEL_ID.door, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
 });
-export const SLOPPY = SLOPPY_RUNS[LEVEL_ID.wind];
+export const SLOPPY = SLOPPY_RUNS[LEVEL_ID["borrowed-wind"]];
 
 /** Calls onEvent(e, s) for every model event and onStep(s, glide) after every
  * step; returns the final state. Wake is the first event. */
-export function drive({ route = "main", level = LEVEL_ID.wind, dt = 1 / 120, failAt = [], removeStars = [], late = [], maxSeconds = 160, onEvent, onStep } = {}) {
+export function drive({ route = "main", level = LEVEL_ID["borrowed-wind"], dt = 1 / 120, failAt = [], removeStars = [], late = [], maxSeconds = 160, onEvent, onStep } = {}) {
   const s = createGame(2021, { level });
   if (removeStars.length) s.pickups = s.pickups.filter((q) => !removeStars.includes(q.id));
   let seen = s.eventSerial;
@@ -94,7 +95,7 @@ export function drive({ route = "main", level = LEVEL_ID.wind, dt = 1 / 120, fai
 
 // timeScale defaults to the level's clock, as in the game (tolerances and
 // caps are real milliseconds).
-export function musicRun({ gentle = false, level = LEVEL_ID.wind, timeScale = levelDef(level).clock, ...options } = {}) {
+export function musicRun({ gentle = false, level = LEVEL_ID["borrowed-wind"], timeScale = levelDef(level).clock, ...options } = {}) {
   const c = createConductor({ level, path: PATHS[level], cracked: CRACKED, gentle });
   const notes = [],
     fx = [],
@@ -130,7 +131,7 @@ export function musicRun({ gentle = false, level = LEVEL_ID.wind, timeScale = le
 
 /** Game frames at `fps` for renderRunOffline: wall time keeps running while
  * Diana falls apart and reforms (the simulation clock does not). */
-export function recordFrames({ fps = 60, level = LEVEL_ID.wind, ...options } = {}) {
+export function recordFrames({ fps = 60, level = LEVEL_ID["borrowed-wind"], ...options } = {}) {
   const frames = [];
   let wall = 0,
     events = [];
@@ -153,4 +154,4 @@ export function recordFrames({ fps = 60, level = LEVEL_ID.wind, ...options } = {
   return { frames, status: s.status, time: s.time, deaths: s.deaths };
 }
 
-export const beaconX = (id, level = LEVEL_ID.wind) => levelDef(level).checkpoints.find((q) => q.id === id).x;
+export const beaconX = (id, level = LEVEL_ID["borrowed-wind"]) => levelDef(level).checkpoints.find((q) => q.id === id).x;

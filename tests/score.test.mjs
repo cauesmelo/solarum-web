@@ -56,7 +56,7 @@ test("every main route: each takeoff, landing, star, chain note, beacon and tile
     2: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID["still-water"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID["way-down"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
-    [LEVEL_ID.wind]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
+    [LEVEL_ID["borrowed-wind"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID.breaking]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID.door]: ["jump", "dash", "super-jump", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
   };
@@ -200,7 +200,7 @@ test("dissonance follows only visible errors, is clearly heard (the bed goes fla
     assert.ok(gentle.player.every((v) => !v.blur), "and never blurs a note");
   }
   // Below H 0.7 the choir rests; it returns as H heals.
-  const sloppy = musicRun(SLOPPY_RUNS[LEVEL_ID.wind]);
+  const sloppy = musicRun(SLOPPY_RUNS[LEVEL_ID["borrowed-wind"]]);
   assert.ok(sloppy.mixes.some((m) => !m.choir) && sloppy.mixes.at(-1).choir);
   // Kindness: three falls at one beacon soften the penalty, five forgive it.
   const t = createTuning();
@@ -240,13 +240,13 @@ test("a fall tape-stops the score (L1 short, no rewind; then backwards), L4 rest
     }
   }
   // Back to last light rewinds without the tape-stop or a penalty.
-  const c = createConductor({ level: LEVEL_ID.wind, path: PATHS[LEVEL_ID.wind], cracked: CRACKED });
+  const c = createConductor({ level: LEVEL_ID["borrowed-wind"], path: PATHS[LEVEL_ID["borrowed-wind"]], cracked: CRACKED });
   c.event({ name: "wake", time: 0 });
-  assert.equal(c.transport.pos(0), SCORES[LEVEL_ID.wind].pickup, "interim III wakes on its half-bar pickup");
-  const out = c.event({ name: "respawn", source: "retry", time: 9, x: beaconX("voids", LEVEL_ID.wind) });
+  assert.equal(c.transport.pos(0), SCORES[LEVEL_ID["borrowed-wind"]].pickup, "VI wakes on its first bar");
+  const out = c.event({ name: "respawn", source: "retry", time: 9, x: beaconX("bridge", LEVEL_ID["borrowed-wind"]) });
   assert.deepEqual(out.fx.map((f) => f.kind), ["restart"]);
   assert.equal(c.tuning.H, 1);
-  assert.equal(c.transport.pos(9), Math.round(posOf(LEVEL_ID.wind, beaconX("voids", LEVEL_ID.wind))), "on the beacon's bar");
+  assert.equal(c.transport.pos(9), Math.round(posOf(LEVEL_ID["borrowed-wind"], beaconX("bridge", LEVEL_ID["borrowed-wind"]))), "on the beacon's bar");
   // Restart level: a fresh, stopped, in-tune song that the next wake starts on its first bar.
   c.event({ name: "chain-fade", time: 10 });
   assert.ok(c.tuning.H < 1);
@@ -254,7 +254,7 @@ test("a fall tape-stops the score (L1 short, no rewind; then backwards), L4 rest
   assert.equal(c.transport.running, false);
   assert.equal(c.tuning.H, 1);
   c.event({ name: "wake", time: 0 });
-  assert.equal(c.transport.pos(0), SCORES[LEVEL_ID.wind].pickup);
+  assert.equal(c.transport.pos(0), SCORES[LEVEL_ID["borrowed-wind"]].pickup);
 });
 
 /* ---------- the payoff ---------- */
@@ -264,7 +264,7 @@ test("a perfect run completes each level's song; a sloppy one does not; three Gr
     2: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID["still-water"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID["way-down"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
-    [LEVEL_ID.wind]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
+    [LEVEL_ID["borrowed-wind"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID.breaking]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID.door]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
   };
@@ -305,10 +305,11 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
   // The engine's loop with a fake clock: frames of 8-50 ms (seeded), one
   // 200 ms hitch; the simulation advances min(frame, 50 ms) like game.js;
   // the audio clock advances in 128-sample render quanta.
-  // The interim wind level: shaker sixteenths through its body.
-  const c = createConductor({ level: LEVEL_ID.wind, path: PATHS[LEVEL_ID.wind], cracked: CRACKED });
+  // VI held in its wind (118 BPM, clock 1.103): the strings run up the chord
+  // on every sixteenth, so the scheduler is never idle.
+  const c = createConductor({ level: LEVEL_ID["borrowed-wind"], path: PATHS[LEVEL_ID["borrowed-wind"]], cracked: CRACKED });
   const clock = createClockMap();
-  const scale = levelDef(LEVEL_ID.wind).clock;
+  const scale = levelDef(LEVEL_ID["borrowed-wind"]).clock;
   let seed = 9;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   let wall = 0,
@@ -327,6 +328,7 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
     sim += Math.min(dt, 0.05) * scale;
     const audioNow = Math.floor(wall / quantum) * quantum;
     clock.follow(sim, audioNow, dt, scale);
+    c.frame({ t: sim, x: 0, status: "running", timeScale: scale, inWind: true });
     if (hitchAt == null || wall > hitchAt + 1) maxDrift = Math.max(maxDrift, Math.abs(clock.stats().drift));
     for (const n of c.ticks(c.transport.pos(sim), c.transport.pos(clock.toSim(audioNow + 0.12, scale)))) {
       const want = clock.toAudio(n.t);
@@ -371,14 +373,21 @@ test("the conductor is deterministic and each level's bed respects its layer pla
     assert.ok(at("pad", [1, 2]).length >= 1, "the sky enters at the wake");
     // The sky never thins out: a pad starts in every bar (a held chord is
     // re-voiced at each bar line).
-    const first = n === LEVEL_ID.wind ? 2 : 1;
-    for (let bar = first; bar < SCORES[n].bars; bar++) assert.ok(at("pad", [bar]).length >= 1, `L${n} bar ${bar} has a sky pad`);
+    for (let bar = 1; bar < SCORES[n].bars; bar++) assert.ok(at("pad", [bar]).length >= 1, `L${n} bar ${bar} has a sky pad`);
     for (const v of a.notes) assert.ok(LAYERS[v.layer], v.layer);
     assert.ok(a.notes.filter((v) => v.layer === "choir").length > 0, "constellations bring in the choir");
   }
   const bar = (run, voice, b) => run.notes.filter((v) => v.voice === voice && v.event === "tick" && Math.floor(v.pos / BAR) + 1 === b).length;
   // (l2-l4: the interim levels, revision five's II-IV.)
-  const [l1, gift, still, way, brk, l2, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID.wind, LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  const [l1, gift, still, way, brk, wind, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID["borrowed-wind"], LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  // VI: the clave only over the first wind and the finale; it rests in the
+  // breeze, the storm and the last wind; no shaker (restraint).
+  assert.equal(bar(wind, "pulse", 4) + bar(wind, "marimba", 4), 0, "VI rests in the breeze");
+  assert.equal(bar(wind, "marimba", 7), 3);
+  assert.equal(bar(wind, "marimba", 12), 0, "VI rests in the storm");
+  assert.equal(bar(wind, "marimba", 16), 3, "the finale");
+  assert.equal(bar(wind, "marimba", 20), 0, "VI rests in the last wind");
+  assert.equal(wind.notes.filter((v) => v.voice === "shaker").length, 0);
   // V: the clave (the half-time beat once a bar, the tresillo's marimba)
   // only where the cracks run land and go; it rests on the first crack,
   // over the split voids and through the stone; no shaker (restraint).
@@ -408,16 +417,12 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   assert.equal(bar(gift, "pulse", 5), 2);
   assert.equal(bar(gift, "pulse", 11), 0, "II rests over the long void");
   assert.equal(gift.notes.filter((v) => v.voice === "shaker" || v.voice === "marimba").length, 0);
-  // L1: no drums at all. L2: heartbeat on 1 and 3 with ticks and shaker.
-  // L4: four on the floor.
+  // L1: no drums at all. The interim Far Door: four on the floor.
   assert.equal(l1.notes.filter((v) => v.voice === "pulse" || v.voice === "shaker").length, 0);
-  assert.equal(bar(l2, "pulse", 5), 2);
-  assert.equal(bar(l2, "shaker", 5), 0, "the shaker waits for the wind");
-  assert.ok(bar(l2, "shaker", 10) >= 16);
   assert.equal(bar(l4, "pulse", 5), 4);
   assert.equal(bar(l4, "marimba", 5), 8);
   // Each level its own space (RESEARCH_LEVELS 6): 5.5 s, 5.5, 3.5, 2.5.
-  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID.wind, LEVEL_ID.door];
-  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 4.5, 3.5, 5.5, 2.5]);
-  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 18, 15, 20]);
+  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID["borrowed-wind"], LEVEL_ID.door];
+  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 4.5, 3.5, 3.5, 2.5]);
+  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 18, 20, 20]);
 });

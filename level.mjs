@@ -425,10 +425,11 @@ function chapterStars() {
  * its geometry, story, glyphs and the authored route pilots (tests/routes.mjs
  * reads them from the state, so the pilots stay self-contained).
  *
- * The chapter above is the source material: L2 keeps Movement III's geometry
- * at its original coordinates (L3 kept Movement II's until V replaced it; the
- * x lattice and every solved cell hold), L4 remixes translated copies of
- * both, and L1 re-solves Movement I's ideas on its own floaty cells. */
+ * The chapter above is the source material: until V and VI replaced them,
+ * L2 and L3 kept Movement III's and Movement II's geometry at their original
+ * coordinates; L4 (the interim Far Door) remixes translated copies of both
+ * (the x lattice and every solved cell hold), and L1 re-solves Movement I's
+ * ideas on its own floaty cells. */
 /** Grid x of sixteenth k on a route with no flights (a flight adds 3). */
 export const gx = (k) => 220 + 37.85 * k;
 const ALL_VERBS = Object.freeze({ cape: true, dive: true, glide: true });
@@ -1607,6 +1608,277 @@ const BREAKING = {
   },
 };
 
+/* ---- VI · Borrowed Wind (118 BPM): storm-bright; solar wind ----
+ * RESEARCH_PROGRESSION 4.5 (VI), toward Jupiter, look 'jupiter'. Nothing to
+ * GET: the solar wind is the world's (a column lifts her at 700 px/s² up to
+ * 240 px/s, 40% more with the cape held; a flight that enters it ends, and
+ * gets its charge back if it began within 0.15 s; no breath inside), and VI
+ * teaches it with the GET's steps: the hearth breeze over solid stone (hold
+ * the cape there and it lifts her; nothing at stake; the helper rides it),
+ * the first wind (jump into it: it lifts her to a shore no jump reaches),
+ * the glide bridge (the cape held past the column's top and let go over the
+ * far shore; Great Star 2 on a ledge for a flight out of its top), the
+ * twist: flying out of the wind's top (its song gives the cape back, so a
+ * flight pressed just before the column, refunded, or spent earlier still
+ * leaves one) and wind, dive, wind; then the finale (a cracked launch, two
+ * flights around the finale-song, the finale wind) and the last wind (the
+ * cape held and let go; Great Star 3 for a flight out of its top). Great
+ * Star 1 is at the top of the first fly-out column, which only the held
+ * cape reaches. 23 bars, the door on the downbeat of bar 24 (368).
+ * Shared physics; a standard column starts 30 px past the jump's grid x,
+ * 180 px wide, its body-centre band from 307 px over the takeoff's top to
+ * 253 under it (the breeze: 160 wide, 200 over, ending at the stone).
+ * Cells (scratch probe on the real model, dy at k/16 after the jump):
+ *   jump in:              9: -154.4  10: -69.8
+ *   jump in, cape held:  16: -163.7 (gliding 19.6 px a sixteenth down)
+ *     ...let go at 12:   15: -53.2;  at 11: 14: -71.9
+ *   jump in, cape at 6 (out of its top): 12: -147.2  13: -61.5
+ *   jump in, dive at 6:   8: +16.2
+ *   breeze, cape held:   16.87: 0 (back on the same stone, 16 ms real off)
+ *   jump, cape 3, jump 9, cape 11 (the finale, refilled between): 17: -16.8
+ * plus V's hold 4/5/6 (-79.9, -26, +57.3), tap 3 (+18) and the double 3
+ * (8: -100.9). */
+const J_CLOCK = 118 / 107;
+const J_SIX = 15 / 107;
+const JY = (() => {
+  const y = {};
+  let at = 0;
+  for (const [id, dy] of [
+    ["gate", 515], ["crack1", 57.3], ["crack2", -100.9], ["breeze", 57.3], ["breeze2", 18],
+    ["lifted", -141.3], ["lCrack1", 57.3], ["lCrack2", 106], ["bridgeGate", -79.9], ["bridgeShore", -53.2], ["bridgeShore2", 18],
+    ["columnShore", -147.2], ["cCrack1", 57.3], ["cCrack2", 106], ["diveGate", -79.9], ["diveIslet", 16.2], ["stormShore", -154.4],
+    ["finaleCrack", -26], ["finaleShore", -16.8], ["finaleHigh", -154.4], ["hCrack1", 149.3], ["hCrack2", 106], ["highShore", 18],
+    ["fIslet", 16.2], ["gShore", -53.2], ["gCrack1", 57.3], ["gCrack2", 106], ["gCrack3", -79.9], ["plain", 18],
+  ])
+    y[id] = at = +(at + dy).toFixed(1);
+  y.ledge = +(y.bridgeGate - 194.5).toFixed(1);
+  return y;
+})();
+const jIsle = (id, landK, F, takeoffK, y, lead = 80, type, edge = 10) => {
+  const q = [id, gk(landK, F) - lead, y, gk(takeoffK, F) + edge - (gk(landK, F) - lead)];
+  return type ? [...q, type] : q;
+};
+/** A solar-wind column for a jump on sixteenth k (F flights so far) from a
+ * stone at y: 30 px past the jump's grid x. */
+const jCol = (id, k, F, y, extra = {}) => ({ id, x: gk(k, F) + 30, width: 180, top: y - 307, bottom: y + 253, ...extra });
+const jBreeze = (id, k, F, y) => ({ id, x: gk(k, F) + 30, width: 160, top: y - 200, bottom: y, gentle: true });
+const J_MAIN = [
+  ["jupiter-gate", -700, JY.gate, gk(23) + 10 + 700],
+  // Warm-up: cracks, land and go: 23 down onto crack 1 (29), a double (31,
+  // 34) up onto crack 2 (39), 41 down onto the breeze stone (47).
+  jIsle("w-crack-1", 29, 0, 31, JY.crack1, 55, "crumble", -6),
+  jIsle("w-crack-2", 39, 0, 41, JY.crack2, 60, "crumble", -6),
+  // The hearth breeze (safe first use): jump 50 into it holding the cape:
+  // it lifts her; let go (58) and she lands on the same stone (about 60.8);
+  // a tap (69) steps down onto the beacon's stone (72). Running on, nothing
+  // happens; holding on, she floats down onto it later.
+  jIsle("breeze-stone", 47, 0, 69, JY.breeze, 55),
+  ["breeze-stone-2", gk(72) - 60, JY.breeze2, gk(84) + 10 - (gk(72) - 60)],
+  // The need: jump into the first wind (84) and again at its top (91): she
+  // lands 141 px up on the lifted shore (97); no jump reaches it.
+  jIsle("lifted-shore", 97, 0, 99, JY.lifted, 80, undefined, -6),
+  // Land and go: 99 down onto crack L1 (105), a double (107, 110) down onto
+  // crack L2 (117), 119 up onto the bridge gate (123).
+  jIsle("l-crack-1", 105, 0, 107, JY.lCrack1, 55, "crumble", -6),
+  jIsle("l-crack-2", 117, 0, 119, JY.lCrack2, 70, "crumble", -6),
+  jIsle("bridge-gate", 123, 0, 125, JY.bridgeGate, 55),
+  // The glide bridge: jump 125 into its column with the cape held, glide
+  // past its top and let go (137) over the far shore (140); without the
+  // cape the jump comes down short of it. A tap (141) onto the beacon's stone (144).
+  jIsle("bridge-shore", 140, 0, 141, JY.bridgeShore, 70),
+  ["bridge-shore-2", gk(144) - 60, JY.bridgeShore2, gk(156) + 10 - (gk(144) - 60)],
+  // Out of the top: jump 156 into the column, the wind-song on its rise,
+  // the cape at its top (162) carries her onto the column shore (168).
+  jIsle("column-shore", 168, 1, 170, JY.columnShore, 80, undefined, -6),
+  jIsle("c-crack-1", 176, 1, 178, JY.cCrack1, 55, "crumble", -6),
+  jIsle("c-crack-2", 188, 1, 190, JY.cCrack2, 70, "crumble", -6),
+  jIsle("dive-gate", 194, 1, 196, JY.diveGate, 55),
+  // Wind, dive, wind: jump into column D (196), dive out of its top (202)
+  // onto the islet (204), jump into column E (206) up onto the storm shore (215).
+  jIsle("dive-islet", 204, 1, 206, JY.diveIslet, 50, undefined, -6),
+  ["storm-shore", gk(215, 1) - 80, JY.stormShore, gk(228, 1) + 10 - (gk(215, 1) - 80)],
+  // The finale: a hop onto the launch stone (233); jump 235, cape at the
+  // top (238; the launch-song on the hop, the stone and the jump's rise
+  // charges it, whatever was spent before the hop), the
+  // double (244), the finale-song along the flight and the double, cape
+  // 246, down onto the finale shore (252); jump into the finale wind (254)
+  // up onto the high stone (263); a jump and a dive from its top (265, 268)
+  // down onto stone H1 (270: stable, a dive smashes a crack it lands on), a
+  // double (272, 275) down onto crack H2 (282)
+  // and a tap onto the last beacon's stone (284, 287).
+  // (Stable: a crack with no catch under it and its next stone 786 px on
+  // would end a failed finale out of view; the launch-song still charges
+  // the first flight after the hop.)
+  jIsle("finale-launch", 233, 1, 235, JY.finaleCrack, 60, undefined, -6),
+  jIsle("finale-shore", 252, 3, 254, JY.finaleShore, 90),
+  jIsle("finale-high", 263, 3, 265, JY.finaleHigh, 80, undefined, -6),
+  jIsle("h-stone-1", 270, 3, 272, JY.hCrack1, 55, undefined, -6),
+  jIsle("h-crack-2", 282, 3, 284, JY.hCrack2, 70, "crumble", -6),
+  ["high-shore", gk(287, 3) - 60, JY.highShore, gk(300, 3) + 10 - (gk(287, 3) - 60)],
+  // The last wind: jump into column F (300), dive out of its top (306) onto
+  // the islet (308), jump into column G (310) with the cape held, let go
+  // (322) over the shore (325); then the cracks down, no glyph, and a tap
+  // onto the plain of Jupiter's storm (353, 356).
+  jIsle("f-islet", 308, 3, 310, JY.fIslet, 50, undefined, -6),
+  jIsle("g-shore", 325, 3, 327, JY.gShore, 70, undefined, -6),
+  jIsle("g-crack-1", 333, 3, 335, JY.gCrack1, 55, "crumble", -6),
+  jIsle("g-crack-2", 345, 3, 347, JY.gCrack2, 70, "crumble", -6),
+  jIsle("g-crack-3", 351, 3, 353, JY.gCrack3, 55, "crumble", -6),
+  ["storm-plain", gk(356, 3) - 60, JY.plain, gk(368, 3) + 520 - (gk(356, 3) - 60)],
+];
+const J_HIGH = [
+  // Great Star 2's ledge over the glide bridge: a flight out of its column's top.
+  ["bridge-ledge", gk(141, 1) - 60, JY.ledge, 37.85 * 5],
+];
+const J_WIND = [
+  jBreeze("hearth-breeze", 50, 0, JY.breeze),
+  // Breezes over the beacons' stones: a jump into one lands on the grid
+  // 9/16 later with a star at its top (optional).
+  jBreeze("breeze-1", 73, 0, JY.breeze2),
+  jCol("first-wind", 84, 0, JY.breeze2),
+  jCol("bridge-wind", 125, 0, JY.bridgeGate),
+  jBreeze("breeze-2", 145, 0, JY.bridgeShore2),
+  jCol("top-wind", 156, 0, JY.bridgeShore2),
+  jCol("dive-wind", 196, 1, JY.diveGate),
+  jCol("storm-wind", 206, 1, JY.diveIslet),
+  jBreeze("breeze-3", 217, 1, JY.stormShore),
+  jCol("finale-wind", 254, 3, JY.finaleShore),
+  jBreeze("breeze-4", 289, 3, JY.highShore),
+  jCol("last-wind-f", 300, 3, JY.highShore),
+  jCol("last-wind-g", 310, 3, JY.fIslet),
+];
+const jAt = (y0, dy) => Math.round(y0 + dy - 36);
+const jRun = (k, F, y) => [gk(k, F) + 39.5, y - 40];
+const jArc = (k, F, y0, dy) => [gk(k, F) + 39.5, jAt(y0, dy)];
+const J_CHAINS = [
+  // The breeze's float (complete on 56).
+  { id: "breeze-song", route: "low", stars: [jArc(51, 0, JY.breeze, -61.8), jArc(52, 0, JY.breeze, -109.1), jArc(54, 0, JY.breeze, -195.9), jArc(56, 0, JY.breeze, -203.1)] },
+  // In the fly-out column, one a sixteenth on the rise (complete on 160).
+  { id: "wind-song", route: "low", stars: [157, 158, 159, 160].map((k, i) => jArc(k, 0, JY.bridgeShore2, [-61.8, -100.5, -134.2, -167.8][i])) },
+  // Required: on the hop onto the cracked launch, the crack and the jump's
+  // rise (complete on 236), three sixteenths before the first flight.
+  { id: "launch-song", route: "low", stars: [jArc(229, 1, JY.stormShore, -61.8), jArc(232, 1, JY.stormShore, -79.9), jRun(234, 1, JY.finaleCrack), jArc(236, 1, JY.finaleCrack, -61.8)] },
+  // Required: along the first flight and at the double (complete on 244), before the second.
+  { id: "finale-song", route: "low", stars: [[gk(238, 1) + 69.69 + 39.5, jAt(JY.finaleCrack, -105.2)], [gk(238, 1) + 2 * 69.69 + 39.5, jAt(JY.finaleCrack, -105.2)], [gk(238, 1) + 3 * 69.69 + 39.5, jAt(JY.finaleCrack, -105.2)], jArc(244, 2, JY.finaleCrack, -17.4)] },
+  // Wind, dive, wind (complete on 212).
+  { id: "storm-song", route: "low", stars: [jArc(198, 1, JY.diveGate, -100.5), jRun(205, 1, JY.diveIslet), jArc(208, 1, JY.diveIslet, -100.5), jArc(210, 1, JY.diveIslet, -167.8), jArc(212, 1, JY.diveIslet, -235.1)] },
+  // The last wind's float (complete on 320).
+  { id: "last-song", route: "low", stars: [jArc(312, 3, JY.fIslet, -109.1), jArc(314, 3, JY.fIslet, -203.3), jArc(316, 3, JY.fIslet, -293.7), jArc(318, 3, JY.fIslet, -308.1), jArc(320, 3, JY.fIslet, -281.5)] },
+];
+const J_GREAT = [
+  { id: "great-1", x: gk(161.5), y: JY.bridgeShore2 - 330, line: "the top of the fly-out wind: hold the cape in it" },
+  { id: "great-2", x: gk(142, 1), y: JY.ledge - 46, line: "the ledge over the glide bridge: fly out of the column's top" },
+  { id: "great-3", x: gk(213, 1), y: JY.diveIslet - 347, line: "the top of the storm wind: hold the cape in it and float onto the storm shore" },
+];
+const J_STARS = [
+  // (The beacons' runs carry their breezes' stars instead.)
+  ...[[359, 3, JY.plain], [362, 3, JY.plain], [365, 3, JY.plain]].map(([k, F, y], i) => [`run-star-${i}`, gk(k, F) + 33.5, y - 40, "low"]),
+  ...[[23, 0, JY.gate], [41, 0, JY.crack2], [99, 0, JY.lifted], [119, 0, JY.lCrack2], [170, 1, JY.columnShore], [178, 1, JY.cCrack1], [190, 1, JY.cCrack2], [327, 3, JY.gShore], [335, 3, JY.gCrack1], [347, 3, JY.gCrack2]].map(([k, F, y], i) => [`hop-star-${i}`, gk(k + 1, F) + 33.5, jAt(y, -64.7), "low"]),
+  // At the top of each beacon breeze's lift, and of the taps.
+  ...[[73, 0, JY.breeze2], [145, 0, JY.bridgeShore2], [217, 1, JY.stormShore], [289, 3, JY.highShore]].map(([k, F, y], i) => [`breeze-star-${i}`, gk(k + 4, F) + 33.5, jAt(y, -167.8), "low"]),
+  ...[[69, 0, JY.breeze], [141, 0, JY.bridgeShore], [284, 3, JY.hCrack2], [353, 3, JY.gCrack3]].map(([k, F, y], i) => [`tap-star-${i}`, gk(k + 1, F) + 33.5, jAt(y, -23.7), "low"]),
+];
+const JJ = (k, F, when = "g") => [gk(k, F) - 0.3, "jump", when];
+const JT = (k, F) => [gk(k, F) - 0.3, "tap", "g"];
+const JD = (k, F) => [gk(k, F) - 0.3, "dash", "a"];
+const JV = (k, F) => [gk(k, F) - 0.3, "dive", "a"];
+// The held cape is pressed at the column's own x (in the wind it glides);
+// a release in the air is a timed letting-go.
+const JG = (k, F) => [gk(k, F) + 30, "glide", "*"];
+const JU = (k, F, when = "a") => [gk(k, F) - 0.3, "unglide", when];
+const J_PLAN_MAIN = [
+  JJ(23, 0), JJ(31, 0), JJ(34, 0, "a"), JJ(41, 0),
+  JJ(50, 0), JG(50, 0), JU(58, 0), JT(69, 0),
+  JJ(73, 0), JJ(84, 0), JJ(91, 0, "a"),
+  JJ(99, 0), JJ(107, 0), JJ(110, 0, "a"), JJ(119, 0),
+  JJ(125, 0), JG(125, 0), JU(137, 0), JT(141, 0),
+  JJ(145, 0), JJ(156, 0), JD(162, 0),
+  JJ(170, 1), JJ(178, 1), JJ(181, 1, "a"), JJ(190, 1),
+  JJ(196, 1), JV(202, 1), JJ(206, 1),
+  JJ(217, 1), JJ(228, 1), JJ(235, 1), JD(238, 1), JJ(244, 2, "a"), JD(246, 2),
+  JJ(254, 3),
+  JJ(265, 3), JV(268, 3), JJ(272, 3), JJ(275, 3, "a"), JT(284, 3),
+  JJ(289, 3), JJ(300, 3), JV(306, 3), JJ(310, 3), JG(310, 3), JU(322, 3),
+  JJ(327, 3), JJ(335, 3), JJ(338, 3, "a"), JJ(347, 3), JT(353, 3),
+];
+const BORROWED_WIND = {
+  key: "borrowed-wind",
+  title: "Borrowed Wind",
+  look: "jupiter",
+  toward: "Jupiter",
+  introduces: "wind",
+  bpm: 118,
+  clock: J_CLOCK,
+  physics: { crumbleAfter: 5 * J_SIX },
+  verbs: { double: true, cape: true, glide: true, dive: true, super: false },
+  gets: [],
+  capeRule: "breath",
+  view: { minWidth: 970, portraitMinWidth: 775 },
+  level: { title: "Borrowed Wind", speed: 270, startX: 220, startY: JY.gate, finishX: gk(368, 3), finishY: JY.plain, beat: BEAT },
+  movements: [{ id: "VI", x: -1000, numeral: "VI", name: "Borrowed Wind" }],
+  sections: [
+    { x: -1000, movement: "VI", step: "warm", name: "VI · Borrowed Wind" },
+    { x: gk(44), movement: "VI", step: "safe", name: "VI · Borrowed Wind — the hearth breeze" },
+    { x: gk(72), movement: "VI", step: "need", name: "VI · Borrowed Wind — the first wind" },
+    { x: gk(115), movement: "VI", step: "develop", name: "VI · Borrowed Wind — the glide bridge" },
+    { x: gk(144), movement: "VI", step: "twist", name: "VI · Borrowed Wind — out of the top" },
+    { x: gk(190, 1), movement: "VI", step: "twist", name: "VI · Borrowed Wind — wind, dive, wind" },
+    { x: gk(216, 1), movement: "VI", step: "conclude", name: "VI · Borrowed Wind — the finale" },
+    { x: gk(288, 3), movement: "VI", step: "conclude", name: "VI · Borrowed Wind — the last wind" },
+    { x: gk(356, 3), movement: "VI", step: "coda", name: "VI · Borrowed Wind — Jupiter's storm" },
+  ],
+  // Beacons on half bars 5½, 10, 14½ and 19 (at most 10.2 s real apart),
+  // each lit by the landing on its own beat.
+  checkpoints: [
+    { id: "breeze", x: gk(72) - 3, y: JY.breeze2, platform: "breeze-stone-2", story: "The wind had come all the way from the Sun, and it would lend itself to anyone light enough.", tip: "Jump into the wind at the edge: it lifts you." },
+    { id: "bridge", x: gk(144) - 3, y: JY.bridgeShore2, platform: "bridge-shore-2", story: "Jupiter's bands turned below her, slow and enormous, and the wind ran between them.", tip: "Jump into the wind, press the cape near the top, fly out." },
+    { id: "storm", x: gk(216, 1) - 3, y: JY.stormShore, platform: "storm-shore", story: "In the storm's eye the stones broke and the wind held. She trusted the wind.", tip: "Take the songs on the cracked stone and in the first flight: each gives the cape back." },
+    { id: "last", x: gk(288, 3) - 3, y: JY.highShore, platform: "high-shore", story: "One more gust, borrowed and given back, and Mars was a red point ahead.", tip: "Drop out of the first wind, hold the cape in the second, let go over the shore." },
+  ],
+  startTip: "Jump into the wind holding the cape: it lifts you.",
+  main: J_MAIN,
+  high: J_HIGH,
+  updrafts: J_WIND,
+  cascades: [],
+  chains: J_CHAINS,
+  great: J_GREAT,
+  // The helper rides the hearth breeze ahead of her (RESEARCH_PROGRESSION 2.1).
+  moments: [{ id: "helper-breeze", kind: "helper", k: 36, target: "hearth-breeze" }],
+  decor: [],
+  prompts: [
+    { id: "p-breeze", glyph: ["up", "then", "hold-right"], action: "glide", x: gk(50), y: JY.breeze - 230, from: gk(48) + 40, to: gk(60), inputX: gk(48) + 90, optional: true, route: "main" },
+    { id: "p-wind", glyph: ["up"], action: "jump", x: gk(83), y: JY.breeze2 - 120, from: gk(83), to: gk(85), inputX: gk(84) + 8 },
+    { id: "p-glide", glyph: ["hold-right"], action: "glide", x: gk(125), y: JY.bridgeGate - 230, from: gk(123) + 40, to: gk(137), inputX: gk(123) + 90 },
+    // (From the column's far edge on: inside it the cape glides.)
+    { id: "p-top", glyph: ["right"], action: "dash", x: gk(162), y: JY.bridgeShore2 - 330, from: gk(161.7), to: gk(164), inputX: gk(162) + 10 },
+  ],
+  stars: J_STARS,
+  routes: {
+    main: J_PLAN_MAIN,
+    // Great Stars 2, 1 and 3: a flight out of the bridge column's top onto
+    // its ledge (then down onto the beacon's stone), the cape held in the
+    // fly-out column (let go after its flight, onto the column shore), and
+    // the cape held in the storm wind (let go at 212 onto the storm shore).
+    upper: [
+      ...J_PLAN_MAIN.filter(([x]) => x < gk(124)),
+      JJ(125, 0), JG(125, 0), JD(131, 0), JU(141, 1, "g"),
+      JJ(156, 0), JG(156, 0), JD(162, 0), JU(166, 1),
+      ...J_PLAN_MAIN.filter(([x]) => x > gk(168, 1) && x < gk(205, 1)),
+      JJ(206, 1), JG(206, 1), JU(212, 1),
+      ...J_PLAN_MAIN.filter(([x]) => x > gk(224, 1)),
+    ],
+    // No breeze hops, and the cape pressed just before the fly-out column:
+    // the wind ends that flight within 0.15 s and gives its charge back, so
+    // the flight out of the top still has it (the wind refund).
+    ability: [
+      ...J_PLAN_MAIN.filter(([x]) => ![73, 145, 217, 289].some((k) => Math.abs(x - gk(k, k > 200 ? (k > 280 ? 3 : 1) : 0) + 0.3) < 1) && x < gk(157)),
+      [gk(156) + 24, "dash", "a"],
+      ...J_PLAN_MAIN.filter(([x]) => x > gk(157) && ![217, 289].some((k) => Math.abs(x - gk(k, k > 280 ? 3 : 1) + 0.3) < 1)),
+    ],
+    safe: J_PLAN_MAIN,
+  },
+};
+
 /**
  * Open a level at `cut` and insert a section (RESEARCH_LEVELS: content, not
  * padding). Everything at x >= cut moves by (dx, dy): platforms, wind,
@@ -1647,175 +1919,10 @@ function insertSection(def, { cut, dx, dy = 0, content = {}, drop = [] }) {
   return out;
 }
 
-/* ---- L2 · Borrowed Wind (107 BPM): floating with marked beats ----
- * Movement III at its own coordinates and today's physics: the cape, solar
- * wind and the held-cape glide, and the dive as the way into the star cache.
- * There is no cracked stone yet: the split voids became one long void with
- * nothing to land on (jump, flight, a constellation gives the cape back,
- * flight again: solved with scripts/arcs.mjs, landing 14/16 after the
- * takeoff, 15 px lower) and the finale launches from stable rock. */
-const L2_VOID = 16003.45; // takeoff, sixteenth 417 of the chapter's lattice
-const vx = (j, flights = 1) => L2_VOID + 37.85 * j + 113.55 * flights;
-const L2_PLAN = {
-  breeze: [[13997.2, "jump", "g"], [14027.2, "glide", "*"], [14197.2, "unglide", "*"]],
-  void: [[L2_VOID - 0.3, "jump", "g"], [vx(3, 0) - 0.3, "dash", "a"], [vx(9) - 0.3, "dash", "a"]],
-  // Upper: a double jump between the flights reaches Great Star 2.
-  voidHigh: [[L2_VOID - 0.3, "jump", "g"], [vx(3, 0) - 0.3, "dash", "a"], [vx(7) - 0.3, "jump", "a"], [vx(11) - 0.3, "dash", "a"]],
-  // The far rock is 86 px above the wind gate: a tap lands 4/16 later.
-  rock: [[vx(30, 2) - 0.3, "tap", "g"]],
-  wind: [[18052, "jump", "g"], [18080, "glide", "*"], [18300, "unglide", "*"]],
-  // (The second press comes early: later, the step-up already sets her on
-  // the shore and the pilot would wait for an airborne moment.)
-  cache: [[18600, "dive", "g"], [18850, "jump", "g"], [18895, "jump", "a"], [19106.5, "jump", "g"]],
-};
-const L2_BASE = {
-  id: 2,
-  key: "wind",
-  numeral: "II",
-  title: "Borrowed Wind",
-  bpm: 107,
-  clock: 1,
-  physics: {},
-  verbs: ALL_VERBS,
-  view: null,
-  level: { title: "Borrowed Wind", speed: 270, startX: gx(360), startY: 319, finishX: 21984, finishY: 470, beat: BEAT },
-  movements: [{ id: "L2", x: -1000, numeral: "II", name: "Borrowed Wind" }],
-  sections: [
-    { x: -1000, movement: "L2", step: "introduce", name: "II · Borrowed Wind" },
-    { x: 15540, movement: "L2", step: "develop", name: "II · Borrowed Wind — the long void" },
-    { x: 17450, movement: "L2", step: "twist", name: "II · Borrowed Wind — the updraft" },
-    { x: 19350, movement: "L2", step: "conclude", name: "II · Borrowed Wind — everything" },
-    { x: 21440, movement: "L2", step: "coda", name: "II · Borrowed Wind — the far door" },
-  ],
-  checkpoints: byId(CHECKPOINTS, ["voids", "updraft", "finale"]),
-  startTip: "Jump at the edge, then press the cape at the top of the jump.",
-  main: [
-    ...pick(MAIN, ["hearth", "wind-shore"]),
-    ["far-rock", 16701, 392, 675],
-    ...pick(MAIN, ["wind-gate", "lifted-shore", "lid-2", "lifted-down", "finale-gate"]),
-    ["finale-rock", 19990, 381, 200],
-    ...pick(MAIN, ["finale-high", "far-door"]),
-  ],
-  high: pick(HIGH, ["star-cache", "low-a", "low-b", "low-c"]),
-  updrafts: UPDRAFTS,
-  cascades: [],
-  chains: [
-    ...byId(CHAINS, ["flight-line"]),
-    // On the first flight's line, one per sixteenth: complete by the end of
-    // the flight, so the second flight (3/16 later) has its cape back.
-    { id: "void-song", route: "low", stars: [3, 4, 5, 6].map((j) => [L2_VOID + 37.85 * j + 31.84 * (j - 3) + 40, 237]) },
-    ...byId(CHAINS, ["cache-song", "finale-song"]),
-  ],
-  great: [
-    { id: "great-1", x: 18760, y: 425, line: "the star cache under the cracked lid: dive" },
-    { id: "great-2", x: 16490, y: 128, line: "above the long void: a double jump between the flights" },
-    { id: "great-3", x: 21105, y: 100, line: "the top of the last wind: hold the cape in it" },
-  ],
-  prompts: [
-    ...byId(PROMPTS, ["p-breeze", "p-cape"]),
-    { id: "p-refill", glyph: ["right"], action: "dash", x: vx(8) + 20, y: 260, from: vx(7), to: vx(10), inputX: vx(9) },
-    ...byId(PROMPTS, ["p-updraft", "p-wind"]),
-    { ...PROMPTS.find((q) => q.id === "p-lid2"), after: "p-wind" },
-  ],
-  stars: starsIn(13817, 23000),
-  routes: {
-    main: [...CP.hearthVoid, ...L2_PLAN.void, ...L2_PLAN.rock, ...CP.updraft, ...CP.finale],
-    upper: [...L2_PLAN.breeze, ...CP.hearthVoid, ...L2_PLAN.voidHigh, ...L2_PLAN.rock, ...L2_PLAN.wind, ...L2_PLAN.cache, ...CP.finale.slice(0, 4), [20583.5, "dash", "a"], [20880, "glide", "*"], [21060, "unglide", "*"]],
-    ability: [...L2_PLAN.breeze, ...CP.hearthVoid, ...L2_PLAN.void, ...L2_PLAN.rock, ...L2_PLAN.wind, ...L2_PLAN.cache, ...CP.finale],
-    safe: [...CP.hearthVoid, ...L2_PLAN.void, ...L2_PLAN.rock, ...CP.updraft, ...CP.safeFinale],
-  },
-};
-
-/* L2's sections, inserted in order. (1) The hearth void twice: the first
- * time along its star line, then (after a 4/16 hop up 80 px onto a second
- * hearth) the same void with nothing to follow. Two bars and one flight:
- * dx = 37.85 x (32 + 3). */
-const L2_X1 = 37.85 * (32 + 3);
-const L2_S1 = insertSection(L2_BASE, {
-  cut: 15098,
-  dx: L2_X1,
-  dy: -22,
-  drop: ["flight-line"],
-  content: {
-    main: [
-      ["wind-shore-1", 15435, 377, 15786.35 - 15435],
-      ["hearth-2", 15867.75, 297, 16384.75 - 15867.75],
-    ],
-    chains: [{ id: "first-flight", route: "low", stars: [[15096, 178], [15202, 178], [15343, 178], [15436, 243]] }],
-    sections: [{ x: 15440, movement: "L2", step: "introduce", name: "II · Borrowed Wind — the void again, without stars" }],
-    routes: { main: [[15776.05, "jump", "g"], [14981.5 + L2_X1, "jump", "g"], [15096 + L2_X1, "dash", "a"]] },
-  },
-});
-/* (2) Currents, before the finale: a flight ends over a low islet and a
- * dive lands on it on the beat (dive at 7/16, 44 px down 1/16 later); a jump
- * into a column of wind that would carry Diana over the island beneath it
- * and on into the dark: a dive out of the wind lands on it 1/16 later; then
- * jump and flight (the island gave the cape back) up 69 px onto the shore
- * 7/16 later. Four bars and two flights; the finale follows 27 px lower.
- * Lattice: x = 674.2 + 37.85 k before the section (four flights so far). */
-const cx = (k, flights = 5) => 220 + 113.55 * flights + 37.85 * k;
-const L2_X2 = cx(586, 6) - 20431.25;
-const L2_S2 = insertSection(L2_S1, {
-  cut: 20600,
-  dx: L2_X2,
-  dy: 27,
-  content: {
-    main: [
-      ["gust-gate", 20638.75, 390, cx(540, 4) + 10 - 20638.75],
-      ["dive-islet", cx(548) - 50, 434, cx(552) + 10 - (cx(548) - 50)],
-      ["under-wind", 21720, 434, cx(559) + 10 - 21720],
-      // Its lip is only 20 px before the landing: a run that never dives
-      // comes down 25-40 px short of it.
-      ["gust-exit", cx(566, 6) - 20, 365, cx(586, 6) + 123.5 - (cx(566, 6) - 20)],
-    ],
-    updrafts: [{ id: "dive-wind", x: 21700, width: 170, top: 60, bottom: 620 }],
-    checkpoints: [{ id: "currents", x: cx(528, 4) - 1, y: 390, platform: "gust-gate", story: "The wind will carry you anywhere. Even past where you meant to go.", tip: "In the wind, press down to drop out of it onto the island below." }],
-    prompts: [
-      { id: "p-islet", glyph: ["down"], action: "dive", x: cx(545), y: 330, from: cx(546), to: cx(548), inputX: cx(547) + 10 },
-      { id: "p-drop", glyph: ["down"], action: "dive", x: 21785, y: 230, from: 21712, to: 21860, inputX: 21840 },
-    ],
-    stars: [576, 580, 584].map((k, i) => [`gust-star-${i}`, cx(k, 6) + 34, 365 - 40, "low"]),
-    sections: [{ x: 20640, movement: "L2", step: "develop", name: "II · Borrowed Wind — currents" }],
-    routes: {
-      main: [
-        [cx(540, 4) - 0.3, "jump", "g"], [cx(542, 4) - 0.3, "dash", "a"], [cx(547) - 0.3, "dive", "a"],
-        [cx(552) - 0.3, "jump", "g"], [cx(554) - 0.3, "dive", "a"],
-        [cx(559) - 0.3, "jump", "g"], [cx(561) - 0.3, "dash", "a"],
-        // ...and the jump down to the finale, as from the lifted shore.
-        [20431.25 + L2_X2, "jump", "g"],
-      ],
-    },
-  },
-});
-/* (3) The glide bridge, before the currents: a jump into a column with the
- * cape held rises 40% faster; held on past its top, the cape glides (fall
- * capped at 140 px/s) across a void too wide to fall across, onto a far
- * shore. Glide is required here, and only here, and only in wind. */
-// No-glide runs come down about 150 px short; the held cape lands 20/16 after the jump.
-const L2_X3 = 37.85 * 64;
-const L2_S3 = insertSection(L2_S2, {
-  cut: 20600,
-  dx: L2_X3,
-  dy: -42,
-  content: {
-    main: [
-      ["glide-gate", 20638.75, 390, cx(540, 4) + 10 - 20638.75],
-      ["glide-shore", 21751.4, 322, cx(576, 4) + 10 - 21751.4],
-      // A copy of the lifted shore's end: the currents begin with its jump.
-      ["glide-exit", cx(581, 4) - 60, 296, cx(586, 4) + 123.5 - (cx(581, 4) - 60)],
-    ],
-    updrafts: [{ id: "glide-wind", x: cx(540, 4) + 30, width: 170, top: 60, bottom: 620 }],
-    // Shown once she is in the wind: pressed before it, the cape would fly level.
-    prompts: [{ id: "p-glide", glyph: ["hold-right"], action: "glide", x: cx(542, 4), y: 230, from: cx(540, 4) + 40, to: 21770, inputX: cx(540, 4) + 100 }],
-    stars: [564, 567, 570].map((k, i) => [`glide-star-${i}`, cx(k, 4) + 34, 322 - 40, "low"]),
-    // Along the held-cape line (where the pickup box meets it on 16ths 544-552).
-    chains: [{ id: "glide-song", route: "low", stars: [[cx(544, 4) + 40, 149], [cx(546, 4) + 40, 61], [cx(548, 4) + 40, 56], [cx(550, 4) + 40, 77], [cx(552, 4) + 40, 119]] }],
-    checkpoints: [{ id: "bridge", x: cx(528, 4) - 1, y: 390, platform: "glide-gate", story: "Hold on to the wind, and it holds on to you.", tip: "Jump into the wind with the cape held, and keep holding it past the top." }],
-    sections: [{ x: 20640, movement: "L2", step: "develop", name: "II · Borrowed Wind — the glide bridge" }],
-    routes: { main: [[cx(540, 4) - 0.3, "jump", "g"], [cx(540, 4) + 30, "glide", "*"], [21851, "unglide", "g"], [cx(576, 4) - 0.3, "jump", "g"], [20431.25 + 37.85 * 64, "jump", "g"]] },
-  },
-});
-const L2 = L2_S3;
+/* Revision six's level II, Borrowed Wind (interim until VI was built), is
+ * retired: VI took its breeze, its first wind and lifted shore, its glide
+ * bridge and its finale (re-solved at 118 BPM, with breath), IV re-solved
+ * its currents (the cut). */
 
 /* Revision five's level III, The Breaking Constellation (interim until V
  * was built), is retired: V took its cracks and floor, the ridge and its
@@ -2015,7 +2122,7 @@ export const CAMPAIGN = Object.freeze(
     { stage: 3, key: "still-water", title: "Still Water", toward: "Neptune", bpm: 100, introduces: "glide", look: "neptune", def: STILL },
     { stage: 4, key: "way-down", title: "The Way Down", toward: "Uranus", bpm: 107, introduces: "dive", look: "uranus", def: WAY_DOWN },
     { stage: 5, key: "breaking", title: "The Breaking Constellation", toward: "Saturn", bpm: 112, introduces: "cracks", look: "saturn", def: BREAKING },
-    { stage: 6, key: "borrowed-wind", title: "Borrowed Wind", toward: "Jupiter", bpm: 118, introduces: "wind", look: "jupiter", def: null },
+    { stage: 6, key: "borrowed-wind", title: "Borrowed Wind", toward: "Jupiter", bpm: 118, introduces: "wind", look: "jupiter", def: BORROWED_WIND },
     { stage: 7, key: "falling-road", title: "The Falling Road", toward: "Mars", bpm: 123, introduces: "cascade", look: "mars", def: null },
     { stage: 8, key: "far-door", title: "The Far Door", toward: "the Moon, then Earth", bpm: 128, introduces: "super", look: "moon-earth", def: null },
   ].map((q) => Object.freeze(q)),
@@ -2024,7 +2131,6 @@ const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 /** The interim levels, in tempo order, with the look of the stage that will
  * take most of their content (VI, V and VIII). */
 const INTERIM = [
-  { ...L2, look: "jupiter", toward: "Jupiter" },
   { ...L4, look: "moon-earth", toward: "the Moon, then Earth" },
 ];
 function register(d, i, extra) {

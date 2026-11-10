@@ -54,9 +54,9 @@ test("the cape tint has four steps (60/45/30/15% dim, clear at full) and keeps t
   assert.deepEqual(TINT_STEPS, [0.6, 0.45, 0.3, 0.15]);
   const cases = [[0, 0.6], [0.24, 0.6], [0.25, 0.45], [0.49, 0.45], [0.5, 0.3], [0.74, 0.3], [0.75, 0.15], [0.999, 0.15], [1, 0]];
   for (const [charge, dim] of cases) assert.equal(tintForCharge(charge), dim, `charge ${charge}`);
-  // One flight per airtime (the interim levels' 'landing' rule): clear when
-  // ready, 60% once a flight is spent, nothing in flight.
-  const s = running(LEVEL_ID.wind);
+  // One flight per airtime (the interim Far Door's 'landing' rule): clear
+  // when ready, 60% once a flight is spent, nothing in flight.
+  const s = running(LEVEL_ID.door);
   assert.equal(capeTint(s, "cape"), 0);
   jump(s);
   update(s, 0.05);

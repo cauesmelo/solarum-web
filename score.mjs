@@ -79,6 +79,10 @@ export const CHORDS = Object.freeze({
   "A/G": { name: "A/G", root: 9, bass: 43, tones: [9, 1, 4], safe: [9, 11, 1, 4, 6], pad: [55, 61, 64, 69] },
   Bm7: { name: "Bm7", root: 11, bass: 47, tones: [11, 2, 6], safe: [11, 2, 4, 6, 9], pad: [57, 62, 66, 69] },
   "F#m/A": { name: "F#m/A", root: 6, bass: 45, tones: [6, 9, 1], safe: [6, 9, 11, 1, 4], pad: [57, 61, 64, 66] },
+  // VI's A Mixolydian over the A pedal (D major's notes): G, D and Em7 with A in the bass.
+  "G/A": { name: "G/A", root: 7, bass: 45, tones: [7, 11, 2], safe: [7, 9, 11, 2, 4], pad: [55, 59, 62, 69] },
+  "D/A": { name: "D/A", root: 2, bass: 45, tones: [2, 6, 9], safe: [2, 4, 6, 9, 11], pad: [57, 62, 66, 69] },
+  "Em7/A": { name: "Em7/A", root: 4, bass: 45, tones: [4, 7, 11, 2], safe: [4, 7, 9, 11, 2], pad: [55, 59, 62, 64] },
   // D Lydian: the chapter's only sustained G#, at the door with three Great Stars.
   Earth: { name: "Dmaj7#11", root: 2, bass: 38, tones: [2, 6, 9, 1, 8], safe: [2, 4, 6, 8, 9, 11, 1], pad: [62, 66, 68, 73] },
 });
@@ -113,20 +117,6 @@ function mapOf(sections, coda) {
     return Array.isArray(c) ? c[halfOf(pos)] : c;
   };
 }
-const CYC = CYCLE.map((b) => b);
-const CYC3 = CYCLE_III.map((b) => b);
-// L2's twist (the glide bridge and the currents): IV V iii vi, the lift.
-const L2_TWIST = [C.G, C.A, C["F#m"], C.Bm];
-const L2_SECTIONS = [
-  { id: "hearth", from: 1, to: 2, pulse: false, cycle: [[C.G, C.D]] },
-  { id: "voids", from: 3, to: 8, cycle: CYC },
-  { id: "wind", from: 9, to: 11, shaker: true, cycle: CYC3 },
-  { id: "bridge", from: 12, to: 15, shaker: true, cycle: L2_TWIST },
-  { id: "currents", from: 16, to: 19, shaker: true, cycle: [C.G, C.A, C.Bm, C["F#m"]] },
-  // The finale climbs to Bm and the theme's head sits on A: V, then home.
-  { id: "finale", from: 20, to: 22, shaker: true, cycle: [C["Gmaj7#11"], C.Bm, C.A] },
-  { id: "coda", from: 23, to: Infinity },
-];
 // II · The Gift: Bm7 Gmaj7 Dadd9 A6 laid over its sections (the heartbeat
 // rests while the gift arrives and over the long void).
 const GIFT_SECTIONS = [
@@ -184,6 +174,23 @@ const BREAKING_SECTIONS = [
   { id: "close", from: 23, to: 23, cycle: [C["Gmaj7#11"]] },
   { id: "coda", from: 24, to: Infinity },
 ];
+// VI · Borrowed Wind: A Mixolydian, A G/A D/A Em7/A over the A pedal
+// (RESEARCH_PROGRESSION 4.3). Restraint: the brief's driving shaker is left
+// out; the tresillo (the clave's 3+3+2 on the marimba, the half-time beat)
+// plays only over the first wind and the finale (the bed stays at or under
+// V's onsets); the wind's own rising
+// runs (the strings, Diana's) carry the storm.
+const WIND_CYCLE = [C.A, C["G/A"], C["D/A"], C["Em7/A"]];
+const WIND_SECTIONS = [
+  { id: "wake", from: 1, to: 2, pulse: false, cycle: [C.A] },
+  { id: "breeze", from: 3, to: 5, pulse: false, cycle: [C.A, C["G/A"]] },
+  { id: "lift", from: 6, to: 9, cycle: WIND_CYCLE },
+  { id: "storm", from: 10, to: 14, pulse: false, cycle: WIND_CYCLE },
+  { id: "finale", from: 15, to: 17, cycle: [C["D/A"], C["Em7/A"], C.A] },
+  { id: "high", from: 18, to: 18, pulse: false, cycle: [C["G/A"]] },
+  { id: "last", from: 19, to: 23, pulse: false, cycle: [...WIND_CYCLE, C.A] },
+  { id: "coda", from: 24, to: Infinity },
+];
 const L4_CYCLE = [C["Bm/F#"], C["G/F#"], C["Em/F#"], [C["F#sus4"], C["F#"]]];
 // L4's twist (the voids at 128): the pedal climbs, G/F# Em/F# then F#sus4 F#.
 const L4_SECTIONS = [
@@ -203,7 +210,8 @@ const L4_SECTIONS = [
  * the payoff. Section flags: pulse (the groove plays), shaker, glass (the
  * earned celesta). Positions are simulation sixteenths from the level's bar
  * 1; the transport plays them at the level's own BPM (clock = BPM / 107).
- * L2 starts on a half bar (pickup 8), like the chapter's hearth it was.
+ * (A level may start on a half bar with `pickup: 8`; revision six's
+ * Borrowed Wind did, from the chapter's hearth.)
  */
 const PRESETS = {
   waking: {
@@ -343,27 +351,6 @@ const PRESETS = {
       "plane-song": [71, 74, 78, 81],
     },
   },
-  wind: {
-    bpm: 107, bars: 24, pickup: 8,
-    // floaty with marked beats: heartbeat on 1 and 3, a tick on 2 and 4,
-    // shaker sixteenths at about -30 dB from the wind on; the twist lifts.
-    groove: "heartbeat", maxFlat: 15, space: { seconds: 5.5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
-    sections: L2_SECTIONS,
-    chordAt: mapOf(L2_SECTIONS, C.Dadd9),
-    signalBars: [3, 7, 9, 20], closeFrom: 22,
-    phrases: {
-      // bar 3 (Bm): the cape opens on a falling Bm line, F#5 E5 D5 B4.
-      "first-flight": [78, 76, 74, 71],
-      // the long void (bar 5, F#m | Dadd9): C#5 E5 F#5 | A5, rising to the refill.
-      "void-song": [74, 76, 78, 81],
-      // the glide bridge: rising and settling, D5 E5 F#5 E5 D5 (fitted below).
-      "glide-song": [73, 76, 78, 76, 73],
-      // the star cache (about bar 9, F#m | Dadd9): E5 F#5 A5 B5.
-      "cache-song": [76, 78, 81, 83],
-      // bar 11 (Bm): the last phrase climbs to the high B, B4 D5 F#5 B5.
-      "finale-song": [71, 74, 78, 83],
-    },
-  },
   breaking: {
     bpm: 112, bars: 24, pickup: 0,
     // V · The Breaking Constellation, a nocturne of call and response
@@ -391,6 +378,32 @@ const PRESETS = {
       "crown-song": [69, 71, 74, 78, 81],
       // bars 21-22 (A7sus4 | Em9): the run down, B5 A5 E5 D5 | E5.
       "plain-song": [83, 81, 76, 74, 76],
+    },
+  },
+  "borrowed-wind": {
+    bpm: 118, bars: 24, pickup: 0,
+    // VI · Borrowed Wind, storm-bright (RESEARCH_PROGRESSION 4.3): the clave
+    // plays 7 of 23 bars (WIND_SECTIONS), no shaker; in the wind the strings
+    // run up the chord with her.
+    groove: "clave", maxFlat: 20, space: { seconds: 3.5, shimmer: 0.3 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
+    sections: WIND_SECTIONS,
+    chordAt: mapOf(WIND_SECTIONS, C.A),
+    // The wake, the first wind (bar 6), out of the top (bar 10) and the
+    // finale (bar 15); the theme closes from bar 22.
+    signalBars: [1, 6, 10, 15], closeFrom: 22,
+    phrases: {
+      // bar 4 (G/A): up the hearth breeze, D5 E5 G5 A5.
+      "breeze-song": [74, 76, 79, 81],
+      // bars 10-11 (A | G/A): up the fly-out wind, C#5 E5 F#5 | A5.
+      "wind-song": [73, 76, 78, 81],
+      // bar 15 (D/A): the cracked launch, D5 F#5 A5 B5.
+      "launch-song": [74, 78, 81, 83],
+      // bars 15-16 (D/A | Em7/A): along the first flight and the double, D6 | B5 A5 G5.
+      "finale-song": [86, 83, 81, 79],
+      // bars 13-14 (Em7/A | A): wind, dive, wind, E5 G5 | A5 C#6 E6.
+      "storm-song": [76, 79, 81, 85, 88],
+      // bars 20-21 (G/A | D/A): the last wind's float, D5 G5 B5 D6 | A5.
+      "last-song": [74, 79, 83, 86, 81],
     },
   },
   door: {
