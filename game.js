@@ -1,5 +1,6 @@
 import {
   createGame,
+  enterLevel,
   start,
   restart,
   retry,
@@ -3477,8 +3478,10 @@ function swapLevel() {
   trans.swapped = true;
   const sx = camera.x + skyOffset.x,
     sy = camera.y + skyOffset.y;
-  const assist = { ...state.assist };
-  Object.assign(state, createGame(state.seed, { level: trans.to, ...assist }));
+  // Serials stay monotonic (enterLevel): with a fresh serial 0 the renderer's
+  // lastSerial would swallow the next level's wake and its first events, so
+  // level II's song never started (owner report, 2026-11-10).
+  enterLevel(state, trans.to);
   audio.setLevel(state.level);
   hudOrbit = buildOrbit($("orbit"), 264, 44, false);
   pauseOrbit = buildOrbit($("pause-orbit"), 360, 80, true);

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
   createGame,
+  enterLevel,
   start,
   update,
   jump,
@@ -1453,4 +1454,21 @@ test("the unreferenced duplicate jump-landing.png stays in source but out of the
   assert.ok(!referenced.includes("assets/jump-landing.png"));
   for (const name of ["index.html", "game.js", "style.css", "embed.js", "embed.css", "model.mjs", "level.mjs"])
     assert.ok(!(await read(name)).includes("jump-landing"), name);
+});
+test("enterLevel keeps event serials monotonic: the renderer must hear the next level's wake (the song starts on it)", () => {
+  const s = createGame(2021, { level: 1 });
+  start(s);
+  jump(s);
+  update(s, 1.2, {});
+  const heard = s.eventSerial; // what the renderer's lastSerial holds after level I
+  assert.ok(heard > 1, "level I produced events");
+  setAssist(s, "starNet", true);
+  enterLevel(s, 2);
+  assert.equal(s.level, 2);
+  assert.equal(s.status, "ready");
+  assert.equal(s.eventSerial, heard, "no rewind to 0: that would hide level II's first events behind lastSerial");
+  assert.equal(s.assist.starNet, true, "assists survive the swap");
+  start(s);
+  const wake = s.events.find((e) => e.name === "wake" && e.serial > heard);
+  assert.ok(wake, "level II's wake is newer than anything level I's renderer voiced");
 });

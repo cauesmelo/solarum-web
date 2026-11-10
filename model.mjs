@@ -290,6 +290,21 @@ export function start(s) {
   }
   return s;
 }
+/**
+ * Replace the world with level `level` in place (the automatic transition's
+ * swap), keeping the assist options. createGame() would restart the event
+ * serial at 0, but the renderer drains events by serial and remembers the
+ * last one it voiced: after level I's ~100 events it would silently drop
+ * level II's first ~100, the wake (which starts the song) among them. So the
+ * serial stays monotonic across the swap, as in restart().
+ */
+export function enterLevel(s, level) {
+  const assist = { ...s.assist },
+    serial = s.eventSerial;
+  Object.assign(s, createGame(s.seed, { level, ...assist }));
+  s.eventSerial = serial;
+  return s;
+}
 export function restart(s) {
   const assist = { ...s.assist },
     serial = s.eventSerial;
