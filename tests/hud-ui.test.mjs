@@ -26,10 +26,12 @@ test("static contract: the breath bar, verbs, the glint and the QA previews", as
   assert.match(css, /conic-gradient\(var\(--paper\) calc\(var\(--charge, 0\) \* 1turn\)/);
   assert.match(css, /\.solarum\[data-verbs\]:not\(\[data-verbs~="cape"\]\) \.cape-btn/);
   // The GET event and the previews.
-  assert.match(js, /case "get":\s*\/\/[^\n]*\n\s*if \(loud\) startMoment\(e\.verb\);/);
+  // A GET starts its moment on the simulation clock, quietly in a QA step (no particles).
+  assert.match(js, /case "get":[\s\S]{0,240}startMoment\(e\.verb, \{ sim: e\.time, loud,/);
   for (const hook of ["setLook:", "previewCape:", "previewGet:", "getHud:"]) assert.ok(js.includes(hook), hook);
-  // HUD art is drawn by CSS: warmed, never decoded for the canvas.
-  assert.match(js, /\.filter\(\(\[, v\]\) => v\.file\?\.endsWith\("\.png"\) && !v\.hud\)/);
+  // HUD art is drawn by CSS: warmed, never decoded for the canvas, except
+  // the meteor stone, which is also the world's asteroid (I's crash, II's eye).
+  assert.match(js, /\.filter\(\(\[name, v\]\) => v\.file\?\.endsWith\("\.png"\) && \(!v\.hud \|\| name === "meteor"\)\)/);
 });
 
 test("style.css crops the breath bar's PNGs at their measured bounds (tests/art.test.mjs)", async () => {

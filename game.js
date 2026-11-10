@@ -31,7 +31,8 @@ import { createFrameClock } from "./frame-clock.mjs";
 import { emergenceAt, emergenceSeconds, resolveSet } from "./emergence.mjs";
 import { owns, spriteSetName, capeMeter, capeTint, doubleInHand } from "./hud.mjs";
 import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, earthBox, ringsCrop, HUD_BAND } from "./backdrop.mjs";
-import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt } from "./moments.mjs";
+import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt, SIXTEENTH_SIM, MOMENT_KINDS, scriptedMoments, fallAt, flashAt, asteroidAt, plumeAt, farPlace, eyeAt, eyeSeconds, eyeTimes, rideAt, slopeAt } from "./moments.mjs";
+import { ISLAND_LOOKS, islandShape, markable, paintMarks, paintParticles } from "./islands.mjs";
 
 /* Renderer, input and UI. All gameplay rules live in model.mjs / level.mjs;
  * this file only draws the simulation, forwards input and plays sound. */
@@ -395,7 +396,15 @@ function backdropView() {
     progress: state.status === "ready" ? 0 : progressOf(state.player.x),
     driftX: camera.x - (WORLD().startX - W / 2),
     driftY: camera.y - (WORLD().startY - 0.6 * H),
+    ...brightStarFate(),
   };
+}
+/** I's brightest star brightens toward its flash and is gone once it has
+ * fallen (it is the asteroid); without a flash moment it follows progress. */
+function brightStarFate() {
+  const flash = state.status === "ready" ? null : scriptedOf().list.find((m) => m.kind === "flash");
+  if (!flash) return { brightness: state.status === "ready" ? 0 : progressOf(state.player.x), fallen: false };
+  return { brightness: Math.max(0, Math.min(1, state.time / flash.at)), fallen: sinceSim(flash.at) >= 0.1 };
 }
 function drawSky() {
   ctx.fillStyle = INK;
@@ -464,6 +473,8 @@ function drawSky() {
     ctx.drawImage(saturnRings, W * 0.08 - ((camera.x * 0.003) % 30), (H - saturnRings.height * scale) / 2, saturnRings.width * scale, saturnRings.height * scale);
     ctx.restore();
   }
+  // The scripted far sky: the brightest star's flash, the asteroid, the plume.
+  drawScriptedFar();
   // Original shooting-star clips (cadent1/2), never under reduced motion;
   // home's sky (level I) is a shower: they come about twice as often.
   if (!reduced && state.status !== "ready") {
@@ -495,31 +506,19 @@ function drawSky() {
  * lip never reaches past the collider, so a near miss cannot look like
  * Diana sinking into stone. */
 function islandPath(q, x, w, thick, jitter = 0) {
-  const y = q.y + jitter,
-    h = hash(q.phase * 3.7 + 1),
-    h2 = hash(q.phase * 5.3 + 2),
-    depth = thick * (0.72 + h * 0.6),
-    keel = 0.3 + h2 * 0.4,
-    inset = Math.min(10, w * 0.06);
+  // The shape is islands.mjs islandShape: the marks and particles share it.
+  const shape = islandShape(q, x, w, thick, jitter),
+    { y, inset } = shape;
   ctx.beginPath();
   ctx.moveTo(x, y + 2);
   for (let k = 0; k <= w; k += 20) ctx.lineTo(x + Math.min(k, w), outlineY(q, Math.min(k, w)) + jitter);
   ctx.lineTo(x + w, y + 3);
   ctx.quadraticCurveTo(x + w - inset * 0.4, y + 9, x + w - inset, y + 12);
-  if (w > 520) {
-    // Long islands: two lobes instead of one giant wedge.
-    const mid = x + w * (0.45 + h * 0.1);
-    ctx.bezierCurveTo(x + w * 0.9, y + depth * 0.9, mid + w * 0.12, y + depth * 0.95, mid, y + depth * 0.62);
-    ctx.bezierCurveTo(mid - w * 0.1, y + depth * 1.05, x + w * 0.12, y + depth * 0.9, x + inset, y + 12);
-  } else {
-    ctx.bezierCurveTo(
-      x + w * (keel + 0.45), y + depth + 12,
-      x + w * (keel - 0.25), y + depth + 8,
-      x + inset, y + 12,
-    );
-  }
+  // The underside: one cubic, or two lobes on long islands (> 520 px).
+  for (const [, c1, c2, end] of shape.curves) ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], end[0], end[1]);
   ctx.quadraticCurveTo(x + inset * 0.4, y + 9, x, y + 3);
   ctx.closePath();
+  return shape;
 }
 function crackLines(q, x, w, y, lid) {
   ctx.strokeStyle = INK;
@@ -582,9 +581,10 @@ function drawPlatform(q) {
     if (lead < RULES.cascadeShake) warn = 1 - lead / RULES.cascadeShake;
   }
   const jitter = warn > 0 && !reduced ? Math.sin(clock * 70 + q.phase) * 1.6 * warn : 0;
-  islandPath(q, x + jitter * 0.6, w, thick, Math.abs(jitter) * 0.5);
+  const shape = islandPath(q, x + jitter * 0.6, w, thick, Math.abs(jitter) * 0.5);
   ctx.fillStyle = PAPER;
   ctx.fill();
+  if (islandLook && markable(q)) drawIslandMarks(shape);
   if (warn > 0) {
     // Grey means one thing only: this stone is breaking right now.
     ctx.fillStyle = `rgba(119,119,113,${0.4 * warn})`;
@@ -620,6 +620,44 @@ function drawPlatform(q) {
     ctx.lineTo(x + k + 4, q.y + thick * 0.5);
     ctx.fill();
   }
+}
+/* ---------- island marks and particles (islands.mjs, RESEARCH_PROGRESSION 4.4) ----------
+ * The level's look gives its stable islands a subtle mark (frost, waves,
+ * striations, ice nubs, strata, hatching, craters) under the walkable top,
+ * and a few ambient particles under their undersides, drawn behind every
+ * island. Both are clipped below the HUD band. */
+let islandLook = null,
+  particlesDrawn = 0;
+/** The world-space rectangle under the HUD band, as a clip. */
+function clipBelowBand() {
+  ctx.beginPath();
+  ctx.rect(camera.x - 400, camera.y + HUD_BAND, W + 800, H * 2);
+  ctx.clip();
+}
+function drawIslandMarks(shape) {
+  ctx.save();
+  clipBelowBand();
+  // The current path is the island's own silhouette: clip the marks to it.
+  islandPath(shape.q, shape.x, shape.w, shape.thick, shape.jitter);
+  ctx.clip();
+  paintMarks(ctx, islandLook, shape, { t: clock, reduced });
+  ctx.restore();
+  ctx.save();
+  clipBelowBand();
+  paintMarks(ctx, islandLook, shape, { t: clock, reduced, part: "under" });
+  ctx.restore();
+}
+function drawIslandParticles() {
+  particlesDrawn = 0;
+  if (!islandLook || !ISLAND_LOOKS[islandLook]?.particles) return;
+  ctx.save();
+  clipBelowBand();
+  for (const q of state.platforms) {
+    if (q.collapsed || !markable(q) || q.x > camera.x + W + 160 || q.x + q.width < camera.x - 160) continue;
+    const thick = q.route === "high" && q.y < 600 ? 30 : 64;
+    particlesDrawn += paintParticles(ctx, islandLook, islandShape(q, q.x, q.width, thick), { t: clock, reduced });
+  }
+  ctx.restore();
 }
 /** A cracked lid has its own look: one star-shaped break radiating from its
  * centre with starlight glinting out of it (the well below is alive), not
@@ -806,6 +844,7 @@ function drawStars() {
     }
     const age = star.collectedAt == null ? 1 : state.time - star.collectedAt;
     if (star.collected && age >= 0.4) continue;
+    if (fallPending(star.id)) continue; // still falling (a scripted fall lands it)
     const bob = reduced ? 0 : Math.sin(clock * 2 + star.x) * 3.5;
     // World stars are always the filled frames (2/3 twinkle); the hollow
     // frame is reserved for an empty Great Star slot in the HUD.
@@ -1131,7 +1170,9 @@ function drawPlayer() {
     // II's GET: the cape settles on her. The caped clip fades in over the
     // no-cape one (same pose, pivot and body lines), so her body stays
     // opaque and only the cape appears.
-    const u = settleAt(clock - settle.at).cape,
+    // (II's asteroid eye holds the cape back for a beat, then the light brings it.)
+    const t = momentAge(settle),
+      u = settle.eye ? eyeAt(t, beatSeconds()).cape : settleAt(t).cape,
       bare = setAnim(state.animation, "nocape");
     drawDiana(bare.name, bare.age, p.x, p.y + footFor(manifest, bare.name, bare.age));
     drawDiana(anim.name, anim.age, p.x, p.y + footFor(manifest, anim.name, anim.age), u, tint);
@@ -1200,24 +1241,40 @@ function drawLeafGlint(p) {
 
 /* ---------- the GET moments (RESEARCH_PROGRESSION 2.1, moments.mjs) ----------
  * A `get` event (the eight-level model) or QA's previewGet starts one. They
- * are drawn over the simulation and never change it. */
+ * are drawn over the simulation and never change it. Each is timed on the
+ * simulation clock, like the scripted moments below: a pause holds it,
+ * Gentle pace slows it with the world, a respawn that rewinds past it ends
+ * it, and a synchronous QA run that passes a GET still shows it. */
 const moments = [];
-// Real seconds per bar at the level's tempo (and Gentle pace).
+// Real seconds per bar and beat at the level's tempo (and Gentle pace).
 const barSeconds = () => 240 / ((state.def.bpm ?? 107) * pace);
-function momentFor(verb) {
-  return moments.find((m) => m.verb === verb && clock < m.until) ?? null;
+const beatSeconds = () => barSeconds() / 4;
+/** Real seconds since simulation time `sim` (negative before it). */
+const sinceSim = (sim) => (state.time - sim) / ((state.clock ?? 1) * pace);
+const momentAge = (m) => sinceSim(m.sim);
+function momentLive(m) {
+  const t = momentAge(m);
+  return t > -0.05 && t < m.seconds;
 }
-function startMoment(verb) {
+function momentFor(verb) {
+  return moments.find((m) => m.verb === verb && momentLive(m)) ?? null;
+}
+/** `get` is the GET (a level's or a QA preview) when known: II's cape
+ * moment needs its asteroid. `loud` false (a quiet QA step) skips the
+ * particles and the button pulses. */
+function startMoment(verb, { sim = state.time, loud = true, get = null } = {}) {
   for (let i = moments.length - 1; i >= 0; i--) if (moments[i].verb === verb) moments.splice(i, 1);
   const bar = barSeconds(),
-    m = { verb, at: clock, bar, until: clock + momentSeconds(verb, bar) };
+    stone = get ? capeStone(get) : null,
+    m = { verb, sim, bar, seconds: momentSeconds(verb, bar) };
+  // II: the cape is the asteroid's gift (GDD). With its stone in view the
+  // moment is the eye: it opens, a beat, a light leaves it and the cape
+  // settles as it arrives, all within 1.5 s (moments.mjs eyeAt).
+  if (stone) Object.assign(m, { eye: stone, seconds: eyeSeconds(beatSeconds()) });
   moments.push(m);
+  if (!loud) return m;
   const p = state.player;
-  if (verb === "cape" && !reduced) {
-    // The gift settles: a burst at the cape's tip, sparks along her back.
-    fx.push({ kind: "follow-burst", dx: -34, dy: -48, life: 1, span: 0.45, vx: 0, vy: 0, scale: 0.3 });
-    puff("spark", p.x - 22, p.y - 52, 7, 40);
-  }
+  if (verb === "cape" && !m.eye) capeBurst();
   if (verb === "dive") {
     // The necklace shows what it woke for: light glints out of the next
     // lid ahead (the stone she can now open), if one is in view.
@@ -1229,6 +1286,13 @@ function startMoment(verb) {
   if (button) pulseClass($(button), "arrive", 900);
   if (verb === "cape") pulseClass($("breath"), "arrive", 900);
   return m;
+}
+/** The gift settles: a burst at the cape's tip, sparks along her back. */
+function capeBurst() {
+  if (reduced) return;
+  const p = state.player;
+  fx.push({ kind: "follow-burst", dx: -34, dy: -48, life: 1, span: 0.45, vx: 0, vy: 0, scale: 0.3 });
+  puff("spark", p.x - 22, p.y - 52, 7, 40);
 }
 /** Restart a one-shot CSS animation class (and drop it afterwards). */
 function pulseClass(node, cls, ms) {
@@ -1266,6 +1330,16 @@ function drawHelper(x, y, alpha, angle) {
   ctx.restore();
   sprite("star", 2, x, y, 0.13, alpha, reduced ? 0 : Math.sin(clock * 1.7) * 0.3);
 }
+/** A tail-star streak with its head at (x, y), travelling along `heading`. */
+function streak(x, y, heading, k, alpha) {
+  if (!images.tailStar || alpha <= 0.01) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(heading - 0.37);
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(images.tailStar, -520 * k, -200 * k, 555 * k, 251 * k);
+  ctx.restore();
+}
 /** GETs still ahead: the level's (`def.gets`, not yet taken) and QA's
  * previews (renderer-only, fired here when Diana reaches them). */
 let previewGets = [];
@@ -1283,7 +1357,8 @@ function runLineAt(x) {
 function drawMoments() {
   if (state.status === "ready") return;
   const p = { ...state.player, ...viewPos() },
-    alive = state.status !== "dead";
+    alive = state.status !== "dead",
+    S = scriptedOf();
   // Before each GET: what Diana runs toward.
   for (const g of pendingGets()) {
     const d = g.x - p.x;
@@ -1291,20 +1366,28 @@ function drawMoments() {
     const y = runLineAt(g.x);
     if (g.verb === "glide" || g.verb === "super") {
       const a = helperApproach(g.verb, d, clock);
-      if (a) drawHelper(g.x + a.x, y + a.y, a.alpha, g.verb === "super" && d < 160 ? -1.2 : Math.atan2(0.2, -0.35));
+      // A scripted helper moment aimed at this GET (III's helper-drift)
+      // decides when the helper appears: it fades in from that moment.
+      const cue = S.list.find((m) => m.kind === "helper" && m.target === g.id);
+      const gate = cue ? Math.max(0, Math.min(1, sinceSim(cue.at) / 0.4)) : 1;
+      if (cue && gate > 0) shownScripted.add(cue.id);
+      if (a) drawHelper(g.x + a.x, y + a.y, a.alpha * gate, g.verb === "super" && d < 160 ? -1.2 : Math.atan2(0.2, -0.35));
     } else if (g.verb === "double") {
-      // The first star that landed softly rests on the run line, circling.
+      // The first star that landed softly rests on the run line, circling
+      // (from its scripted fall's landing, when one is aimed at the GET).
+      const landed = S.targets.get(g.id);
+      if (landed != null && state.time < landed) continue;
       const a = reduced ? 0 : clock * 2.2;
       sprite("star", 2, g.x + Math.cos(a) * 6, y - 16 + Math.sin(a) * 3, 0.16, 0.95);
     }
   }
   // QA previews fire once Diana runs through them.
-  for (const g of previewGets) if (p.x >= g.x) startMoment(g.verb);
+  for (const g of previewGets) if (p.x >= g.x) startMoment(g.verb, { get: g });
   previewGets = previewGets.filter((g) => p.x < g.x);
   for (let i = moments.length - 1; i >= 0; i--) {
     const m = moments[i],
-      t = clock - m.at;
-    if (clock >= m.until) {
+      t = momentAge(m);
+    if (t >= m.seconds || t < -0.05) {
       moments.splice(i, 1);
       continue;
     }
@@ -1312,27 +1395,51 @@ function drawMoments() {
     if (m.verb === "double") {
       const r = riseAt(t);
       sprite("star", 2, p.x + r.dx, p.y + r.dy, r.scale, r.alpha);
-    } else if (m.verb === "glide" || m.verb === "super") {
-      const h = helperAfter(t, m.bar);
-      drawHelper(p.x + h.dx, p.y + h.dy, h.alpha, h.trail);
-      if (m.verb === "glide") drawRipple(p, rippleAt(t, m.bar));
-    } else if (m.verb === "dive") {
-      const n = necklaceAt(t, m.bar),
-        cx = p.x + ANCHORS.chest.dx,
-        cy = p.y + ANCHORS.chest.dy;
-      ctx.save();
-      ctx.strokeStyle = PAPER;
-      ctx.lineWidth = 2;
-      for (const ring of reduced ? n.rings.slice(0, 1) : n.rings) {
-        ctx.globalAlpha = ring.alpha * n.fade;
-        ctx.beginPath();
-        ctx.arc(cx, cy, reduced ? 18 : ring.r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-      sprite("star", 2, cx, cy, 0.07 + 0.03 * n.glint, n.fade);
-    }
+    } else if (m.verb === "glide" || m.verb === "super") drawHelperAfter(m, t, p);
+    else if (m.verb === "dive") drawNecklace(p, t, m.bar);
+    else if (m.verb === "cape" && m.eye) drawEyeLight(m, t, p);
   }
+  drawScriptedFront(p, alive);
+}
+/** III after the GET: the helper loops round Diana, then (with a helper
+ * decor at the GET) drifts down its slope of air ahead of her; without one
+ * it flies off ahead and up. Her cape ripples on each beat of the bar. */
+function drawHelperAfter(m, t, p) {
+  const slope = m.verb === "glide" ? (state.def.decor ?? []).find((d) => d.kind === "helper" && d.to && Math.abs(d.x - p.x) < 900) : null;
+  if (slope) {
+    const s = slopeAt(t, m.bar);
+    if (s.loop) {
+      m.from = { x: p.x + s.dx, y: p.y + s.dy };
+      drawHelper(m.from.x, m.from.y, s.alpha, s.trail);
+    } else {
+      // From where the loop left it to just past the slope's foot, 46 px
+      // above the float line (its stars stay clear).
+      const a = m.from ?? { x: slope.x, y: slope.y - 30 },
+        b = { x: slope.to[0] + 120, y: slope.to[1] - 46 };
+      drawHelper(a.x + (b.x - a.x) * s.u, a.y + (b.y - a.y) * s.u, s.alpha, Math.atan2(b.y - a.y, b.x - a.x));
+    }
+  } else {
+    const h = helperAfter(t, m.bar);
+    drawHelper(p.x + h.dx, p.y + h.dy, h.alpha, h.trail);
+  }
+  if (m.verb === "glide") drawRipple(p, rippleAt(t, m.bar));
+}
+/** IV's GET: the necklace wakes (a glint at her chest, three rings). */
+function drawNecklace(p, t, bar) {
+  const n = necklaceAt(t, bar),
+    cx = p.x + ANCHORS.chest.dx,
+    cy = p.y + ANCHORS.chest.dy;
+  ctx.save();
+  ctx.strokeStyle = PAPER;
+  ctx.lineWidth = 2;
+  for (const ring of reduced ? n.rings.slice(0, 1) : n.rings) {
+    ctx.globalAlpha = ring.alpha * n.fade;
+    ctx.beginPath();
+    ctx.arc(cx, cy, reduced ? 18 : ring.r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+  sprite("star", 2, cx, cy, 0.07 + 0.03 * n.glint, n.fade);
 }
 /** III's GET: the cape ripples on each beat of one bar (three short ink-on-
  * paper strokes of light along its trailing edge). */
@@ -1355,6 +1462,429 @@ function drawRipple(p, amount) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/* ---------- II's asteroid eye (RESEARCH_PROGRESSION 2.1, GDD) ----------
+ * The cape is the asteroid's gift. The stone (the original meteoroCheio,
+ * the full meteor of the HUD) lies half buried in the crater beside every
+ * cape GET, 440 px past it so the eye is in view as she reaches the GET and
+ * still well ahead of her when the light leaves it. It is drawn behind the
+ * islands at 60% over an opaque ink disc: under --mute brightness, so Diana
+ * stays the brightest thing in front of it. */
+const STONE_R = 95;
+function capeStone(g) {
+  if (g?.verb !== "cape") return null;
+  const d = (state.def.decor ?? []).find((q) => q.kind === "asteroid" && q.x >= g.x - 100 && q.x <= g.x + 900);
+  return d ? { x: d.x, y: d.y, r: d.r ?? STONE_R } : { x: g.x + 440, y: runLineAt(g.x), r: STONE_R };
+}
+/** Its centre, a little under the run line (more than half shows), and its eye. */
+const stoneCentre = (s) => ({ x: s.x, y: s.y + 0.15 * s.r });
+const eyeOf = (s) => ({ x: s.x - 0.3 * s.r, y: s.y + 0.15 * s.r - 0.4 * s.r, w: 0.44 * s.r });
+function stones() {
+  const out = [];
+  const add = (s, moment) => s && !out.some((o) => Math.abs(o.x - s.x) < 1) && out.push({ ...s, moment });
+  for (const m of moments) if (m.eye && momentLive(m)) add(m.eye, m);
+  for (const g of [...(state.def.gets ?? []), ...previewGets]) add(capeStone(g), null);
+  for (const d of state.def.decor ?? []) if (d.kind === "asteroid") add({ x: d.x, y: d.y, r: d.r ?? STONE_R }, null);
+  return out;
+}
+/** A half-buried asteroid: ink disc, the meteor art at `alpha`, clipped at
+ * the ground line `cut` (world or screen y, whatever the caller draws in). */
+function drawStone(cx, cy, r, alpha, cut) {
+  if (!images.meteor) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(cx - r - 4, cy - r - 4, 2 * r + 8, cut - (cy - r - 4));
+  ctx.clip();
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.98, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha *= alpha;
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.35);
+  // meteoroCheio.png: a 1080 px disc (radius about 525 px) with two cracks.
+  const k = r / 525;
+  ctx.drawImage(images.meteor, -540 * k, -540 * k, 1080 * k, 1080 * k);
+  ctx.restore();
+}
+function drawAsteroids() {
+  for (const s of stones()) {
+    if (s.x + s.r < camera.x - 40 || s.x - s.r > camera.x + W + 40) continue;
+    const c = stoneCentre(s);
+    drawStone(c.x, c.y, s.r, 0.6, s.y + 14);
+    const m = s.moment;
+    drawEye(eyeOf(s), m ? eyeAt(momentAge(m), beatSeconds()) : { open: 0, earth: 0 });
+  }
+}
+/** The asteroid's eye: a closed lash line, or an almond of paper with an
+ * ink iris and, in its pupil, a small blue world (Earth: the only colour).
+ * Under reduced motion it fades open instead of parting. */
+function drawEye(e, st) {
+  const open = st.open;
+  ctx.save();
+  ctx.strokeStyle = INK;
+  ctx.lineCap = "round";
+  ctx.lineWidth = 2;
+  const half = e.w / 2,
+    h = reduced ? (open > 0.01 ? e.w * 0.24 : 0) : e.w * 0.24 * open;
+  if (h < 1) {
+    // Closed: one drooping lash line.
+    ctx.beginPath();
+    ctx.moveTo(e.x - half, e.y);
+    ctx.quadraticCurveTo(e.x, e.y + 5, e.x + half, e.y);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  if (reduced) ctx.globalAlpha *= open;
+  ctx.beginPath();
+  ctx.moveTo(e.x - half, e.y);
+  ctx.quadraticCurveTo(e.x, e.y - h * 1.15, e.x + half, e.y);
+  ctx.quadraticCurveTo(e.x, e.y + h * 0.95, e.x - half, e.y);
+  ctx.closePath();
+  ctx.fillStyle = PAPER;
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  const ir = Math.min(e.w * 0.17, h * 0.9 + 2);
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(e.x - 2, e.y - h * 0.05, ir, 0, Math.PI * 2);
+  ctx.fill();
+  if (st.earth > 0.01) {
+    ctx.globalAlpha *= st.earth;
+    ctx.fillStyle = EARTH;
+    ctx.beginPath();
+    ctx.arc(e.x - 2, e.y - h * 0.05, ir * 0.48, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = PAPER;
+    ctx.beginPath();
+    ctx.arc(e.x - 2 - ir * 0.2, e.y - h * 0.05 - ir * 0.22, ir * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.stroke();
+  ctx.restore();
+}
+/** The light leaving the pupil for Diana's back; the cape's burst when it arrives. */
+function drawEyeLight(m, t, p) {
+  const st = eyeAt(t, beatSeconds());
+  if (st.light != null && !reduced) {
+    const e = eyeOf(m.eye),
+      tx = p.x + ANCHORS.cape.dx,
+      ty = p.y + ANCHORS.cape.dy,
+      u = st.light * st.light * (3 - 2 * st.light),
+      x = e.x + (tx - e.x) * u,
+      y = e.y + (ty - e.y) * u - Math.sin(Math.PI * u) * 30;
+    streak(x, y, Math.atan2(ty - e.y, tx - e.x), 0.08, 0.6);
+    sprite("star", 2, x, y, 0.09, 1);
+  }
+  if (t >= eyeTimes(beatSeconds()).cape && !m.burst) {
+    m.burst = true;
+    capeBurst();
+  }
+}
+
+/* ---------- scripted world moments and decor (moments.mjs MOMENT_KINDS,
+ * DECOR_KINDS; level.mjs def.moments / def.decor) ----------
+ * Read generically from the level's data and sampled from the simulation
+ * clock, so a stage that authors these kinds needs no renderer work. Three
+ * layers: the far sky (the flash, the asteroid's streak, the plume) behind
+ * the islands; the world's back (falling stars, locks, glints) behind
+ * stars, glyphs and Diana; and the front (the helper, the necklace, the
+ * ripple). Each layer is clipped below the HUD band. */
+let scripted = { def: null };
+function scriptedOf() {
+  if (scripted.def === state.def) return scripted;
+  const list = scriptedMoments(state.def),
+    // Pickup or GET id -> the time its star lands (hidden until then).
+    targets = new Map(list.filter((m) => m.kind === "fall" && m.target).map((m) => [m.target, m.at]));
+  scripted = { def: state.def, list, targets, decor: state.def.decor ?? [] };
+  return scripted;
+}
+const shownScripted = new Set(); // moment and decor ids drawn in the last frame (QA)
+const starBob = (q) => (reduced ? 0 : Math.sin(clock * 2 + q.x) * 3.5);
+/** A star still waiting for its scripted fall is not drawn yet. */
+function fallPending(id) {
+  const at = scriptedOf().targets.get(id);
+  return at != null && state.time < at - 1e-9;
+}
+/** Where a fall lands: its pickup (with the bob it will have), or a GET's
+ * resting star on the run line (a soft fall). null: nothing to land on. */
+function fallTarget(m) {
+  const q = state.pickups.find((s) => s.id === m.target);
+  if (q) return q.collected ? null : { x: q.x, y: q.y + starBob(q), soft: false, scale: q.chain ? 0.24 : 0.21 };
+  const g = (state.def.gets ?? []).find((s) => s.id === m.target);
+  return g ? { x: g.x, y: runLineAt(g.x) - 16, soft: true, scale: 0.16 } : null;
+}
+function drawScriptedBack() {
+  if (state.status === "ready") return;
+  const S = scriptedOf(),
+    left = camera.x - 200,
+    right = camera.x + W + 200;
+  ctx.save();
+  clipBelowBand();
+  for (const m of S.list) {
+    const t = sinceSim(m.at);
+    if (m.kind === "fall") {
+      const g = fallTarget(m),
+        f = g && fallAt(t, { soft: g.soft });
+      if (!f || g.x < left - 500 || g.x > right + 500) continue;
+      shownScripted.add(m.id);
+      if (f.phase === "fall") {
+        if (reduced) {
+          // Reduced motion: no streak, the star fades in where it lands.
+          sprite("star", 2, g.x, g.y, g.scale, Math.max(0, Math.min(1, (t + 0.25) / 0.25)));
+          continue;
+        }
+        streak(g.x + f.dx, g.y + f.dy, f.heading, 0.13, 0.6 * f.alpha);
+        sprite("star", 2, g.x + f.dx, g.y + f.dy, g.scale, f.alpha);
+      } else {
+        ctx.save();
+        ctx.strokeStyle = PAPER;
+        ctx.lineWidth = 1.4;
+        ctx.globalAlpha *= f.ringAlpha;
+        ctx.beginPath();
+        ctx.arc(g.x, g.y, reduced ? 16 : f.ring, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        if (!reduced) sprite("star", f.burst, g.x, g.y, g.scale * 1.1, 0.8);
+      }
+    } else if (!MOMENT_KINDS[m.kind] && t >= 0 && t < 0.4) {
+      // An unknown kind (a builder's new idea before its art): a small
+      // burst at its target, or ahead of Diana.
+      const q = state.pickups.find((s) => s.id === m.target) ?? (state.def.gets ?? []).find((s) => s.id === m.target);
+      const x = q?.x ?? state.player.x + 220,
+        y = q?.y ?? state.player.y - 60;
+      shownScripted.add(m.id);
+      sprite("star", 4 + Math.min(3, Math.floor(t * 10)), x, y, 0.3, 0.8);
+    }
+  }
+  for (const d of S.decor) {
+    if (d.kind === "cluster") {
+      const xs = d.stars.map(([x]) => x);
+      if (Math.max(...xs) < left || Math.min(...xs) > right) continue;
+      shownScripted.add(d.id);
+      drawCluster(d.stars);
+    } else if (d.kind === "glint") {
+      if (d.x < left || d.x > right) continue;
+      // Until the stone under it breaks.
+      const under = state.platforms.find((q) => d.x >= q.x && d.x <= q.x + q.width && Math.abs(q.y - d.y) < 30);
+      if (under?.collapsed) continue;
+      shownScripted.add(d.id);
+      drawGlint(d.x, d.y - 4);
+    }
+  }
+  ctx.restore();
+}
+/** A lock: stars that are drawn and never collected, joined by the unlinked
+ * constellation hairline (a shape she will reach with a verb to come). */
+function drawCluster(stars) {
+  ctx.save();
+  ctx.strokeStyle = MUTE;
+  ctx.globalAlpha *= 0.4;
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([2, 7]);
+  ctx.beginPath();
+  stars.forEach(([x, y], i) => (i ? ctx.quadraticCurveTo((stars[i - 1][0] + x) / 2, (stars[i - 1][1] + y) / 2 - 6, x, y) : ctx.moveTo(x, y)));
+  ctx.stroke();
+  ctx.restore();
+  for (const [x, y] of stars) {
+    const frame = reduced ? 2 : 2 + (Math.floor(clock * 4 + x) % 2),
+      bob = reduced ? 0 : Math.sin(clock * 1.4 + x) * 2.5;
+    sprite("star", frame, x, y + bob, 0.19, 0.85);
+  }
+}
+/** A glinting stone: four short rays and a star, twinkling slowly. */
+function drawGlint(x, y) {
+  const tw = reduced ? 0.6 : 0.5 + 0.5 * Math.sin(clock * 3.1);
+  ctx.save();
+  ctx.strokeStyle = PAPER;
+  ctx.lineCap = "round";
+  ctx.lineWidth = 1.4;
+  ctx.globalAlpha *= 0.5 + 0.4 * tw;
+  const r = 7 + 5 * tw;
+  ctx.beginPath();
+  ctx.moveTo(x - r, y);
+  ctx.lineTo(x + r, y);
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x, y + r);
+  ctx.stroke();
+  ctx.restore();
+  sprite("star", 2, x, y, 0.08 + 0.03 * tw, 0.95);
+}
+/** The front layer: helpers riding wind ahead of her, and the necklace and
+ * ripple when no GET moment already draws them. */
+function drawScriptedFront(p, alive) {
+  if (!alive) return;
+  const S = scriptedOf();
+  ctx.save();
+  clipBelowBand();
+  for (const m of S.list) {
+    const t = sinceSim(m.at);
+    if (m.kind === "helper") {
+      // A GET target is handled by its approach (drawMoments).
+      if ((state.def.gets ?? []).some((g) => g.id === m.target)) continue;
+      const column = state.updrafts.find((u) => u.id === m.target);
+      if (column) {
+        const r = rideAt(t, (column.bottom - column.top) * 0.85);
+        if (!r) continue;
+        shownScripted.add(m.id);
+        drawHelper(column.x + column.width / 2 + r.dx, column.bottom - 10 + r.dy, r.alpha, r.angle);
+      } else if (t >= 0 && t < barSeconds()) {
+        // No target: it runs just ahead of her for a bar.
+        const h = helperAfter(Math.min(t + 0.5, barSeconds() * 0.99), barSeconds());
+        shownScripted.add(m.id);
+        drawHelper(p.x + h.dx, p.y + h.dy, h.alpha, h.trail);
+      }
+    } else if ((m.kind === "necklace" || m.kind === "ripple") && t >= 0 && t < barSeconds()) {
+      // Drawn by the GET's own moment when the two coincide (IV, III).
+      shownScripted.add(m.id);
+      if (m.kind === "necklace" && !momentFor("dive")) drawNecklace(p, t, barSeconds());
+      if (m.kind === "ripple" && !momentFor("glide")) drawRipple(p, rippleAt(t, barSeconds()));
+    }
+  }
+  ctx.restore();
+}
+/** The far sky (drawn in view px, behind the islands): the brightest star's
+ * flash, the asteroid streaking to its crash, and each plume after it. */
+function drawScriptedFar() {
+  if (state.status === "ready") return;
+  const S = scriptedOf();
+  if (!S.list.some((m) => m.kind === "flash" || m.kind === "crash") && !S.decor.some((d) => d.kind === "plume")) return;
+  const p = viewPos(),
+    near = Math.max(0.1, Math.min(0.6, (p.x - camera.x) / W));
+  // A plume is placed by its distance ahead of Diana (moments.mjs farPlace).
+  const plumes = S.decor
+    .filter((d) => d.kind === "plume")
+    .map((d) => {
+      const f = farPlace(d.x - p.x, W, near),
+        // A plume beyond the door stays beyond it on screen too.
+        door = d.x > WORLD().finishX ? WORLD().finishX - camera.x + 150 * f.scale : -Infinity;
+      return { d, x: Math.max(f.x, door), y: d.y - camera.y + 6, scale: f.scale, far: d.x - p.x, at: (d.from ?? 0) * SIXTEENTH_SIM };
+    });
+  const plumeFor = (crash) => plumes.find((q) => q.d.from === crash.k) ?? plumes[0] ?? { x: W * 0.8, y: H * 0.7, scale: 0.6, at: crash.at };
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, HUD_BAND, W, H - HUD_BAND);
+  ctx.clip();
+  for (const m of S.list) {
+    const t = sinceSim(m.at);
+    if (m.kind === "flash") {
+      const a = flashAt(t, reduced);
+      if (a > 0) {
+        // Paper over the sky, fading in under the HUD band (no hard edge).
+        shownScripted.add(m.id);
+        const g = ctx.createLinearGradient(0, HUD_BAND, 0, HUD_BAND + 110);
+        g.addColorStop(0, "rgba(251,251,234,0)");
+        g.addColorStop(1, `rgba(251,251,234,${a})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, HUD_BAND, W, H - HUD_BAND);
+      }
+      // The bright star flares for half a second (home's body).
+      if (t >= 0 && t < 0.6 && currentLook() === "home") {
+        const b = bodyBox("home", backdropView());
+        sprite("star", 2, b.x, b.y, (b.r * 2.6) / 200 * (reduced ? 1.4 : 1.4 + 1.6 * (1 - t / 0.6)), 1 - t / 0.6);
+      }
+      // Then the asteroid streaks across, heading right, to the next crash.
+      const crash = S.list.find((c) => c.kind === "crash" && c.at > m.at);
+      if (!crash) continue;
+      const span = (crash.at - m.at) / ((state.clock ?? 1) * pace),
+        s = asteroidAt(t, span);
+      if (!s || reduced) continue;
+      shownScripted.add(m.id);
+      // The brightest star itself falls (home's body): it leaves its place
+      // slowly, swings out to the right and dives onto the plume's base on
+      // the crash. Without that body it crosses high from the upper left.
+      const end = plumeFor(crash),
+        home = currentLook() === "home" ? bodyBox("home", backdropView()) : null,
+        S0 = home ? { x: home.x, y: home.y } : { x: W * 0.04, y: HUD_BAND + 46 },
+        C = home ? { x: Math.max(S0.x, end.x) + W * 0.16, y: S0.y + H * 0.02 } : { x: end.x - W * 0.05, y: HUD_BAND + 30 },
+        e = s.e,
+        at = (u) => ({ x: (1 - u) ** 2 * S0.x + 2 * (1 - u) * u * C.x + u * u * end.x, y: (1 - u) ** 2 * S0.y + 2 * (1 - u) * u * C.y + u * u * end.y }),
+        here = at(e),
+        ahead = at(Math.min(1, e + 0.01));
+      streak(here.x, here.y, Math.atan2(ahead.y - here.y, ahead.x - here.x), 0.34, 0.7 * s.alpha);
+      drawStone(here.x, here.y, 9, s.alpha, here.y + 20);
+    }
+  }
+  for (const m of S.list) if (m.kind === "crash" && sinceSim(m.at) >= 0 && sinceSim(m.at) < 1.6) shownScripted.add(m.id);
+  for (const q of plumes) {
+    const t = sinceSim(q.at),
+      pl = plumeAt(t, reduced);
+    if (!pl) continue;
+    shownScripted.add(q.d.id);
+    drawPlume(q, pl);
+  }
+  ctx.restore();
+}
+/** The dust plume (paper billows at most 0.3 alpha: under --mute): a
+ * column of overlapping billows leaning with the signal's way, spreading
+ * into a cap, fading into the dark at its foot. Within about 2200 px the
+ * asteroid shows half buried at its base, its rim glinting: the goal
+ * beyond the door (brief 4.5 I, coda). */
+function drawPlume(q, pl) {
+  const s = q.scale,
+    height = 300 * s * pl.rise;
+  ctx.save();
+  if (pl.impact > 0) {
+    // The boom: a flash on the horizon.
+    const glow = ctx.createRadialGradient(q.x, q.y, 2, q.x, q.y, 140 * s);
+    glow.addColorStop(0, `rgba(251,251,234,${0.55 * pl.impact})`);
+    glow.addColorStop(1, "rgba(251,251,234,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(q.x - 140 * s, q.y - 140 * s, 280 * s, 280 * s);
+  }
+  ctx.lineWidth = 1;
+  const n = 18;
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1),
+      cap = f > 0.72,
+      jit = hash(i * 7.7 + 3),
+      side = cap ? (i % 2 ? 1 : -1) * (0.4 + (f - 0.72) * 3.6) : (jit - 0.5) * 0.7,
+      r = (18 + f * 24 + (cap ? 8 : 0)) * (0.8 + 0.4 * jit) * s * (0.55 + 0.45 * pl.rise),
+      x = q.x + side * 30 * s + Math.sin(i * 2.3 + pl.billow * 0.3) * 5 * s + f * 30 * s,
+      y = q.y - height * Math.min(1, f * 1.05) - (cap ? jit * 10 * s : 0),
+      foot = Math.min(1, f * 4 + 0.1);
+    // Soft fills that overlap into one column; only a faint rim on the
+    // upper billows, so it reads as dust and not as bubbles.
+    ctx.fillStyle = `rgba(251,251,234,${(0.045 + 0.04 * f) * foot})`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    if (f > 0.45) {
+      ctx.strokeStyle = `rgba(251,251,234,${0.05 + 0.1 * f})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  const show = Math.max(0, Math.min(1, (2200 - q.far) / 500));
+  if (show <= 0) return;
+  ctx.save();
+  ctx.globalAlpha *= show;
+  drawStone(q.x + 6 * s, q.y + 10 * s, 60 * s, 0.6, q.y + 2);
+  const tw = reduced ? 0.6 : 0.5 + 0.5 * Math.sin(clock * 2.6);
+  sprite("star", 2, q.x - 30 * s, q.y - 38 * s, 0.07 + 0.04 * tw, 0.6 + 0.4 * tw);
+  ctx.restore();
+}
+/** Real-time side effects of the scripted moments (frame() only, never in
+ * a QA step): the score ducks for the beat before a crash (one beat of
+ * silence, brief §5), and the boom shakes the view a little. */
+let scriptedPrev = 0;
+function scriptedCues() {
+  const now = state.time,
+    prev = scriptedPrev;
+  scriptedPrev = now;
+  if (now <= prev || state.status !== "running") return;
+  for (const m of scriptedOf().list) {
+    if (m.kind !== "crash") continue;
+    const hush = m.at - 4 * SIXTEENTH_SIM;
+    if (prev < hush && now >= hush) audio.duck(30, 0.05, Math.max(0.05, beatSeconds() - 0.09), 0.04);
+    if (prev < m.at && now >= m.at && !reduced) shake = Math.max(shake, 4);
+  }
 }
 
 /* ---------- the wake: Diana emerges from the earth ---------- */
@@ -1525,6 +2055,7 @@ function draw() {
   const dt = Math.min(0.05, Math.max(0, clock - lastDraw));
   lastDraw = clock;
   ctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+  shownScripted.clear();
   drawSky();
   drawSignal();
   let sx = 0,
@@ -1546,9 +2077,16 @@ function draw() {
     ctx.save();
     ctx.globalAlpha = worldAlpha;
     drawUpdrafts();
+    // The look's ambient particles and II's asteroid sit behind the islands
+    // (the crater floor half buries the stone); the scripted back layer
+    // (falling stars, locks, glints) behind stars, glyphs and Diana.
+    islandLook = currentLook();
+    drawIslandParticles();
+    drawAsteroids();
     for (const q of state.platforms) drawPlatform(q);
     drawBeacons();
     drawPortal();
+    drawScriptedBack();
     drawConstellations();
     drawStars();
     drawPrompts();
@@ -1849,8 +2387,9 @@ function processEvents(quiet = false) {
         }
         break;
       case "get":
-        // A new verb (the eight-level model): its wordless moment.
-        if (loud) startMoment(e.verb);
+        // A new verb (the eight-level model): its wordless moment, timed on
+        // the simulation clock from the event (a quiet QA step still shows it).
+        startMoment(e.verb, { sim: e.time, loud, get: (state.def.gets ?? []).find((g) => g.id === e.id) ?? null });
         ui.verbs = undefined;
         break;
       case "great-star":
@@ -2006,6 +2545,7 @@ function clearMoments() {
   moments.length = 0;
   previewGets = [];
   glint.trail.length = 0;
+  scriptedPrev = state.time;
 }
 function afterReset() {
   hideCards();
@@ -2525,6 +3065,7 @@ function frame(now) {
   if (ready) {
     if (emergence && clock - emergence.at >= emergenceSeconds(reduced)) wake();
     processEvents();
+    scriptedCues();
     syncAudio();
     if (state.status === "won" && !ui.victoryShown && clock - wonAt > 1.5) showVictory();
     updateCamera(real);
@@ -2619,7 +3160,19 @@ window.__game = {
       clip: manifest ? clipFor(manifest, state.animation.name, set?.name) : null,
       look: currentLook(),
       body: currentLook() ? bodyBox(currentLook(), backdropView()) : null,
-      moments: moments.filter((m) => clock < m.until).map((m) => m.verb),
+      moments: moments.filter(momentLive).map((m) => m.verb),
+      // The scripted moments and decor drawn in the last frame (ids), II's
+      // eye, and the look's island marks and particles.
+      scripted: [...shownScripted],
+      eye: (() => {
+        const m = moments.find((q) => q.eye && momentLive(q));
+        return m ? eyeAt(momentAge(m), beatSeconds()) : null;
+      })(),
+      stones: stones().length,
+      marks: ISLAND_LOOKS[currentLook()]?.marks ?? null,
+      // I's brightest star has fallen (it is the asteroid): home's body is gone.
+      fallen: currentLook() === "home" && brightStarFate().fallen,
+      particles: particlesDrawn,
       pending: pendingGets().map((g) => g.verb),
       verbs: root.dataset.verbs ?? null,
       owns: { double: owns(state, "double"), cape: owns(state, "cape"), dive: owns(state, "dive") },
@@ -2642,7 +3195,36 @@ window.__game = {
   startLevel: (n, options) => startLevel(n, options),
   // The animated map between levels, as Continue plays it (skippable).
   showMap: (n) => (showMap(n), !!map),
-  levels: () => LEVELS.map((d) => ({ id: d.id, title: d.title, bpm: d.bpm, clock: d.clock, verbs: { ...d.verbs }, unlocked: d.id <= progress.unlocked, great: progress.great[d.id] ?? 0 })),
+  // Each also lists its key, look, GETs, scripted moments (`at` in
+  // simulation seconds from the wake) and decor, so root QA follows the
+  // campaign as stages are built.
+  levels: () =>
+    LEVELS.map((d) => ({
+      id: d.id,
+      key: d.key,
+      title: d.title,
+      bpm: d.bpm,
+      clock: d.clock,
+      look: d.look ?? null,
+      interim: !!d.interim,
+      verbs: { ...d.verbs },
+      gets: (d.gets ?? []).map(({ id, verb, x }) => ({ id, verb, x })),
+      moments: scriptedMoments(d).map(({ id, kind, k, at, target }) => ({ id, kind, k, at, target: target ?? null })),
+      decor: (d.decor ?? []).map(({ id, kind }) => ({ id, kind })),
+      unlocked: d.id <= progress.unlocked,
+      great: progress.great[d.id] ?? 0,
+    })),
+  // Frame cost of the renderer alone: draw() n times now (ms per frame).
+  drawTime: (n = 60) => {
+    const times = [];
+    for (let i = 0; i < n; i++) {
+      const t0 = performance.now();
+      draw();
+      times.push(performance.now() - t0);
+    }
+    times.sort((x, y) => x - y);
+    return { mean: times.reduce((a, b) => a + b, 0) / n, p95: times[Math.floor(n * 0.95)], max: times.at(-1) };
+  },
   // Harmony feedback: { gentle: true } removes every dissonance (no detune,
   // a fade instead of the tape-stop). Persisted like the sound setting.
   setMusic: ({ gentle } = {}) => (gentle != null && setGentleMusic(gentle), { gentle: sound.gentle }),
@@ -2691,7 +3273,8 @@ async function load() {
     for (const v of Object.values(manifest)) if (v?.hud && v.file) new Image().src = v.file;
     await Promise.all(
       Object.entries(manifest)
-        .filter(([, v]) => v.file?.endsWith(".png") && !v.hud)
+        // The meteor stone is also the world's asteroid (I's crash, II's eye).
+        .filter(([name, v]) => v.file?.endsWith(".png") && (!v.hud || name === "meteor"))
         .map(async ([name, data]) => {
           const img = new Image();
           img.src = data.file;
