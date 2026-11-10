@@ -12,6 +12,24 @@ Audited 2026-11-10 against the shared rubric [`common/docs/MOVEMENT_CRITERIA.md`
 
 Status uses the rubric's meaning. **WARN** means the value is within 25% of the band, or the deviation is a reasoned exception. **N/A** means the criterion has no object in an autorunner, and the reason is given.
 
+## Revision five, progression (2026-11-10): what changed since this audit
+
+The campaign now opens with the rebuilt **I · Waking** (88 BPM) and the new **II · The Gift** (94 BPM); the audit's levels II–IV play on as interim levels III–V with unchanged numbers. Measured on the new levels (`scripts/movement-audit.mjs` helpers, pinned in `tests/movement-audit.test.mjs` and `tests/levels.test.mjs`):
+
+| Item | I · Waking (88) | II · The Gift (94) | Was (old I at 96) |
+| --- | --- | --- | --- |
+| B5 apex, held | 0.507 s | 0.427 s | 0.539 s |
+| B6 0 ms tap / hold | 0.228 (tap cap 308 sim) | 0.236 | 0.234 |
+| B6 50 ms keyboard tap | 0.432 | 0.484 | 0.449 |
+| B7 fall cap | 560 px/s real | none (shared arc) | 560 |
+| B8 hang extra | 0.098 s: **PASS** (≤ 0.12) | — | 0.13 s (WARN) |
+| B9 coyote | 111 ms | 114 ms | — |
+| F narrowest / median required window | 618 / 628 ms | 332 / 626 ms | 557 / 576 ms |
+
+- **No visible lip sink (§7):** the step-up reaches 30 px on the span and at the lip (was 20 / 25) with 4 px of overlap (was 10); flights keep 24 px. The C1/B12 sweep and the step-up tests pass at the new bounds, and no main route needs a step-up.
+- **The hang ends at touch-down:** a key still held from the jump before no longer slows a walk-off (level I's lookout and crown edges drop onto the grid).
+- **Verbs per level:** before I's GET there is no air jump (a late press waits in the buffer, U2); II's cape breathes (C1–C6).
+
 ## Scorecard
 
 | # | Criterion | Before | After |
