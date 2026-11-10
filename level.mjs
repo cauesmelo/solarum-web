@@ -39,8 +39,9 @@ export const LEVEL = Object.freeze({
 /** Three movement title cards only; the coda arrives without a card. */
 export const MOVEMENTS = Object.freeze([
   { id: "I", x: -1000, numeral: "I", name: "Waking" },
-  // Cards start on bar lines of the main route: II on bar 11 (sixteenth 160),
-  // III on bar 24 (368), the coda (no card) on bar 35 (544).
+  // Cards start on the main route's grid: II on the downbeat of bar 11
+  // (sixteenth 160), III with the hearth beacon on bar 23 1/2 (360), the coda
+  // (no card) on the downbeat of bar 35 (544).
   { id: "II", x: 6276, numeral: "II", name: "The Breaking Constellation" },
   { id: "III", x: 13845.2, numeral: "III", name: "Borrowed Wind" },
   { id: "coda", x: 21376, numeral: "", name: "The Far Door" },
@@ -75,8 +76,8 @@ export const SECTIONS = Object.freeze([
 /** Beacons: right before each first required use of a mechanic and never more
  * than 14 s of nominal run apart (tested). `story` is the one line shown when
  * the beacon lights; `tip` appears only after three falls since that beacon.
- * Each sits on a half-bar line of the main route (bar 5 1/2, 11 1/2, 18, 24,
- * 26, 29, 32), a few px before the grid point so it lights on it, and
+ * Each sits on a half-bar line of the main route (bars 5 1/2, 11 1/2, 17 1/2,
+ * 23 1/2, 26, 29, 32), a few px before the grid point so it lights on it, and
  * a respawn there restarts the score on that strong beat. */
 export const CHECKPOINTS = Object.freeze([
   {
@@ -144,10 +145,12 @@ const MAIN = [
   // I · Waking — introduce: 2.4 s of flat ground, tap / hold star rows.
   ["home", -700, 540, 1800],
   // develop: four different hops on the grid (takeoff sixteenths 23, 32, 40,
-  // 50, 64). The first is a forgiving 90 px gap down 44 px (a 0 ms tap still
-  // clears it), then an 83 px rise onto a rock, a 23 px hop onto a slab and a
-  // 49 px drop to a long island: cells of 6, 4, 5, 6 and 5 sixteenths.
-  ["hop-a", 1190, 584, 260],
+  // 50, 64). The first is a forgiving 105 px gap down 44 px: a 0 ms tap still
+  // clears it (it reaches 133 px on the way down), but walking off the edge
+  // does not (it would reach the top only 81 px out). Then an 83 px rise onto
+  // a rock, a 23 px hop onto a slab and a 49 px drop to a long island: cells
+  // of 6, 4, 5, 6 and 5 sixteenths.
+  ["hop-a", 1205, 584, 245],
   ["hop-b", 1540, 501, 220],
   ["hop-c", 1840, 478, 300],
   ["hop-d", 2260, 527, 450],
@@ -170,7 +173,8 @@ const MAIN = [
   ["second-crack", 7900, 489, 300, "crumble"],
   ["beat-isle", 8220, 457, 328.6],
   // develop: the ridge changes rhythm: a wide island, a drop onto a small
-  // stepping stone and straight off it, then two rises.
+  // stepping stone and straight off it, then two rises. Beat-isle and ridge-c
+  // are 151.4 px (four sixteenths) shorter each so no beacon gap exceeds 14 s.
   ["ridge-a", 8668.6, 425, 360],
   ["ridge-stone", 9148.6, 476, 120],
   ["ridge-b", 9328.6, 444, 320],
@@ -193,8 +197,9 @@ const MAIN = [
   ["cascade-end", 12719.2, 540, 638],
   ["last-crack", 13467.2, 458, 300, "crumble"],
   // conclude: a late double jump (4/16 + 4/16) off the cracked shelf climbs
-  // 139 px onto the crown, which is also the hearth (B4), landing on the
-  // downbeat of bar 24: three calm seconds and a story line.
+  // 139 px onto the crown, which is also the hearth (B4), landing with the
+  // beacon on bar 23 1/2: four calm seconds (it took back the eight
+  // sixteenths the ridge gave up, see LEVEL_DESIGN "Beat map") and a story line.
   ["hearth", 13817.2, 319, 1242.8],
   // III · Borrowed Wind — introduce: a 375 px void under a drawn flight line.
   ["wind-shore", 15435, 377, 585],
@@ -252,8 +257,8 @@ const CASCADES = [
     // The wave drops one tile per 107 BPM beat (0.5607 s). Tiles are 207 px
     // apart, so the wave travels 369 px/s against Diana's 270 and gains
     // 55.6 px a beat. `lead` is px of nominal run past tile 0's start at
-    // which it drops; 551 puts the first drop on the downbeat of bar 21
-    // (sixteenth 320) for the main route, and every later drop on a beat.
+    // which it drops; 551 puts the main route's first drop on beat 3 of bar
+    // 20 (sixteenth 312) and every later drop on a beat.
     // The bouncing line leaves tile k 13, 11, 10, 8, 7 and 5 sixteenths before
     // it falls: the wave visibly closes in, and a player may run up to about
     // 0.1 s late on every hop before the last tile catches them.

@@ -850,11 +850,16 @@ test("lip catch: a jump that arrives up to 25 px below a lip pops onto it; walk-
   assert.equal(make(20, { launched: false }).player.grounded, false, "walking off never earns it");
   assert.equal(make(20, { vy: -300 }).player.grounded, false, "not while rising fast");
 });
-test("the first gap forgives a first input: a held jump or a 0 ms tap clears it", async () => {
+test("the first gap forgives a first input (a held jump or a 0 ms tap clears it) but still needs one", async () => {
   const { followGlyph } = await import("./glyphs.mjs");
   const p = createLevel().prompts.find((q) => q.id === "p-jump");
   const gap = createLevel().platforms.find((q) => q.id === "hop-a").x - 1100;
-  assert.ok(gap <= 90);
+  assert.ok(gap <= 110, `first gap ${gap} px`);
+  // Walking off without any input misses the lower island.
+  const idle = start(createGame());
+  for (let i = 0; i < 600 && idle.status === "running"; i++) update(idle, 1 / 120);
+  assert.equal(idle.status, "dead", "the first jump is required");
+  assert.ok(idle.player.x < 1400);
   for (const [start, tap] of [
     [p.from, false],
     [p.inputX, false],
