@@ -429,8 +429,6 @@ const PRESETS = {
       "wind-song": [73, 76, 78, 81],
       // bar 15 (D/A): the cracked launch, D5 F#5 A5 B5.
       "launch-song": [74, 78, 81, 83],
-      // bars 15-16 (D/A | Em7/A): along the first flight and the double, D6 | B5 A5 G5.
-      "finale-song": [86, 83, 81, 79],
       // bars 13-14 (Em7/A | A): wind, dive, wind, E5 G5 | A5 C#6 E6.
       "storm-song": [76, 79, 81, 85, 88],
       // bars 20-21 (G/A | D/A): the last wind's float, D5 G5 B5 D6 | A5.

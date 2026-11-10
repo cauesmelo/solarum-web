@@ -140,7 +140,7 @@ test("each main route reaches every beacon and uses its level's kit through publ
     2: { dash: 7, "double-jump": 10, constellations: 6 },
     [LEVEL_ID["still-water"]]: { dash: 9, "double-jump": 3, constellations: 6 },
     [LEVEL_ID["way-down"]]: { dash: 8, dive: 1, "double-jump": 2, constellations: 5 },
-    [LEVEL_ID["borrowed-wind"]]: { dash: 3, "double-jump": 5, constellations: 6 },
+    [LEVEL_ID["borrowed-wind"]]: { dash: 3, "double-jump": 5, constellations: 5 },
     // VII: the dives land on stable stones (a dive smashes a tile), so it smashes nothing.
     [LEVEL_ID["falling-road"]]: { dash: 4, "double-jump": 7, constellations: 6, cascade: true },
     [LEVEL_ID.breaking]: { dash: 2, dive: 1, "double-jump": 2, constellations: 7 },
@@ -210,8 +210,8 @@ test("removing a level's new action fails exactly at the challenge that teaches 
 });
 test("missing a required midair constellation leaves the cape spent over the void", () => {
   for (const [n, star, beacon, lo, hi] of [
-    // VI: the finale-song's last star is at the double, before the second flight.
-    [LEVEL_ID["borrowed-wind"], "finale-song-3", "storm", 220 + 37.85 * 244 + 113.55 * 2, 220 + 37.85 * 252 + 113.55 * 3 - 90],
+    // (VI's finale-song became a required cape star: its removal is C10,
+    // tests/refills.test.mjs.)
     // V: the split-song's last star is on the jump off the cracked islet.
     [LEVEL_ID.breaking, "split-song-4", "split", 220 + 37.85 * 191 + 113.55, 220 + 37.85 * 201 + 113.55 * 2 - 90],
   ]) {
@@ -514,10 +514,10 @@ test("constellation steps climb the pentatonic scale and time out after 1.2 s", 
   assert.equal(s.chains[0].broken, true);
 });
 test("no required crossing depends on a chain unless a beacon sits right before it", () => {
-  // The required chains are V's split-song and VI's launch-song and
-  // finale-song (tested above); each one's beacon is the last before it,
-  // within 6 s of run.
-  for (const [n, chain, beacon] of [[LEVEL_ID.breaking, "split-song", "split"], [LEVEL_ID["borrowed-wind"], "launch-song", "storm"], [LEVEL_ID["borrowed-wind"], "finale-song", "storm"], [LEVEL_ID["falling-road"], "gap-song", "dive"]]) {
+  // The required chains are V's split-song and VI's launch-song (tested
+  // above; VI's finale-song became a cape star, tests/refills.test.mjs);
+  // each one's beacon is the last before it, within 6 s of run.
+  for (const [n, chain, beacon] of [[LEVEL_ID.breaking, "split-song", "split"], [LEVEL_ID["borrowed-wind"], "launch-song", "storm"], [LEVEL_ID["falling-road"], "gap-song", "dive"]]) {
     const stars = createLevel(n).pickups.filter((q) => q.chain === chain);
     const before = levelDef(n).checkpoints.filter((c) => c.x < stars[0].x).at(-1);
     assert.equal(before.id, beacon);
