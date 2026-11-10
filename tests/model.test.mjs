@@ -727,7 +727,7 @@ test("a beacon (or the level's start) sits right before the first required use o
     [LEVEL_ID["borrowed-wind"]]: { updraft: 220 + 37.85 * 84 + 30, flight: 220 + 37.85 * 162, constellation: 220 + 37.85 * 229 + 113.55 + 39.5 },
     // VII: the first road, the dive onto the first stone, the flight over
     // the first missing tile and the gap-song that charges the second.
-    [LEVEL_ID["falling-road"]]: { cascade: gx(44) - 80, dive: gx(158), flight: gx(219), constellation: gx(220) + 31.84 + 39.5 },
+    [LEVEL_ID["falling-road"]]: { cascade: gx(44) - 80, dive: gx(158), flight: gx(219), constellation: gx(218) + 39.5 },
     // V: the second crack (the first that must be left), the split voids'
     // first flight and song, the dive through the first stone.
     [LEVEL_ID.breaking]: { fragile: 220 + 37.85 * 73 - 80, flight: 220 + 37.85 * 182, constellation: 220 + 37.85 * 182 + 69.69 + 39.5, dive: 220 + 37.85 * 249.6 + 113.55 * 2 },
