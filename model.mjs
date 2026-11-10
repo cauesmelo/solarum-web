@@ -972,8 +972,10 @@ function tick(s, dt, controls) {
     if (s.gotten.includes(g.id) || p.x < g.x) continue;
     s.gotten.push(g.id);
     s.verbs[g.verb] = true;
-    // The cape's bar appears empty and breathes in over the next bar.
-    if (g.verb === "cape" && s.capeRule === "breath") ((s.capeCharge = 0), (s.capeCharges = 0));
+    // The cape's bar appears empty and breathes in over the next bar, or,
+    // for a relic marked `full` (RESEARCH_REFILLS 2.2: II's gift on the
+    // crater floor), full: its first flight is the gift's own.
+    if (g.verb === "cape" && s.capeRule === "breath") ((s.capeCharge = g.full ? 1 : 0), (s.capeCharges = g.full ? 1 : 0));
     event(s, "get", { id: g.id, verb: g.verb });
     // The relic (RESEARCH_REFILLS 2): the renderer's banner and pickup.
     event(s, "relic", { type: "relic", id: g.id, verb: g.verb, x: g.x, y: relicY(s.def, g) });

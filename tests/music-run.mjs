@@ -19,7 +19,8 @@ export const CRACKED = new Set(LEVELS.flatMap((d) => createLevel(d).platforms.fi
 /** Where each beacon's challenge is (x range of the first airborne press to block). */
 const CHALLENGE = {
   1: { "first-star": [gx(152), gx(165)] },
-  2: { void: [220 + 37.85 * 100 + 113.55 * 2, 220 + 37.85 * 112 + 113.55 * 2] },
+  // II: the hearth void's flight after the gift beacon.
+  2: { gift: [220 + 37.85 * 232 + 113.55, 220 + 37.85 * 236 + 113.55] },
   // III: the flight up to the glide ledge after the still beacon.
   [LEVEL_ID["still-water"]]: { still: [220 + 37.85 * 117 + 113.55 * 2, 220 + 37.85 * 122 + 113.55 * 2] },
   // IV: the flight over the cut islet after the down beacon.
@@ -38,7 +39,7 @@ const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJu
  * grounded jumps pressed late (still on the island). */
 export const SLOPPY_RUNS = Object.freeze({
   1: { level: 1, failAt: ["first-star"], removeStars: ["first-song-2"], late: [[gx(34) - 1, gx(34) + 1, 14], [gx(168) - 1, gx(168) + 1, 12]] },
-  2: { level: 2, failAt: ["void"], removeStars: ["first-flight-2"], late: [[gx(23) - 1, gx(23) + 1, 12], [gx(252) + 908.4 - 1, gx(252) + 908.4 + 1, 10]] },
+  2: { level: 2, failAt: ["gift"], removeStars: ["first-flight-2"], late: [[gx(24) - 1, gx(24) + 1, 12], [gx(384) + 794.85 - 1, gx(384) + 794.85 + 1, 10]] },
   [LEVEL_ID["still-water"]]: { level: LEVEL_ID["still-water"], failAt: ["still"], removeStars: ["drift-song-1"], late: [[220 + 37.85 * 156 + 113.55 * 3 - 1, 220 + 37.85 * 156 + 113.55 * 3 + 1, 10]] },
   [LEVEL_ID["way-down"]]: { level: LEVEL_ID["way-down"], failAt: ["down"], removeStars: ["warm-song-2"], late: [[220 + 37.85 * 124 + 113.55 + 94.9 - 1, 220 + 37.85 * 124 + 113.55 + 94.9 + 1, 10]] },
   [LEVEL_ID["borrowed-wind"]]: { level: LEVEL_ID["borrowed-wind"], failAt: ["bridge"], removeStars: ["storm-song-2"], late: [[220 + 37.85 * 228 + 113.55 - 1, 220 + 37.85 * 228 + 113.55 + 1, 8]] },

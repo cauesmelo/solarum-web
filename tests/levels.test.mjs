@@ -83,12 +83,12 @@ test("U1: each built stage starts with its own verbs and its GET (if it has one)
 test("U3: without its GET the route wins up to the first required use and dies exactly there, after its beacon", () => {
   // I's main route (its safe double under the key costs nothing) dies at the
   // leap; II's safe line (no cape over the first gap) dies at the hearth
-  // void; III's main route (its float off the cliff is optional) at the
+  // void (after the gift on the crater floor, bar 11); III's main route (its float off the cliff is optional) at the
   // still void.
   const gk = (k, F) => 220 + 37.85 * k + 113.55 * F;
   for (const [d, route, beacon, lo, hi] of [
     [I, "main", "first-star", gx(152), gx(168)],
-    [II, "safe", "gift", gk(68, 1), gk(80, 1)],
+    [II, "safe", "gift", gk(232, 1), gk(244, 1)],
     [III, "main", "float", gk(76, 1), gk(96, 2)],
     // IV's main route (the safe dive through the glinting lid is optional)
     // dies at the cut: the flight runs on over the islet.
@@ -322,9 +322,10 @@ test("C2: no doomed approach: an optional flight spent in any airtime with a ful
     assert.ok(survived >= 1, `${d.numeral}: ${survived} of ${candidates.length} injected runs still win`);
   }
 });
-test("C3: every respawn restores a full bar; Restart starts II empty at its GET (it breathes full over one bar) and III on full", () => {
+test("C3: every respawn restores a full bar; II's gift (bar 11) arrives full and III restarts full", () => {
   for (const d of BREATH)
-    for (const cp of d.checkpoints) {
+    // (II's beacons before its gift give no cape to restore.)
+    for (const cp of d.checkpoints.filter((c) => !d.gets.some((g) => g.verb === "cape" && g.x > c.x))) {
       for (const how of ["fall", "retry", "net"]) {
         const s = game(d, how === "net" ? { starNet: true } : {});
         const m = createRouteMemory("main");
@@ -346,14 +347,20 @@ test("C3: every respawn restores a full bar; Restart starts II empty at its GET 
         assert.equal(snapshot(s).capeFull, true);
       }
     }
+  // RESEARCH_REFILLS 2.2: the relic is the first flight's charge.
   const s = game(II);
   restart(s);
-  while (s.player.x < II.gets[0].x + 1) update(s, TICK);
-  assert.ok(s.capeCharge < 0.01, "the gift arrives empty");
-  assert.equal(snapshot(s).capeCharges, 0, "the legacy flag follows it");
-  const t0 = s.time;
-  while (s.capeCharge < 1) update(s, TICK);
-  assert.ok(Math.abs((s.time - t0) - 4 * 4 * SIX) < 2 * TICK, `full after ${((s.time - t0) / SIX).toFixed(2)} sixteenths of running`);
+  const m = createRouteMemory("main");
+  while (s.status === "running" && s.player.x < II.gets[0].x - 1) {
+    const a = chooseAction(snapshot(s), m);
+    if (a) api(s)[a]();
+    update(s, TICK, { glide: m.glide });
+    assert.equal(s.verbs.cape, false, "no cape before the gift");
+  }
+  update(s, TICK);
+  assert.equal(s.verbs.cape, true);
+  assert.equal(s.capeCharge, 1, "the gift arrives full");
+  assert.equal(snapshot(s).capeCharges, 1, "the legacy flag follows it");
   for (const d of BREATH.filter((q) => q !== II)) {
     const r = game(d);
     update(r, 1);

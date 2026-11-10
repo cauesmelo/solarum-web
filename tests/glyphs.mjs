@@ -3,6 +3,8 @@
  * route pilot. Used by the "following each glyph succeeds" test.
  *   ↑        jump when grounded
  *   ↑ ↑      jump, then jump again near the top (vy >= -40)
+ *   ↑ ↑ ↑    as ↑ ↑, then once the leaf star gives an air jump back,
+ *            jump again near the top
  *   ↑ · →    jump, then open the cape near the top
  *   → · ↑    open the cape when airborne, jump 0.1 s later (super jump)
  *   hold →   press and hold the cape until the prompt's window ends
@@ -51,6 +53,10 @@ export function followGlyph(api, prompt, { route = "main", at = "from", start: f
           if (p.grounded || s.coyote > 0) (act("jump"), (done = true));
         } else if (prev === "right") {
           if (since >= 0.1) (act("jump"), (done = true));
+        } else if (step >= 2 && g[step - 2] === "up") {
+          // ↑ ↑ ↑: the third press answers the leaf star at the double's
+          // top (its first valid moment is the air jump it gives back).
+          if (p.jumps < 2 && p.vy >= -40) (act("jump"), (done = true));
         } else if (p.vy >= -40) (act("jump"), (done = true));
       } else if (k === "right") {
         if (step === 0 ? !p.grounded : p.vy >= -40) (act("dash"), (done = true));
