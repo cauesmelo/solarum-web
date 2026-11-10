@@ -3912,8 +3912,13 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (trans) return transitionKey(e);
-  // Keys still down from before the run began are stale until released.
-  if (staleKeys.has(e.code)) return e.preventDefault();
+  // Keys still down from before the run began are stale until released:
+  // their auto-repeats do nothing. A fresh (non-repeat) keydown means the
+  // key was released, even if that keyup never arrived: it acts.
+  if (staleKeys.has(e.code)) {
+    if (e.repeat) return e.preventDefault();
+    staleKeys.delete(e.code);
+  }
   if (onButton && ["Space", "Enter"].includes(e.code)) return; // native activation
   if (GAME_KEYS.includes(e.code)) e.preventDefault();
   if (e.repeat) return;
