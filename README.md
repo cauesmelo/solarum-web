@@ -212,11 +212,67 @@ Only IV matches the soundtrack's tempo and cycle, and only I the main theme's te
 | VII | −16.9 → −17.7 | −1.6 → −1.5 | −18.7 → −19.3 | – → −29.0 (−9.7 dB) | −30.9 → −42.1 | −12.2 → −22.8 dB | 48 → 0 | −33.1 → −39.4 | +1.0 → −0.7 |
 | VIII | −19.2 → −19.4 | −1.7 → −1.7 | −20.7 → −21.1 | – → −26.9 (−5.8 dB) | −32.2 → −42.3 | −11.5 → −21.2 dB | 49 → 0 | −31.3 → −37.8 | +3.8 → −0.2 |
 
-Also measured (after): the glide whistle −37.4 / −37.1 / −36.9 / −36.1 LUFS in III / IV / VI / VII (revision seven's sine measured −26.7 in III); the air of glides and winds −34.8 in III and IV and −26.4 to −26.9 in VI–VIII (inside wind columns only; its gain is 4.9 dB under revision seven's); the longest unbroken stretch of her notes' wash I 47.5 → 17.3 s, III 45.1 → 21.0, VIII 20.9 → 9.4 (VII stays 45.7 s but 20 dB under her notes); the sky sounds (over −45 LUFS) 61–86% of a run instead of 99%; no soundtrack note was scheduled late in any level. Chrome 157, measured 2026-11-10.
+Also measured (after): the glide whistle −37.4 / −37.1 / −36.9 / −36.1 LUFS in III / IV / VI / VII (revision seven's sine measured −26.7 in III); the air of glides and winds −34.8 in III and IV and −26.4 to −26.9 in VI–VIII (inside wind columns only; its gain is 4.9 dB under revision seven's); the longest unbroken stretch of her notes' wash I 47.5 → 17.3 s, III 45.1 → 21.0, VIII 20.9 → 9.4 (VII stays 45.7 s but 20 dB under her notes); the sky sounds (over −45 LUFS) 61–86% of a run instead of 99%; no soundtrack note was scheduled late in any level. Chrome 157, measured 2026-11-10. (VIII's row is the interim Far Door as it was then; the rebuilt VIII, measured in revision nine, has its sky at −32.3 → −42.5 LUFS with 50 → 0 sharp partials.)
 
 **Mix rules** (`tests/mix-rules.mjs`, checked by `tests/mix.test.mjs` on every level's measurement, which must be fresh: its signature covers `MIX`, `MIX_REV7`, `TUNES`, the sky and the soundtrack's voices): the sky at least 18 dB under Diana's notes and 8 dB under the soundtrack, with at most 2 sharp partials; the soundtrack 4–12 dB under Diana's notes; her notes' wash in her gaps at least 8 dB under her dry notes; the whistle at least 12 dB under her notes; sample peak at or under −1 dBFS; the door within 2.5 LU of the run. `tests/mix.test.mjs` also runs every level through the engine on a strict Web Audio stand-in: every soundtrack note lands on the level's sixteenth grid in step with Diana's on-grid notes (within 4 ms; none late), nothing is scheduled and no node is made while paused, and the old bed plays no soundtrack. `tests/tune.test.mjs` checks the composition rules.
 
 **Measured versus heard.** Everything above is measured. Nobody has listened yet. These need the owner's ears: whether the wind reads as wind rather than hiss; whether each level's song is pleasant, memorable and not tiring over repeats and falls; whether the lead's call and response with Diana feels like one piece of music; whether the soundtrack is loud enough to count as "music" (it sits 6–10 dB under her notes); and whether the relic chime and the softer landing feel right. The soundboard has A/Bs for all of it.
+
+### Revision nine: soft bodies, a celestial palette, quieter SFX
+
+The owner (Portuguese), after playing revision eight: the jump and landing sounds (soft and hard) were still "too hard"; the ledge catch was OK-ish but could be a little softer; the SFX were a little too loud against the music; and could the game bring some of the essence of Bard's sounds (League of Legends), "a bit mystical"?
+
+**What still read as hard, measured** (each body offline with Diana's note on the same instant, as the game plays them; mono sum, 1 ms RMS envelope, the median of seeds 1–5; "under 300 Hz" is the share of the first 300 ms's energy there):
+
+| Body | Peak (dBFS) | Energy (dB) | Attack 10→90% | First 10 ms | Centroid | Under 300 Hz |
+| --- | --- | --- | --- | --- | --- | --- |
+| Jump (body) | −24.9 → −27.7 | −18.7 → −19.8 | 15 → 46 ms | 5 → 2% | 561 → 1191 Hz | 47 → 0% |
+| Jump with Diana's note | −15.5 → −15.0 | 4.0 → 1.6 | – | – | 364 → 359 Hz | 0 → 12% |
+| Double jump (body) | −28.8 → −28.2 | −24.3 → −20.6 | 17 → 40 ms | 5 → 1% | 1184 → 1439 Hz | 6 → 0% |
+| Double jump with Diana's note | −15.9 → −16.4 | 2.8 → −0.8 | – | – | 580 → 580 Hz | 0 → 0% |
+| Soft landing (body) | −29.2 → −34.1 | −21.6 → −27.4 | 39 → 37 ms | 2 → 2% | 244 → 1114 Hz | 80 → 1% |
+| Soft landing with Diana's note | −12.8 → −18.2 | 0.5 → −2.1 | – | – | 74 → 309 Hz | 100 → 97% |
+| Hard landing (body) | −27.2 → −29.5 | −18.5 → −21.0 | 22 → 49 ms | 5 → 1% | 179 → 1022 Hz | 87 → 1% |
+| Hard landing with Diana's note | −11.6 → −16.5 | 1.6 → −1.0 | – | – | 74 → 315 Hz | 100 → 96% |
+| Ledge catch (body) | −37.5 → −38.5 | −32.8 → −34.1 | 13 → 19 ms | 17 → 5% | 1053 → 1156 Hz | 9 → 0% |
+| Ledge catch with Diana's note | −19.5 → −20.6 | −2.3 → −4.4 | – | – | 378 → 374 Hz | 0 → 0% |
+
+The hard part of a landing was not the body. It was Diana's own landing note, the felt bass, at 73–123 Hz with an 8 ms mallet and a 1 ms click: 99.9% of the landing's energy under 300 Hz, its peak at −12.8 dBFS, louder than a jump. Under the jump and both landings, the bodies also had a brown-noise "weight" layer (47–87% of their energy under 300 Hz), which read as a thud however slowly it rose. So these sounds were rethought rather than given longer attacks:
+- **Bodies** (`jump`, `double-jump`, `land-soft`, `land-hard`, `lip-catch`) are air only: band-passed noise high-passed at 350–450 Hz, swelling in over 30–49 ms (the ledge catch 3 dB softer), and no brown noise. Their feedback is still on the same frame (they are cues, never quantised).
+- **The landing's note** is a small singing bowl on the chord's root two octaves above the felt bass (D4–B4: FM with the bowl's inharmonic 2.76 partial barely in it, an 18 ms touch, a 1.2 s ring, no click). The soundtrack's bass now holds the low end. (One octave up still put 99% of the energy under 300 Hz.) In the table, the landing's 96–97% "under 300 Hz" (and the jump's 12%) is the D4 fundamental itself, 294 Hz, not a thud. Its peak is 5 dB lower and its centroid four times higher.
+- **The jump's note** opens on a glass chime (FM 1:2, a 15 ms touch) on the root, a smaller chime arrives with the fifth, and the glass glide that drew the gesture stays under them 4 dB down. Doubles, dives, the ledge catch's grace (one chime, no second bell for a 60 ms scoop) and the wind's runs (wind chimes in the column) use the same voice. Its peak stays at or under revision eight's: the bells touch in over 15 ms.
+
+**Quieter SFX** (the bodies: every cue, its room reverb and the air; `MIX.sfx`, −4 dB). Diana's notes are music, not SFX: they are the path drawing the song, quantised on the grid with the soundtrack. So they stay on the score bus at their level (`MIX.player` 0). Their softer timbres (the bowl, the chimes) bring them 2–3 dB down as a whole, and the soundtrack stays 3 dB or more under them. The bodies' reverb sends now pass the Sounds setting too (at Sounds 0 their room tails used to remain). Measured per level (`node scripts/mix-check.mjs`; "SFX" = every cue and the air, "music" = the bed and the soundtrack, without Diana's notes):
+
+
+| Level | SFX (LUFS) | Music (bed + soundtrack) | SFX − music | Diana's notes | Soundtrack under Diana | Whole mix | Door − run |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| I | −24.1 → −27.4 | −27.4 → −27.3 | +3.3 → −0.1 dB | −22.0 → −23.2 | 5.8 → 4.5 dB | −20.6 → −21.9 | +2.2 → +2.1 LU |
+| II | −22.4 → −26.2 | −28.5 → −28.5 | +6.1 → +2.3 dB | −21.0 → −21.8 | 8.2 → 7.4 dB | −19.8 → −20.9 | +1.0 → +1.2 LU |
+| III | −23.6 → −26.9 | −27.9 → −27.8 | +4.3 → +0.9 dB | −20.8 → −21.4 | 7.8 → 7.1 dB | −19.5 → −20.4 | −0.4 → +1.0 LU |
+| IV | −21.9 → −25.5 | −28.3 → −28.3 | +6.4 → +2.8 dB | −20.6 → −21.5 | 8.6 → 7.6 dB | −19.0 → −20.1 | +0.1 → −0.1 LU |
+| V | −25.0 → −28.2 | −28.7 → −28.6 | +3.7 → +0.4 dB | −19.9 → −20.8 | 9.7 → 8.8 dB | −19.0 → −20.1 | +0.1 → +1.2 LU |
+| VI | −25.4 → −28.9 | −27.5 → −27.4 | +2.1 → −1.5 dB | −19.6 → −20.7 | 8.5 → 7.3 dB | −18.5 → −20.0 | −1.3 → +1.3 LU |
+| VII | −22.6 → −26.5 | −28.2 → −28.1 | +5.6 → +1.6 dB | −19.3 → −20.3 | 9.7 → 8.6 dB | −17.7 → −19.3 | −0.7 → +0.8 LU |
+
+Reading it: the SFX were 2.1–6.4 dB over the music and are now −1.5 to +2.8 dB, level with it. Diana's notes moved 0.6–1.2 dB (their timbres; their bus is unchanged), and the soundtrack stays 4.5–10.0 dB under them. The whole mix is 0.9–1.6 LU quieter, the door's bloom stays in line (−0.3 … +2.1 LU over the run; it is the level's cadence, so it keeps `MIX.door` and skips the SFX trim), and peaks are at or under −1.7 dBFS. (VIII's "before" column is the rebuilt VIII, measured again; the other levels' revision-seven numbers above are unchanged.)
+
+**Bard, in Solarum's own palette.** Riot has published little about Bard's audio. What is documented: his voice is wordless melody, compared to Journey's traveller and to whale song, built from layers that cycle a synthesizer through the harmonic series over flutes and an alpenhorn. His sounds use Tibetan singing bowls, chimes, a gong and bowed cymbals, and his kit is made from "tiny brass bells" from Los Angeles' Chinatown ([League of Legends Wiki, Bard trivia](https://wiki.leagueoflegends.com/en-us/Bard/Trivia)). His Meeps, the little spirits that give him that voice, are named after a high-pitched chirp. In his kit, chimes appear across the map as he walks and are collected for speed and mana ([The Outer Haven, champion reveal](https://www.theouterhaven.net/2015/02/league-legends-champion-reveal-bard)). League also uses wind chimes as the sound category for healing ([Game Developer, how League communicates action through audio](https://gamedeveloper.com/audio/how-i-league-of-legends-i-communicates-action-through-audio-clues)). Nothing was copied: no sample, no recording, no melody. The principles taken, each synthesised and on the chord's safe notes:
+
+| Principle | Where in Solarum |
+| --- | --- |
+| Tiny bright bells for light touches (quiet, high, tuned) | `tinyBell` (FM 3.5): a bell two octaves over each star's note, a faint one over the jump's chime and the landing's bowl |
+| Singing bowls for weight instead of a thump | the landing's note; the relic's slow swell |
+| Wind chimes for restoring | refill stars (three grains), constellations (six, rising), the relic (four, trailing off) |
+| A small helper's chirp, the Meep | refill stars: two chirps leaping up the chord, the second higher |
+| Tuned chimes as the hero's voice | Diana's jumps, doubles, dives and ledge catches open on a glass chime |
+| A celestial colour under the music | the soundtrack's harp carries a faint bell an octave up |
+
+Kept restrained on purpose. The chimes are the same notes the score already chose: no extra voices on the grid, and each sparkle sits 20–30 dB under its note. The wind bed, the soundtrack and the levels above are unchanged. The old wordless "flute and alpenhorn" voice is the one thing not taken, since a held reed tone is what the owner disliked in revision seven.
+
+**A/B.** `createAudioEngine({ mix: "rev8" })` plays revision eight's bodies, voices and SFX levels (`BODY_REV8`, `VOICES_REV8`); the soundboard pairs each body with its note in both revisions, plays a run of moves both ways, and A/Bs the whole run and the SFX level alone.
+
+**Needs the owner's ears:** whether the jump and the landings now feel soft and airy and still answer at once; whether the bowl under each landing and the chime on each jump are pleasant over a whole level, or too many bells; whether the SFX sit right against the music now (bodies −4 dB, and the whole mix 2–3 dB quieter); whether the refill star's chirp reads as cute or as a squeak; whether any of it feels "mystical" in the way Bard does.
 
 ### Every action has two parts
 
@@ -224,13 +280,13 @@ The **body** (breath, cloth, air, stone, sparkle) plays at once and carries no f
 
 | Event | Voice (Diana's own notes are never detuned) | Grid / cap |
 | --- | --- | --- |
-| Jump | Glass harmonica gliding root → fifth over the 0.38 s rise | 1/16 / 70 ms |
-| Double jump | Glide from the fifth to the ninth (or the next safe note) | 1/16 / 70 ms |
+| Jump | A glass chime on the root and a smaller one on the fifth as the glass glide under them arrives (0.38 s; a glass harmonica alone until revision nine) | 1/16 / 70 ms |
+| Double jump | The same from the fifth to the ninth (or the next safe note) | 1/16 / 70 ms |
 | Cape flight | A sung vowel (oo opening to ah) on the fifth, held through the flight | 1/16 / 70 ms |
 | Super jump | Open fifths stacked a thirty-second apart | 1/16 / 70 ms |
-| Dive | An octave glide down to the root | 1/16 / 70 ms |
-| Stable landing | **Steps:** the chord's root on the felt bass (cracks give no bass) | 1/16 / 35 ms, else at once −6 dB |
-| Ledge catch | A grace scoop into the third | 1/16 / 35 ms |
+| Dive | A chime on the octave, gliding down to the root's | 1/16 / 70 ms |
+| Stable landing | **Steps:** the chord's root on a small singing bowl, D4–B4 (the felt bass two octaves lower until revision nine; cracks give no note) | 1/16 / 35 ms, else at once −6 dB |
+| Ledge catch | A chime and a grace scoop into the third | 1/16 / 35 ms |
 | Loose star | **Stars:** the next chord tone, climbing (a pause restarts the run) | 1/16 / 140 ms |
 | Constellation star | Its authored note: the phrases quote the motif (first-song is D5 C♯5 B4 A4) | 1/16 / 140 ms |
 | Constellation | The chord blooms in glass and the **choir** enters for four bars | 1/8 / 140 ms |
@@ -278,7 +334,7 @@ All 62 intended stars on time, all five main constellations, no fall: the song i
 
 ### Palette and signal flow
 
-Voices (`VOICES` in `audio.mjs`): the sky's air, the soundtrack's keys, bass, harp, tick, brush, rim and kick (`TUNE_VOICES`), choir and cape vowel (saws through two formant band-passes with a vibrato that blooms in), glass harmonica (sine plus a third harmonic 20 dB down and a wet-finger noise rub at twice the pitch), music-box glass and felt kalimba for stars, felt bass (sine under 400 Hz with an 8 ms mallet), felt heartbeat, shaker, FM celesta, inharmonic star-dust bells, glass shards, stone marimba, bloom, beacon chime.
+Voices (`VOICES` in `audio.mjs`): the sky's air, the soundtrack's keys, bass, harp (with a faint bell since revision nine), tick, brush, rim and kick (`TUNE_VOICES`), Diana's glass chime (jumps, doubles, dives, the ledge catch, the wind's runs) and singing bowl (steps), revision eight's felt bass kept as `feltBass` for the A/B, choir and cape vowel (saws through two formant band-passes with a vibrato that blooms in), glass harmonica (sine plus a third harmonic 20 dB down and a wet-finger noise rub at twice the pitch), music-box glass and felt kalimba for stars, felt bass (sine under 400 Hz with an 8 ms mallet), felt heartbeat, shaker, FM celesta, inharmonic star-dust bells, glass shards, stone marimba, bloom, beacon chime.
 
 ```
 cue -> sfx bus (x Sounds) -> compressor -> master -> safety clipper -> out    (+ 2.4 s room reverb)
@@ -348,20 +404,21 @@ Every cue gets ±1 dB, ±3 cents (pads up to 8), fresh noise positions and crack
 | --- | --- | --- |
 | `wake` | wake | Leaf rustle, a rising breath and two kalimba notes (A5, D6) as the sprout pops |
 | `emerge` | the wake press (title) | The soil stirs: a slow low breath of air and two soft leaf whispers while Diana rises |
-| `jump` / `double-jump` | jump / double-jump | An airy upward breath with a whisper of cloth; the second is thinner and higher, with a soft airy shimmer instead of a tick |
+| `jump` / `double-jump` | jump / double-jump | An airy upward breath from 650 Hz, nothing under 450 Hz (revision nine: the brown-noise weight is gone); the second is thinner and higher, with a soft airy shimmer instead of a tick |
 | `super-jump` | super-jump | A long rising wash of air with a soft shimmer above it |
 | `cape` | dash | A breathy whoosh that opens and settles over the flight, with a 13-16 Hz fabric flutter |
 | `dive` | dive | A falling rush of air (1.7 kHz → 320 Hz) |
-| `land-soft` / `land-hard` | land (`hard`) | Feet settling into soft ground: a short hush of air and cloth; hard landings settle deeper and longer, with a little dust in the air |
-| `lip-catch` | lip-catch (ledge catch and step-up) | A soft brush of cloth |
+| `land-soft` / `land-hard` | land (`hard`) | A hush of air falling as she settles, high-passed at 350 Hz (revision nine: no low weight); hard landings settle longer, with a little dust in the air |
+| `lip-catch` | lip-catch (ledge catch and step-up) | A soft brush of cloth, 3 dB softer since revision nine |
 | `crumble-shake` / `crumble-fall` | shelf state | Dry stone crackle that builds over the 0.65 s shake; a crunch, thud and pebbles when it gives |
 | `cascade` / `tile-drop` | cascade / tile-drop | A distant rumble on the chord's root; a stone knock per tile |
 | `smash` | smash | Cracking stone and chips over a soft low boom |
 | `wind-catch`, updraft bed, glide bed | wind-catch, `inWind`, `gliding` | An airy swell with two chord tones; breathing wind that sings in a column; soft air with flutter while gliding |
-| `star` / `chain-note` | star / chain-note | A 3 ms glass sparkle (warmer with an ink stroke for constellation stars) |
-| `constellation` / `chain-fade` | constellation / chain-fade | Ink lines drawn in light, a rising shimmer; a soft falling breath |
-| `refill` | refill (ground / net), refill-star | A reversed inhale ending on an A6 glint (A is safe on every chord) |
-| `relic` | relic (`{ type: 'relic', verb }`) | The relic's banner: a soft breath and three small bells climbing the chord, the third a step higher for a later verb (revision eight) |
+| `star` / `chain-note` | star / chain-note | A glass sparkle touching in over 4 ms (warmer with an ink stroke for constellation stars); the score's star note carries a tiny bell |
+| `constellation` / `chain-fade` | constellation / chain-fade | Ink lines drawn in light, a rising shimmer and six wind chimes on the chord; a soft falling breath |
+| `refill` | refill (ground / net) | A reversed inhale ending on an A6 glint (A is safe on every chord) |
+| `refill-star` | refill-star | Two little chirps leaping up the chord, the second higher, over three wind-chime grains (revision nine; it borrowed the refill glint before) |
+| `relic` | relic (`{ type: 'relic', verb }`) | The relic's banner: a soft breath and three small bells climbing the chord, the third a step higher for a later verb (revision eight), over a bowl's slow swell on the root with wind chimes trailing off (revision nine) |
 | `great-star` / `great-banked` | great-star / great-banked | A burst of light and glittering dust; two bells on the chord's tones |
 | `beacon` | checkpoint | A ring of light: an airy swell and a soft low pulse |
 | `movement` | movement | A low singing bowl on the chord's root and fifth |
@@ -486,6 +543,8 @@ A fall sets `status: 'dead'` for 0.7 s, then `'respawning'` for 0.4 s, then `'ru
 For the root checks (`common/tests/browser.mjs`, data-driven from `__game.levels()`, so VII and VIII join when they land): the cape is checked in II once it is hers and its breath is full (`getState().verbs.cape && capeFull`); I has no cape and no double jump before its GET. Each level's screenshot moment is its most telling scripted moment (crash, helper, necklace, flash, fall, ripple, in that order) a little after it begins, else 55% of its main route; II's eye is photographed in real time at its GET. The pause card is checked by `solarumPauseMainMenu`; the end-of-level transition by the T1b and T5–T11 helpers (`solarumAutoAdvance`, `solarumTransitionInput`, `solarumTallyAndSave`, `solarumReducedTransition`, `solarumTransitionLayouts`, `solarumSignsStill`) and the relic banner by `solarumBanner`. The victory card and `__game.showMap` are gone.
 
 ## Validation evidence (2026-11-10, Node 22.14.0)
+
+**Revision nine, audio (2026-11-10).** `npm test`: **218/218 pass** in a clean copy of the tree with this round (new `tests/palette.test.mjs`, 4: the bodies are air with nothing under 350 Hz and 25 ms swells or longer, the landing's bowl with no click and the jump's chimes, the celestial sparkles on the chord's safe notes, the SFX trims and the Sounds-scaled cue sends; `tests/mix-rules.mjs` adds the bodies 3–5.5 dB under revision eight's, Diana's notes never louder and at most 3 dB under, the soundtrack 3–12 dB under her). `node scripts/mix-check.mjs` (Chrome 157): every rule holds on all eight levels (tables in [Sound](#revision-nine-soft-bodies-a-celestial-palette-quieter-sfx)). The soundboard's revision-nine A/Bs load and play in Chrome with no console error. Nobody has listened.
 
 **Revision eight, audio (2026-11-10).** `npm test`: **210/210 pass** in a clean copy of the pushed tree. New: `tests/tune.test.mjs` (8: every lead bar lasts a bar, IV quotes the motif, every pitch safe over its chord on all eight levels, call and response against Diana's baked notes and the Signal, phrases in order, the kit's rests, whole sixteenths and the first bar after a fall) and `tests/mix.test.mjs` (9: the sky is noise only with no send, the soundtrack's voices decay, the mix constants, the relic chime, the landing's attack, tempo lock on all eight levels through the engine (every soundtrack note on the level's sixteenth grid and in step with Diana's on-grid notes within 4 ms, none late), pause silence (no note and no node while paused), the old bed without a soundtrack, and every mix rule on `tests/mix-measured.json` with its freshness). `node scripts/mix-check.mjs` (Chrome 157): every rule holds on all eight levels (table in [Sound](#revision-eight-the-constant-tone-the-wind-and-a-soundtrack)). Root QA `ONLY=Solarum npm run test:browser` on the ZIP of the pushed tree `1e5f05e` (a clean copy, other squads' uncommitted work left out): **26/26 PASS**. (The shared working tree, with that work in it, showed 22/26 earlier the same hour: T5, T6/T10, the meteor platforms and the leaf glint, none of them audio; T5 and T6 were fixed by the front end's `7cc0dd8` and `8df5e75`, and a clean copy of `7cc0dd8` plus the audio work gave 25/26, the leaf glint being the stale-key fix of `8df5e75`.) After it, `bead0a0` gave the count-in its `cancel()`, the held pad its A2 and the recording its two bars: `npm test` 213/213. The soundboard loads and plays its new A/Bs and soundtrack cards in Chrome with no console error. Nobody has listened.
 
