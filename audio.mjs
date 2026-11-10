@@ -33,6 +33,7 @@
  */
 import { createConductor, createClockMap, chordTones, rootIn, safeAtOrAbove, scoreOf, CHORDS, SIXTEENTH, BEAT, BAR, LAYERS } from "./score.mjs";
 import { PATHS } from "./score-path.mjs";
+import { createTune } from "./tune.mjs";
 import { createLevel, LEVELS } from "./level.mjs";
 
 /* ---------- settings ---------- */
@@ -500,13 +501,17 @@ export const CUES = {
     maxTail: 1,
     // The thump (a 2 ms sine sweep) is gone: the landing's note is the felt
     // bass the score plays on the grid; the body only settles under it.
+    // Revision eight: the critic measured this body's attack at 9 ms with 58%
+    // of its energy in the first 10 ms (an 18 ms ramp into an 80 dB-per-100 ms
+    // fall); it now rises over 38 ms, holds a little and settles over 160 ms,
+    // 9.5 dB lower so its energy stays the same (peak 2-3 dB lower).
     build: (rng) =>
       voice({
-        gain: 0.44,
+        gain: 0.125,
         send: 0.08,
         layers: [
-          noise({ filter: { type: "lowpass", freq: 900 * (1 + spread(rng, 0.08)), q: 0.5 }, highpass: 150, env: env.perc(0.018, 0.1), gain: 0.2 }),
-          noise({ color: "brown", filter: { type: "lowpass", freq: 240, q: 0.5 }, env: env.perc(0.02, 0.09), gain: 0.2 }),
+          noise({ filter: { type: "lowpass", freq: 900 * (1 + spread(rng, 0.08)), q: 0.5 }, highpass: 150, env: [[0, 0], [0.038, 1, "lin"], [0.07, 0.6, "lin"], [0.2, Z, "exp"]], gain: 0.2 }),
+          noise({ color: "brown", filter: { type: "lowpass", freq: 240, q: 0.5 }, env: [[0, 0], [0.042, 1, "lin"], [0.075, 0.6, "lin"], [0.2, Z, "exp"]], gain: 0.2 }),
         ],
       }),
   },
@@ -752,6 +757,30 @@ export const CUES = {
           glass(93, rng, { at: 0.2, gain: 0.06, decay: 0.3, bright: 0.2 }),
         ],
       }),
+  },
+  relic: {
+    group: "stars",
+    label: "Relic",
+    about: "A relic's banner (an ability taken as a pickup): a soft breath and three small bells climbing the chord (params.chord), the third a step higher for a later verb (params.verb)",
+    limit: 1,
+    minGap: 0.5,
+    maxTail: 4,
+    build: (rng, p = {}) => {
+      const c = chordOf(p),
+        tones = chordTones(c, 81, 95),
+        lift = Math.max(0, ["double", "cape", "glide", "dive", "super"].indexOf(p.verb ?? "double"));
+      const top = tones[Math.min(tones.length - 1, 2 + (lift >> 1))] ?? tones.at(-1);
+      return voice({
+        gain: 0.42,
+        send: 0.45,
+        layers: [
+          noise({ filter: { type: "bandpass", freq: [[0, 900], [0.35, 2600, "exp"]], q: 0.9 }, env: env.swell(0.12, 0.08, 0.6), gain: 0.03 }),
+          bell(tones[0], rng, { at: 0.04, attack: 0.012, gain: 0.08, decay: 1.1, ratio: 2, index: 0.35, pan: -0.2 }),
+          bell(tones[1] ?? tones[0], rng, { at: 0.16, attack: 0.012, gain: 0.07, decay: 1.2, ratio: 2, index: 0.35, pan: 0.05 }),
+          bell(top, rng, { at: 0.3, attack: 0.012, gain: 0.07, decay: 1.5, ratio: 2, index: 0.3, pan: 0.25 }),
+        ],
+      });
+    },
   },
   "great-star": {
     group: "stars",
@@ -1111,29 +1140,182 @@ const harmonicaLayers = (n, rng, o = {}) => {
     noise({ filter: { type: "bandpass", freq: Math.min(12000, midiHz(m) * 2), q: 12 }, env: env.perc(0.02, 0.08), gain: (o.gain ?? 0.12) * 0.5 }),
   ];
 };
+/** A slow random walk for a filter or gain: points every 1.1-2.1 s over
+ * `len` seconds around `base`, within +-`depth` (a ratio), linear ramps (no
+ * oscillator: the movement never repeats and costs no node). */
+function wander(rng, base, depth, len, start = 0) {
+  const pts = [[0, base * (1 + spread(rng, depth))]];
+  for (let t = start + 1.1 + rng(); t < len; t += 1.1 + rng()) pts.push([t, base * (1 + spread(rng, depth)), "lin"]);
+  pts.push([len, base * (1 + spread(rng, depth)), "lin"]);
+  return pts;
+}
+/** An envelope whose sustain wanders between `lo` and 1 (gusts): the
+ * swell's attack and release, random levels in between. */
+function gusts(rng, a, dur, r, lo = 0.45) {
+  const pts = [[0, 0], [a, lo + (1 - lo) * rng(), "lin"]];
+  for (let t = a + 0.9 + rng(); t < dur; t += 0.9 + 1.1 * rng()) pts.push([t, lo + (1 - lo) * rng(), "lin"]);
+  pts.push([Math.max(a + 0.01, dur), lo + (1 - lo) * rng(), "lin"], [Math.max(a + 0.01, dur) + r, Z, "exp"]);
+  return pts;
+}
+/** Revision eight (the owner, Portuguese: the constant tone "like a harmonica,
+ * flute, keyboard, accordion... loud and obnoxious" must be "very soft, like
+ * the wind in the background"). Offline stems measured the old sky (two saws
+ * 12 cents apart per chord tone: an accordion's musette) sounding through
+ * 99% of every level without a break, the loudest thing in Diana's gaps 36-56%
+ * of the time, and the octave shimmer lifting it +4.4 dB, from a 198 Hz to a
+ * 613 Hz centroid and from 20 to 45 sharp partials: the reedy tone itself
+ * (README, "The constant tone"). The sky is now air. Pink noise through two
+ * wandering wind bands (L 420 Hz, R 640 Hz, Q 0.7, gusting), the chord only as
+ * soft breaths an octave below its voicing (band-passes at Q 7, 92-277 Hz,
+ * each fading in and out on its own), and a whisper of high air. No
+ * oscillator, no saw, nothing held on top; it never feeds the shimmer. */
+function skyAir(rng, n = {}) {
+  const midis = n.midis ?? CHORDS.D.pad,
+    dur = n.dur ?? 4 * BEAT,
+    e = swellEnv(1.6, dur, 2.8),
+    len = envEnd(e);
+  const layers = [
+    noise({ filter: { type: "bandpass", freq: wander(rng, 420, 0.35, len), q: 0.7 }, env: gusts(rng, 1.6, dur, 2.8, 0.5), gain: 0.05, pan: -0.6 }),
+    noise({ filter: { type: "bandpass", freq: wander(rng, 640, 0.35, len), q: 0.7 }, env: gusts(rng, 1.6, dur, 2.8, 0.5), gain: 0.04, pan: 0.6 }),
+    // The harmony, implied: each chord tone an octave down as a breath, its
+    // level wandering on its own (no tone holds steady for a bar).
+    ...midis.map((m, i) => ({ ...noise({ filter: { type: "bandpass", freq: midiHz(m - 12), q: 7 }, env: gusts(rng, 1.6, dur, 2.8, 0.15), gain: 0.05, pan: i % 2 ? 0.45 : -0.45 }), band: m - 12 })),
+    noise({ filter: { type: "bandpass", freq: wander(rng, 2600, 0.25, len), q: 0.9 }, env: gusts(rng, 2.2, dur, 2.8, 0.3), gain: 0.006 }),
+  ];
+  return voice({ gain: 4.5 * (n.gain ?? 1), send: 0, bed: true, hold: "pad", env: e, layers });
+}
+/** The sky as it was until revision eight, kept for the soundboard's A/B
+ * (createAudioEngine({ mix: "rev7" })); the game never plays it. */
+export const SKY_SAWS = Object.freeze({
+  group: "bed",
+  label: "Sky pad (saws, before)",
+  about: "Each chord tone as two saws 12 cents apart and a triangle an octave below the root, under a breathing 900 Hz lowpass; 1.6 s in, 2.8 s out",
+  build: (rng, n = {}) => {
+    const midis = n.midis ?? CHORDS.D.pad,
+      dur = n.dur ?? 4 * BEAT,
+      e = swellEnv(1.6, dur, 2.8);
+    // Rendered as grouped buses (renderPad): each tone's two saws feed the
+    // two sides in turn, the second 7-15 ms later so the sides decorrelate,
+    // under one envelope. The layers below describe the same sound (tests,
+    // tuning checks); the engine does not build a node graph per layer.
+    const layers = [];
+    midis.forEach((m, i) => {
+      const u = midis.length > 1 ? i / (midis.length - 1) : 0.5;
+      layers.push(tone(m, { wave: "sawtooth", cents: 6, detuneBus: 1, env: e, gain: 0.028, pan: i % 2 ? 0.75 : -0.75 }));
+      layers.push(tone(m, { wave: "sawtooth", cents: -6, detuneBus: -1, env: e, gain: 0.028, pan: i % 2 ? -0.75 : 0.75, at: 0.007 + 0.008 * u }));
+    });
+    layers.push(tone(midis[0] - 12, { wave: "triangle", detuneBus: 1, env: e, gain: 0.06 }));
+    return voice({ gain: 0.64 * (n.gain ?? 1), send: 0.55, bed: true, hold: "pad", grouped: true, env: e, filter: { type: "lowpass", freq: 900, q: 0.4, lfo: { rate: 0.07, depth: 300 } }, layers });
+  },
+});
+/* The soundtrack's voices (tune.mjs decides the notes). Decaying timbres
+ * only, none held, none like Diana's glass, kalimba or harmonica: a soft FM
+ * electric piano for the lead, a round plucked bass, a dark nylon harp and a
+ * light kit. They follow the bed's flat bus (mistakes detune the world's
+ * song, never Diana's). */
+const KEYS_RELEASE = 0.6;
+export const TUNE_VOICES = {
+  keys: {
+    group: "tune",
+    label: "Soundtrack keys (lead)",
+    about: "The level's tune: a soft FM electric piano (1:1, the index closing over 0.35 s) with a faint tine two octaves up",
+    build: (rng, n = {}) => {
+      const m = n.midi ?? 71,
+        hold = Math.max(0.3, n.dur ?? 0.6),
+        b = n.brightness ?? 1,
+        c = spread(rng, 2);
+      return voice({
+        gain: 0.67 * (n.gain ?? 1),
+        send: n.send ?? 0.2,
+        pan: n.pan,
+        tune: "lead",
+        layers: [
+          fm(m, { ratio: 1, index: [[0, 1.1 * b], [0.35, 0.18 * b, "exp"]], env: [[0, 0], [0.01, 1, "lin"], [0.3, 0.5, "exp"], [hold, 0.3, "lin"], [hold + KEYS_RELEASE, Z, "exp"]], gain: 0.15, cents: c }),
+          tone(m + 24, { partial: true, env: env.perc(0.003, 0.14), gain: 0.012 * b, cents: c }),
+        ],
+      });
+    },
+  },
+  tbass: {
+    group: "tune",
+    label: "Soundtrack bass",
+    about: "A round plucked bass: a sine under 600 Hz and a triangle's octave that fades first",
+    build: (rng, n = {}) => {
+      const m = n.midi ?? 38,
+        hold = Math.max(0.12, (n.dur ?? 0.8) * 0.9);
+      return voice({
+        gain: 0.19 * (n.gain ?? 1),
+        send: 0.05,
+        pan: n.pan ?? 0.05,
+        tune: "rest",
+        layers: [
+          tone(m, { env: [[0, 0], [0.014, 1, "lin"], [hold, 0.45, "exp"], [hold + 0.25, Z, "exp"]], gain: 0.3, filter: { type: "lowpass", freq: 600, q: 0.6 }, cents: spread(rng, 1) }),
+          tone(m + 12, { partial: true, wave: "triangle", env: env.perc(0.012, Math.min(0.5, hold * 0.6)), gain: 0.05 }),
+        ],
+      });
+    },
+  },
+  harp: {
+    group: "tune",
+    label: "Soundtrack harp",
+    about: "The harmony the sky used to hold: a dark nylon pluck (Karplus-Strong, brightness 0.16) with a little sine body",
+    build: (rng, n = {}) => {
+      const m = n.midi ?? 66,
+        c = spread(rng, 2);
+      return voice({
+        gain: 1.5 * (n.gain ?? 1),
+        send: 0.25,
+        pan: n.pan,
+        tune: "rest",
+        layers: [pluck(m, { t60: 0.85, bright: 0.16, gain: 0.22, cents: c }), tone(m, { env: env.perc(0.006, 0.45), gain: 0.05, cents: c })],
+      });
+    },
+  },
+  tick: {
+    group: "tune",
+    label: "Soundtrack tick",
+    about: "A closed, soft tick: high band of noise, 30 ms",
+    build: (rng, n = {}) =>
+      voice({ gain: 15 * (n.gain ?? 1), send: 0.05, pan: n.pan, tune: "rest", layers: [noise({ color: "white", filter: { type: "bandpass", freq: 7000 * (1 + spread(rng, 0.05)), q: 1.2 }, highpass: 3500, env: env.perc(0.002, 0.03), gain: 0.05 })] }),
+  },
+  brush: {
+    group: "tune",
+    label: "Soundtrack brush",
+    about: "A brushed eighth: pink noise around 4.5 kHz, 8 ms in, 90 ms out",
+    build: (rng, n = {}) =>
+      voice({ gain: 15 * (n.gain ?? 1), send: 0.08, pan: n.pan, tune: "rest", layers: [noise({ filter: { type: "bandpass", freq: 4500 * (1 + spread(rng, 0.06)), q: 0.7 }, env: env.perc(0.008, 0.09), gain: 0.055 })] }),
+  },
+  rim: {
+    group: "tune",
+    label: "Soundtrack rim",
+    about: "A wooden rim on the half-time backbeat: a 40 ms knock with a woody overtone",
+    build: (rng, n = {}) =>
+      voice({
+        gain: 10 * (n.gain ?? 1),
+        send: 0.12,
+        pan: n.pan,
+        tune: "rest",
+        layers: [
+          { ...tone(76, { env: env.perc(0.001, 0.04), gain: 0.06 }), tonal: false, freq: [[0, 820 * (1 + spread(rng, 0.03))]] },
+          noise({ filter: { type: "bandpass", freq: 1900, q: 3 }, env: env.perc(0.001, 0.03), gain: 0.06 }),
+        ],
+      }),
+  },
+  kick: {
+    group: "tune",
+    label: "Soundtrack kick",
+    about: "A felt kick: 64 to 42 Hz over 120 ms",
+    build: (rng, n = {}) => voice({ gain: 1.2 * (n.gain ?? 1), send: 0.02, tune: "rest", layers: [thump(64, 42, 0.12, { env: env.perc(0.005, 0.22), gain: 0.3 })] }),
+  },
+};
 export const VOICES = {
   pad: {
     group: "bed",
-    label: "Sky pad",
-    about: "Each chord tone as two saws 12 cents apart and a triangle an octave below the root, under a breathing 900 Hz lowpass; 1.6 s in, 2.8 s out",
-    build: (rng, n = {}) => {
-      const midis = n.midis ?? CHORDS.D.pad,
-        dur = n.dur ?? 4 * BEAT,
-        e = swellEnv(1.6, dur, 2.8);
-      // Rendered as grouped buses (renderPad): each tone's two saws feed the
-      // two sides in turn, the second 7-15 ms later so the sides decorrelate,
-      // under one envelope. The layers below describe the same sound (tests,
-      // tuning checks); the engine does not build a node graph per layer.
-      const layers = [];
-      midis.forEach((m, i) => {
-        const u = midis.length > 1 ? i / (midis.length - 1) : 0.5;
-        layers.push(tone(m, { wave: "sawtooth", cents: 6, detuneBus: 1, env: e, gain: 0.028, pan: i % 2 ? 0.75 : -0.75 }));
-        layers.push(tone(m, { wave: "sawtooth", cents: -6, detuneBus: -1, env: e, gain: 0.028, pan: i % 2 ? -0.75 : 0.75, at: 0.007 + 0.008 * u }));
-      });
-      layers.push(tone(midis[0] - 12, { wave: "triangle", detuneBus: 1, env: e, gain: 0.06 }));
-      return voice({ gain: 0.64 * (n.gain ?? 1), send: 0.55, bed: true, hold: "pad", grouped: true, env: e, filter: { type: "lowpass", freq: 900, q: 0.4, lfo: { rate: 0.07, depth: 300 } }, layers });
-    },
+    label: "Sky (air)",
+    about: "The constant bed as air: two wandering wind bands, the chord only as soft low breaths, a whisper of high air; no saw, nothing held on top",
+    build: skyAir,
   },
+  ...TUNE_VOICES,
   choir: {
     group: "bed",
     label: "Choir",
@@ -1350,6 +1532,8 @@ export const BEDS = {
   updraft: { group: "air", label: "Updraft (held)", about: "The sustained airy wind swell while Diana is inside a solar-wind column", seconds: 2.4, air: { wind: true } },
   glide: { group: "air", label: "Glide (held)", about: "Soft air with a fabric flutter while the cape is held outside the wind", seconds: 1.6, air: { glide: true } },
 };
+// (Revision seven's levels; revision eight's are MIX.air, 5 dB lower: the
+// glide's breath measured -30 LUFS in III, as loud as the new soundtrack.)
 const AIR = { wind: 0.088, glide: 0.052 };
 
 /* ---------- game events -> cues (pure) ---------- */
@@ -1362,7 +1546,7 @@ export const EVENT_NAMES = Object.freeze([
 /** Returns [{ cue, params, music }]. A cue the engine must count (star steps,
  * cascade tiles, the chain's size) is resolved by the engine. */
 export function cuesForEvent(e) {
-  switch (e?.name) {
+  switch (e?.name ?? e?.type) {
     case "wake": return [{ cue: "wake" }];
     case "jump": return [{ cue: "jump" }];
     case "double-jump": return [{ cue: "double-jump" }];
@@ -1386,10 +1570,10 @@ export function cuesForEvent(e) {
     // (A cape star's refill is voiced by its own refill-star event.)
     case "refill": return e.source === "beacon" || e.source === "constellation" || e.source === "cape-star" ? [] : [{ cue: "refill" }];
     // RESEARCH_REFILLS: a refill star that acts glints (the cape's A6 glint
-    // for both until the leaf gets its glass tick); a relic's pickup adds the
-    // glint under the GET's bloom.
+    // for both until the leaf gets its glass tick).
     case "refill-star": return [{ cue: "refill" }];
-    case "relic": return [{ cue: "refill" }];
+    // A relic's pickup (RESEARCH_REFILLS 2: { type: 'relic', verb }): its banner chime.
+    case "relic": return [{ cue: "relic", params: { verb: e.verb } }];
     case "great-star": return [{ cue: "great-star" }];
     case "great-banked": return [{ cue: "great-banked" }];
     case "checkpoint": return [{ cue: "beacon" }];
@@ -1562,14 +1746,35 @@ export const MIX = Object.freeze({
   bedLowpass: 6500, // Hz: the bed's tuning lowpass at H = 1 (was 16 kHz); it still closes with H
   bedDip: Object.freeze({ freq: 2500, q: 0.8, gain: -4 }), // dB: tames the pads' and choir's 1-4 kHz presence
   bedVoices: 12, // bed voices sounding at once; the oldest fades (Diana's notes are never stolen for the bed)
-  layers: Object.freeze({ sky: -1, signal: -2, pulse: -3, choir: -3, glass: -2, earth: -1 }), // dB on top of the bed bus
+  // (Revision eight: the choir -3 -> -6; its formant saws held for 44 s of V,
+  // the same reed colour as the old sky, though 20 dB under Diana.)
+  layers: Object.freeze({ sky: -1, signal: -2, pulse: -3, choir: -6, glass: -2, earth: -1 }), // dB on top of the bed bus
   presence: Object.freeze({ freq: 3800, q: 0.7, gain: 3.5 }), // dB: now on Diana's notes only (it lifted the whole score)
+  // Revision eight (README, "The constant tone"): the sky is air, the shimmer
+  // stops droning, the soundtrack plays.
+  sky: "air", // the sky voice ("saws": the old pad, for the A/B)
+  shimmer: 0.5, // x the conductor's shimmer feedback (0.4 -> 0.2, 0.15 -> 0.075): tails fade instead of holding a tone
+  shimmerOut: -6, // dB on the shimmer's return
+  whistle: Object.freeze({ tone: 0.006, air: 0.3, q: 14 }), // the glide whistle: a breath at the pitch, a faint sine under it
+  sing: Object.freeze({ gain: 4, q: 14 }), // the wind column's singing bands (were 9 and Q 28: a flute)
+  air: Object.freeze({ wind: 0.05, glide: 0.03 }), // the wind / glide breath (were 0.088 / 0.052)
+  tune: -2.5, // dB: the soundtrack bus (tune.mjs), under Diana's notes
+  tuneWet: -4, // dB on its space sends (the reverb, not the shimmer)
+  leadDuck: 5, // dB the soundtrack's lead gives way while one of Diana's notes sounds
+  door: -4, // dB on the far door's bloom (it stood 3-5 LU over the level)
 });
+/** Revision seven's mix as it was before the wind bed and the soundtrack (the
+ * soundboard's "old bed" A/B: createAudioEngine({ mix: "rev7" })). */
+export const MIX_REV7 = Object.freeze({ ...MIX, layers: Object.freeze({ ...MIX.layers, choir: -3 }), sky: "saws", shimmer: 1, shimmerOut: 0, whistle: Object.freeze({ tone: 0.045, air: 0, q: 14 }), sing: Object.freeze({ gain: 9, q: 28 }), tune: null, door: 0, air: null, skyBefore: true });
 /** The revision-six mix, kept only for the soundboard's before / after A/B
  * (createAudioEngine({ mix: "before" })): the bed as loud as Diana's notes,
  * open to 16 kHz, the presence lift on everything, no bed voice cap, and the
  * soundtrack at 0.32. */
-export const MIX_BEFORE = Object.freeze({ bed: 0, bedWet: 0, bedLowpass: 16000, bedDip: Object.freeze({ freq: 2500, q: 0.8, gain: 0 }), bedVoices: 99, layers: Object.freeze({}), presence: MIX.presence, presenceOnBed: true, closing: 1, music: 0.32 });
+export const MIX_BEFORE = Object.freeze({ ...MIX_REV7, bed: 0, bedWet: 0, bedLowpass: 16000, bedDip: Object.freeze({ freq: 2500, q: 0.8, gain: 0 }), bedVoices: 99, layers: Object.freeze({}), presence: MIX.presence, presenceOnBed: true, closing: 1, music: 0.32 });
+/** The mix an engine uses: "before" (revision six), "rev7" (before the wind
+ * bed and the soundtrack), an object laid over MIX (the soundboard's A/Bs), or
+ * MIX. */
+const mixOf = (m) => (m === "before" ? MIX_BEFORE : m === "rev7" ? MIX_REV7 : m && typeof m === "object" ? { ...MIX, ...m } : MIX);
 /** Player volume settings: Music (the bed and the soundtrack) and Sounds
  * (Diana's bodies and notes, stars, beacons, the interface), each 0-1, 1 by
  * default = the mix above. Guarded storage like the sound setting. */
@@ -1609,6 +1814,7 @@ const PAUSE_FADE = 0.015; // s of fade before suspending and after resuming
  * fallback is needed (nothing moves while the simulation is frozen). */
 export const SCHEDULE_AHEAD = 0.12;
 const MAX_MUSIC = 28; // score voices beside the 20 cue voices
+const MAX_TUNE = 16; // soundtrack voices, a budget of their own
 const TAPE_BASE = 0.005; // s of music-bus delay at rest (the tape-stop's head room)
 const WOW_BASE = 0.008;
 const WOW_RATE = 0.45; // Hz
@@ -1629,7 +1835,7 @@ const wallNow = () => globalThis.performance?.now?.() ?? Date.now();
 // cracked in one level and stable in another).
 const CRACKED = new Set(LEVELS.flatMap((d) => createLevel(d).platforms.filter((q) => q.type).map((q) => q.id)));
 /** Pitched cues follow the score's chord at the moment they sound. */
-const CHORDED = new Set(["cascade", "wind-catch", "great-banked", "movement", "respawn"]);
+const CHORDED = new Set(["cascade", "wind-catch", "great-banked", "movement", "respawn", "relic"]);
 
 /**
  * options: enabled (default true), context (an existing / Offline context),
@@ -1653,6 +1859,7 @@ export function createAudioEngine(options = {}) {
     musicRouted = false,
     musicWanted = false,
     musicLevel = options.mix === "before" ? MIX_BEFORE.music : MUSIC_LEVEL,
+    tune = null,
     resumingUntil = 0,
     bed = null,
     melody = null,
@@ -1676,12 +1883,16 @@ export function createAudioEngine(options = {}) {
     plucks = new Map();
   let level = options.level ?? 1;
   const vol = { music: options.volumes?.music ?? 1, sounds: options.volumes?.sounds ?? 1 };
-  const mix = options.mix === "before" ? MIX_BEFORE : MIX;
+  const mix = mixOf(options.mix);
   // A cue book override (the soundboard's before / after A/B); the game
   // always plays CUES.
   const book = options.cues ? { ...CUES, ...options.cues } : CUES;
   const makeConductor = (n, gentle) => createConductor({ level: n, path: PATHS[n], cracked: CRACKED, seed: seed ^ 0x51, gentle });
   let conductor = makeConductor(level, !!options.gentle);
+  // The soundtrack (tune.mjs) on the conductor's transport; mix.tune null: none.
+  const makeTune = (n) => (mix.tune == null ? null : createTune({ level: n }));
+  tune = makeTune(level);
+  const tn = { lastT: null, played: {}, peak: 0, late: 0 };
   const clock = createClockMap();
   const only = options.only ? new Set(options.only) : null;
   const sc = { lastAudio: null, scale: 1, sim: 0, status: "ready", scheduled: 0, late: 0, maxLate: 0, lateCount: 0, maxQuant: 0, tapeStops: 0, fades: 0, restarts: 0, frames: 0, mix: null, whistle: null };
@@ -1935,15 +2146,37 @@ export function createAudioEngine(options = {}) {
     lp.type = "lowpass";
     lp.frequency.value = 6000;
     const fb = node("Gain");
-    fb.gain.value = 0.4;
+    fb.gain.value = 0.4 * (mix.shimmer ?? 1);
     shifted.connect(hp);
     hp.connect(lp);
     lp.connect(fb);
     fb.connect(spaceIn);
     const shimmerOut = node("Gain");
-    shimmerOut.gain.value = 0.22 * (scoreOf(level).space.shimmer / 0.4);
+    shimmerOut.gain.value = 0.22 * (scoreOf(level).space.shimmer / 0.4) * dbToGain(mix.shimmerOut ?? 0);
     lp.connect(shimmerOut);
     shimmerOut.connect(scoreIn);
+    // The soundtrack (revision eight): its own bus under Diana's notes, after
+    // the Music setting, into the score bus (so it tape-stops, detunes and
+    // pauses with the world). The lead passes a duck that gives way while one
+    // of Diana's notes sounds. Its sends are 4 dB under its dry level.
+    const tuneIn = node("Gain"),
+      leadDuck = node("Gain"),
+      tuneTone = node("BiquadFilter"),
+      tuneVol = node("Gain"),
+      tuneSend = node("Gain");
+    tuneTone.type = "lowpass";
+    tuneTone.frequency.value = 7000;
+    tuneTone.Q.value = 0.5;
+    tuneVol.gain.value = dbToGain(mix.tune ?? 0) * vol.music;
+    tuneSend.gain.value = dbToGain((mix.tune ?? 0) + (mix.tuneWet ?? 0)) * vol.music;
+    leadDuck.connect(tuneIn);
+    tuneIn.connect(tuneTone);
+    tuneTone.connect(tuneVol);
+    tuneVol.connect(scoreIn);
+    // (They join the space input, so the shimmer hears them too, now at half
+    // its feedback and 6 dB down: keeping them out would cost a second 5 s
+    // convolver.)
+    tuneSend.connect(spaceIn);
     // The detune bus: pad and choir oscillators add +-padCents from here.
     const det = ctx.createConstantSource();
     nodes++;
@@ -1962,7 +2195,7 @@ export function createAudioEngine(options = {}) {
     const rewind = node("Gain");
     rewind.gain.value = vol.music;
     rewind.connect(graph.master);
-    score = { scoreOut, tapeGain, tapeTone, tape, scoreIn, playerIn, playerVol, bedIn, bedVol, bedSend, playerSend, wowDepth, bedTone, spaceIn, fb, det, detDown, flat, rewind, space, shimmerOut, spaceSeconds, rng: r };
+    score = { scoreOut, tapeGain, tapeTone, tape, scoreIn, playerIn, playerVol, bedIn, bedVol, bedSend, playerSend, wowDepth, bedTone, spaceIn, fb, det, detDown, flat, rewind, space, shimmerOut, spaceSeconds, tuneIn, leadDuck, tuneVol, tuneSend, rng: r };
   }
   function routeMusic() {
     if (!musicEl || musicRouted || !graph || offline) return;
@@ -2144,6 +2377,8 @@ export function createAudioEngine(options = {}) {
       f.type = L.filter.type;
       f.Q.value = L.filter.q ?? 0.7;
       setParam(f.frequency, L.filter.freq, start);
+      // The sky's breaths are tuned bands: they drift flat with the world.
+      if (L.band != null && f.detune) flatInto(f.detune);
       f.connect(into);
       into = f;
       list.push(f);
@@ -2280,7 +2515,8 @@ export function createAudioEngine(options = {}) {
       const list = [];
       const out = node("Gain");
       list.push(out);
-      out.gain.value = spec.gain * dbToGain(spread(rng, 1)); // +-1 dB of life
+      // +-1 dB of life; the far door's bloom sits mix.door under its old level.
+      out.gain.value = spec.gain * dbToGain(spread(rng, 1) + (name === "win" ? mix.door ?? 0 : 0));
       let head = out;
       if (spec.pan && ctx.createStereoPanner) {
         const p = node("StereoPanner");
@@ -2314,13 +2550,15 @@ export function createAudioEngine(options = {}) {
   /** Render one score note at its grid time on the audio clock (never in the
    * past: a note whose grid point has just gone by sounds at once). */
   function renderMusic(n, { at: forceAt } = {}) {
-    const recipe = VOICES[n.voice];
+    const recipe = n.voice === "pad" && mix.sky === "saws" ? SKY_SAWS : VOICES[n.voice];
     if (!recipe || !canPlay() || !score) return null;
-    if (only && !only.has(n.layer)) return null;
+    // Stems: a layer, or one part of the soundtrack ("tune:lead").
+    if (only && !only.has(n.layer) && !(n.part && only.has(`${n.layer}:${n.part}`))) return null;
     try {
       const now = t();
       prune(now);
-      const want = forceAt ?? clock.toAudio(n.t) + (LAYERS[n.layer]?.bed ? BED_DELAY : 0);
+      // The soundtrack sits on the grid like the bed (both 15 ms late).
+      const want = forceAt ?? clock.toAudio(n.t) + (LAYERS[n.layer]?.bed || n.layer === "tune" ? BED_DELAY : 0);
       const at = Math.max(now + LOOKAHEAD, want);
       if (n.voice === "shaker") return shake(at, n);
       const late = at - want;
@@ -2329,9 +2567,16 @@ export function createAudioEngine(options = {}) {
         sc.maxLate = Math.max(sc.maxLate, late);
       }
       sc.maxQuant = Math.max(sc.maxQuant, n.delay ?? 0);
-      const live = active(now, music);
-      if (live.length >= MAX_MUSIC) fadeOut(live.find((v) => v.bed && !v.hold) ?? live[0], 0.05);
+      // The soundtrack has its own budget (MAX_TUNE) and gives way to itself:
+      // it never steals one of Diana's notes or the bed's.
+      const all = active(now, music),
+        live = all.filter((v) => !v.tune);
+      if (n.layer === "tune") {
+        const own = all.filter((v) => v.tune);
+        if (own.length >= MAX_TUNE) fadeOut(own[0], 0.05);
+      } else if (live.length >= MAX_MUSIC) fadeOut(live.find((v) => v.bed && !v.hold) ?? live[0], 0.05);
       const spec = recipe.build(rng, n);
+      const isTune = !!spec.tune;
       // The layer decides the bus (LAYERS in score.mjs): a voice that serves
       // both, like the marimba of the pulse, follows the layer it plays in.
       if (LAYERS[n.layer]) spec.bed = LAYERS[n.layer].bed;
@@ -2386,16 +2631,26 @@ export function createAudioEngine(options = {}) {
           (spec.extra ??= []).push(lfo);
         }
       }
-      head.connect(spec.bed ? score.bedIn : score.playerIn);
+      head.connect(isTune ? (spec.tune === "lead" ? score.leadDuck : score.tuneIn) : spec.bed ? score.bedIn : score.playerIn);
       if (spec.send) {
         const send = node("Gain");
         send.gain.value = spec.send;
         head.connect(send);
-        send.connect(spec.bed ? score.bedSend : score.playerSend);
+        send.connect(isTune ? score.tuneSend : spec.bed ? score.bedSend : score.playerSend);
         list.push(send);
       }
-      const sources = [...(spec.grouped ? renderPad(spec, at, out, list) : spec.layers.flatMap((L) => renderLayer(L, at, out, list, { bed: !!spec.bed }))), ...(spec.extra ?? [])];
-      const v = { voice: n.voice, layer: n.layer, bed: !!spec.bed, hold: spec.hold, start: at, end: at + spec.dur, out, sources, nodes: list, stolen: false };
+      // Soundtrack voices follow the flat bus like the bed: H detunes the
+      // world's song against Diana's in-tune notes.
+      const sources = [...(spec.grouped ? renderPad(spec, at, out, list) : spec.layers.flatMap((L) => renderLayer(L, at, out, list, { bed: !!spec.bed || isTune }))), ...(spec.extra ?? [])];
+      const v = { voice: n.voice, layer: n.layer, bed: !!spec.bed, tune: isTune, part: n.part, hold: spec.hold, start: at, end: at + spec.dur, out, sources, nodes: list, stolen: false };
+      // The lead gives way while one of Diana's own notes sounds.
+      if (!spec.bed && !isTune && (n.layer === "stars" || n.layer === "strings")) duckLead(at);
+      if (isTune) {
+        tn.played[n.part] = (tn.played[n.part] ?? 0) + 1;
+        if (late > 0.002) tn.late++;
+      }
+      // Tests read where each note landed (options.trace: { voice, layer, part, at, want, pos }).
+      options.trace?.({ voice: n.voice, layer: n.layer, part: n.part, kind: n.kind, at, want, pos: n.pos });
       // A sustained voice hands over: the previous sky (or choir) releases
       // as the next one swells, so the bed never has a gap or a click.
       if (spec.hold) {
@@ -2405,7 +2660,8 @@ export function createAudioEngine(options = {}) {
       }
       music.push(v);
       sc.scheduled++;
-      peakMusic = Math.max(peakMusic, active(now, music).length);
+      peakMusic = Math.max(peakMusic, active(now, music).filter((q) => !q.tune).length);
+      if (isTune) tn.peak = Math.max(tn.peak, active(now, music).filter((q) => q.tune).length);
       if (v.bed) peakBed = Math.max(peakBed, active(now, music).filter((q) => q.bed && !q.stolen).length);
       return v;
     } catch {
@@ -2596,6 +2852,8 @@ export function createAudioEngine(options = {}) {
   function runFx(list, simTime) {
     for (const fx of list) {
       if (fx.kind === "wake") {
+        tn.lastT = null;
+        tune?.reset();
         // Anchor on the first frame after the wake, not at the event: the
         // event arrives a frame late, and anchoring early made the first
         // frame re-anchor the grid by an odd 60-70 ms (audio critic).
@@ -2612,6 +2870,8 @@ export function createAudioEngine(options = {}) {
         silenceScore(t(), 0.12);
         restoreTape(0.12);
         sc.restarts++;
+        tn.lastT = null;
+        tune?.restart(fx.pos ?? 0);
       } else if (fx.kind === "tape-stop") tapeStop(fx);
       else if (fx.kind === "fade") fadeScore(fx);
       else if (fx.kind === "door") door(fx);
@@ -2669,14 +2929,18 @@ export function createAudioEngine(options = {}) {
       score.wowDepth.gain.setTargetAtTime(m.wowCents * WOW_PER_CENT, now, 0.27);
       // The bed's ceiling is mix.bedLowpass; mistakes still close it (H 0.6: 4.2 kHz).
       score.bedTone.frequency.setTargetAtTime(Math.min(mix.bedLowpass, m.lowpass * (mix.closing ?? 0.6)), now, 0.27);
-      score.fb.gain.setTargetAtTime(m.shimmer, now, 0.3);
+      score.fb.gain.setTargetAtTime(m.shimmer * (mix.shimmer ?? 1), now, 0.3);
     } catch {
       /* ignore */
     }
   }
   /** The glide whistle: a breathy sine that snaps to chord tones by altitude
    * with a 120 ms portamento (time constant 40 ms). */
+  /** Revision eight: the stems measured the sine whistle (a flute) sounding
+   * through 65% of III at -29 LUFS in Diana's gaps; it is now mostly breath
+   * (pink noise in a Q 14 band at the pitch) over a faint sine (mix.whistle). */
   function whistle(simTime, now) {
+    if (only && !only.has("whistle")) return;
     const m = conductor.whistle(simTime);
     if (m == null && !sc.whistle) return;
     try {
@@ -2687,20 +2951,47 @@ export function createAudioEngine(options = {}) {
         o.frequency.value = midiHz(m);
         g.gain.value = 0;
         p.pan.value = -0.25;
-        o.connect(g);
+        const tg = node("Gain");
+        tg.gain.value = mix.whistle.tone;
+        o.connect(tg);
+        tg.connect(g);
+        const nodesW = [o, g, p, tg];
+        let air = null;
+        if (mix.whistle.air > 0) {
+          const src = node("BufferSource"),
+            bp = node("BiquadFilter"),
+            ag = node("Gain");
+          src.buffer = buffers.pink;
+          src.loop = true;
+          bp.type = "bandpass";
+          bp.Q.value = mix.whistle.q;
+          bp.frequency.value = midiHz(m);
+          // A Q 14 band passes about 1/14 of the noise's power around it: make up.
+          ag.gain.value = mix.whistle.air;
+          src.connect(bp);
+          bp.connect(ag);
+          ag.connect(g);
+          src.start(now, rng() * 2.5);
+          air = { src, bp };
+          nodesW.push(src, bp, ag);
+        }
         g.connect(p);
         p.connect(score.playerIn);
         const send = node("Gain");
         send.gain.value = 0.5;
         p.connect(send);
         send.connect(score.playerSend);
+        nodesW.push(send);
         o.start(now);
-        sc.whistle = { o, g, p, send, on: false };
+        sc.whistle = { o, g, p, send, air, nodes: nodesW, on: false };
       }
       const w = sc.whistle;
-      if (m != null) w.o.frequency.setTargetAtTime(midiHz(m), now, 0.04);
+      if (m != null) {
+        w.o.frequency.setTargetAtTime(midiHz(m), now, 0.04);
+        w.air?.bp.frequency.setTargetAtTime(midiHz(m), now, 0.04);
+      }
       if (w.on !== (m != null)) {
-        w.g.gain.setTargetAtTime(m != null ? 0.045 : 0, now, m != null ? 0.08 : 0.15);
+        w.g.gain.setTargetAtTime(m != null ? 1 : 0, now, m != null ? 0.08 : 0.15);
         w.on = m != null;
       }
     } catch {
@@ -2711,11 +3002,42 @@ export function createAudioEngine(options = {}) {
     if (!sc.whistle) return;
     try {
       sc.whistle.o.stop();
-      for (const n of [sc.whistle.o, sc.whistle.g, sc.whistle.p, sc.whistle.send]) n.disconnect();
+      sc.whistle.air?.src.stop();
+      for (const n of sc.whistle.nodes) n.disconnect();
     } catch {
       /* ignore */
     }
     sc.whistle = null;
+  }
+  /** The soundtrack's lead gives way to one of Diana's notes: mix.leadDuck dB
+   * in 15 ms at the note, back over about 0.5 s. */
+  function duckLead(at) {
+    if (!score || !mix.leadDuck) return;
+    try {
+      const g = score.leadDuck.gain;
+      g.cancelScheduledValues(at);
+      g.setTargetAtTime(dbToGain(-mix.leadDuck), at, 0.015);
+      g.setTargetAtTime(1, at + 0.15, 0.18);
+    } catch {
+      /* ignore */
+    }
+  }
+  /** The soundtrack's sixteenths from the present to the lookahead, on the
+   * conductor's transport. The last scheduled tick is kept by its simulation
+   * time, not its number: a re-phase renumbers the bar under it (as the
+   * conductor's own lastTick does) and the song simply moves with the place. */
+  function tuneTicks(nowPos, aheadPos) {
+    if (!tune) return;
+    const tr = conductor.transport,
+      first = Math.ceil(nowPos - 1e-6);
+    let k = tn.lastT == null ? first : Math.round(tr.pos(tn.lastT)) + 1;
+    if (k < first - 1) k = first; // after a hitch: skip, never cram
+    const s16 = SIXTEENTH / (sc.scale || 1);
+    for (; k <= Math.floor(aheadPos + 1e-9); k++) {
+      const at = tr.timeOf(k);
+      for (const n of tune.tick(k)) renderMusic({ ...n, t: at, dur: (n.len ?? 1) * s16 });
+      tn.lastT = at;
+    }
   }
   /** Per rAF frame (and per step in offline renders): follow the clock,
    * schedule the bed's sixteenths 120 ms ahead, retune, steer the whistle and
@@ -2754,6 +3076,7 @@ export function createAudioEngine(options = {}) {
         const nowPos = conductor.transport.pos(sc.sim);
         const aheadPos = conductor.transport.pos(clock.toSim(now + SCHEDULE_AHEAD));
         for (const n of conductor.ticks(nowPos, aheadPos)) renderMusic(n);
+        tuneTicks(nowPos, aheadPos);
       }
       applyTuning(now);
       restFrame(now);
@@ -2895,7 +3218,7 @@ export function createAudioEngine(options = {}) {
     const bands = [0, 1, 2].map(() => {
       const b = node("BiquadFilter");
       b.type = "bandpass";
-      b.Q.value = 28;
+      b.Q.value = mix.sing.q; // was 28: a flute; 14 is a breath with a pitch
       b.frequency.value = 880;
       src.connect(b);
       b.connect(sing);
@@ -2921,7 +3244,7 @@ export function createAudioEngine(options = {}) {
         bed.chord = chord;
       }
       if (bed.singing !== wind) {
-        bed.sing.gain.setTargetAtTime(wind ? 9 : 0, now, 0.2); // narrow bands pass little: make up level
+        bed.sing.gain.setTargetAtTime(wind ? mix.sing.gain : 0, now, 0.2); // narrow bands pass little: make up level
         bed.singing = wind;
       }
     } catch {
@@ -2948,7 +3271,9 @@ export function createAudioEngine(options = {}) {
   }
   function setAir({ wind = false, glide = false } = {}, when) {
     if (paused) return; // a frozen context keeps the bed exactly where it was
-    const target = canPlay() ? (wind ? AIR.wind : glide ? AIR.glide : 0) : 0;
+    if (only && !only.has("air")) return; // a stem without the air
+    const air = mix.air ?? AIR;
+    const target = canPlay() ? (wind ? air.wind : glide ? air.glide : 0) : 0;
     if (!bed) {
       if (target <= 0) return;
       try {
@@ -2975,6 +3300,7 @@ export function createAudioEngine(options = {}) {
    * swells in under the last one's closing chord instead of starting cold). */
   function hush(fade = 0.06, { hold = fade } = {}) {
     conductor.revoice(); // a silenced bed is voiced again on the next tick
+    tn.lastT = null;
     rest = null;
     if (!ctx) return;
     for (const v of voices) fadeOut(v, fade);
@@ -3029,6 +3355,10 @@ export function createAudioEngine(options = {}) {
           to(score.rewind.gain, vol.music);
           to(score.playerVol.gain, vol.sounds);
           to(score.playerSend.gain, vol.sounds);
+          if (mix.tune != null) {
+            to(score.tuneVol.gain, dbToGain(mix.tune) * vol.music);
+            to(score.tuneSend.gain, dbToGain(mix.tune + (mix.tuneWet ?? 0)) * vol.music);
+          }
         }
       } catch {
         /* ignore */
@@ -3090,10 +3420,12 @@ export function createAudioEngine(options = {}) {
       if (next === level) return level;
       level = next;
       conductor = makeConductor(level, conductor.gentle);
+      tune = makeTune(level);
+      tn.lastT = null;
       if (score) {
         try {
           score.space.buffer = makeBuffer(reverbImpulse(ctx.sampleRate, score.spaceSeconds(level), score.rng, { predelay: 0.03, fadeIn: 0.12 }));
-          score.shimmerOut.gain.value = 0.22 * (scoreOf(level).space.shimmer / 0.4);
+          score.shimmerOut.gain.value = 0.22 * (scoreOf(level).space.shimmer / 0.4) * dbToGain(mix.shimmerOut ?? 0);
         } catch {
           /* a context mid-close keeps its old space */
         }
@@ -3106,6 +3438,8 @@ export function createAudioEngine(options = {}) {
     /** A fresh score (restart chapter, title): bar 1, H = 1, silence. */
     scoreReset({ hold = 0.12 } = {}) {
       conductor.reset();
+      tune?.reset();
+      tn.lastT = null;
       rest = null;
       if (ctx) {
         for (const v of music) fadeOut(v, v.hold ? hold : 0.12);
@@ -3273,6 +3607,8 @@ export function createAudioEngine(options = {}) {
         played: { ...played },
         decoded: Object.keys(buffers).sort(), // generated buffers: no samples are decoded
         cues: [...CUE_NAMES],
+        // The soundtrack: its level key, notes played per part, peak voices.
+        tune: tune ? { key: tune.key, played: { ...tn.played }, peakVoices: tn.peak, lateNotes: tn.late, leadBars: [...tune.plan.keys()] } : null,
         score: {
           running: st.running,
           audible: scoreAudible(),
@@ -3339,6 +3675,9 @@ export async function renderRunOffline({ frames, from = 0, seconds = 20, Offline
     const live = f.wall >= from;
     now = Math.max(0, f.wall - from);
     for (const e of f.events ?? []) engine.event(e, { render: live, cues, timeScale: f.timeScale });
+    // The air bed, as game.js steers it every frame (a body sound: with the
+    // cues, or in a stem that names "air").
+    if (live && (only ? only.includes?.("air") || only.has?.("air") : cues)) engine.setAir({ wind: f.status === "running" && !!f.inWind, glide: f.status === "running" && !!f.gliding && !f.inWind }, now + 0.006);
     engine.scoreFrame(f, { render: live });
   }
   const buffer = await ctx.startRendering();

@@ -241,3 +241,15 @@ Unchanged from the sections above; this round uses no further archive art. `logo
 
 Screenshots on the packaged build (root QA, `common/artifacts/revision-4/`): `solarum-transition-*.png` (A0.5, A1.5, A3 at four layouts, B2.5, B3.5), `solarum-ending-tally.png`, `solarum-relic-*.png`, `solarum-banner-double.png`, `solarum-refill-stars.png`, and every sign at full opacity at 960 × 640 and 390 × 844 (`solarum-signs/`, contact sheet of the moved ones `solarum-signs-moved.png`). Nobody has judged the keyline, the relic hold or the necklace's read yet.
 
+## Revision five (2026-11-10): meteor platforms (experiment)
+
+The owner asked to try the GDD's first concept of the platforms: meteors and space rocks Diana hops across (GDD v0.4 p. 9, the boulder panel by the ringed planet; the trailer's floating trapezoids are the shape the classic islands kept). It is drawn in code; **no image was extracted and none changed use**: the original `platform01`–`platform03` and `platform-tilemap*` concepts (paper fills with a hand-drawn ink outline: a square, an octagon and the trapezoid) are not extracted and stay in the Unity archive (`refs/solarum/solarum-master.zip`), because a stretched tile cannot keep a lip that matches every collider to 2 px. Their look is what the code takes: paper fill, a thick hand-drawn ink outline, faceted corners.
+
+| Part | Collides | Moves | Notes |
+| --- | --- | --- | --- |
+| Top (contour from `geometry.mjs` `outlineY`) and lip taper | yes (it is the collider) | never | identical to the classic island |
+| Rock body: facets, craters, fissures, hatching, rim shadow, top-face edge, ink outline | no | never (shakes only while breaking, as before) | seeded per island (`phase`), cached per level and look |
+| Cracked rock: edge cracks, grey, seams, lid star | no | the existing shake and glints | the stone language of `game.js`, unchanged |
+| Pebbles, the turning fragment, Saturn's ring | no | pebbles bob 2.5–3 px over 5–9 s, the fragment turns at 0.18 rad/s; still under reduced motion | drawn behind every island, under the HUD band |
+
+Reversible: `DEFAULT_PLATFORM_STYLE` in `platform-style.mjs`, `?platforms=classic` or `__game.setPlatformStyle("classic")` (README, *Platforms are meteors*). Every Diana clip, pivot and layering is unchanged.
