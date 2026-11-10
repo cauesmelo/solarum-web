@@ -19,7 +19,11 @@ export const RULES = Object.freeze({
   capeRule: "landing",
   dashCooldown: 6,
   dashDuration: 0.5,
-  dashSpeed: 230, // added to the 270 px/s run while the cape is open
+  // Added to the 270 px/s run while the cape is open. 227.1 px/s x 0.5 s =
+  // 113.55 px = 3 x 37.85 px, i.e. three sixteenths of run at 107 BPM, so a
+  // full flight keeps Diana on the score's x lattice (RESEARCH_MUSIC 5.2;
+  // was 230, 1.3% faster, which drifted 1.6 ms of grid per flight).
+  dashSpeed: 227.1,
   glideGravity: 350,
   glideFall: 140,
   updraftLift: 700, // net upward acceleration inside a solar-wind column
@@ -576,11 +580,21 @@ function tick(s, dt, controls) {
   const p = s.player;
   s.time += dt;
   s.dashCooldown = Math.max(0, s.dashCooldown - dt);
-  s.dashRemaining = Math.max(0, s.dashRemaining - dt);
+  // The cape is open for exactly dashDuration of simulation time whatever the
+  // substep: the part of this substep it was still open carries the flight
+  // speed and the level hold. (Decrementing first and testing afterwards used
+  // to drop the last substep, so a flight lasted 0.5 s - dt and its shift
+  // changed with the sampling rate. The score needs a full flight to move
+  // Diana exactly 0.5 s x 227.1 px/s = 113.55 px = three 107 BPM sixteenths
+  // of run, at 30, 60, 120 and 240 Hz alike.) Float residue below 1 ns is
+  // treated as closed so it never adds a phantom hold substep.
+  const flightDt = s.dashRemaining > 1e-9 ? Math.min(dt, s.dashRemaining) : 0;
+  s.dashRemaining = s.dashRemaining - dt > 1e-9 ? s.dashRemaining - dt : 0;
   s.jumpBuffer = Math.max(0, s.jumpBuffer - dt);
   const previousY = p.y,
     wasGrounded = p.grounded;
-  p.x += (s.speed + (s.dashRemaining > 0 ? RULES.dashSpeed : 0)) * dt;
+  const advance = s.speed * dt + RULES.dashSpeed * flightDt;
+  p.x += advance;
   s.distance = (p.x - LEVEL.startX) / 10;
   // Entering the wind ends a flight: the column takes over and lifts.
   if (s.dashRemaining > 0 && !p.grounded && !p.diving && updraftAt(s)) {
@@ -591,7 +605,7 @@ function tick(s, dt, controls) {
   p.inWind = !!wind;
   p.gliding = !!controls.glide && !p.diving && !p.grounded && s.dashRemaining <= 0;
   if (p.gliding && wind) markPrompts(s, "glide");
-  if (s.dashRemaining > 0) p.vy = 0;
+  if (flightDt > 0) p.vy = 0;
   else if (wind) {
     // M5: inside a column gravity becomes lift. A fast upward jump keeps its
     // ordinary deceleration until it slows to the cap, so entering a column
@@ -607,23 +621,24 @@ function tick(s, dt, controls) {
   }
   p.y += p.vy * dt;
   p.grounded = false;
-  // Platforms are sorted top-to-bottom: falling can land on a high route,
-  // while rising passes through all one-way surfaces.
+  // Collapses first, for every platform: the collision loop below stops at
+  // the surface Diana lands on, so a shelf or cascade tile sorted after it
+  // used to wait until she was airborne again (a tile under a lower-numbered
+  // y could drop seconds late, off its beat).
   for (const q of s.platforms) {
-    if (
-      q.crumbleAfter &&
-      q.triggeredAt !== null &&
-      s.time - q.triggeredAt >= q.crumbleAfter &&
-      !q.collapsed
-    ) {
+    if (q.collapsed) continue;
+    if (q.crumbleAfter && q.triggeredAt !== null && s.time - q.triggeredAt >= q.crumbleAfter) {
       q.collapsed = true;
       q.collapsedAt = s.time;
-    }
-    if (q.collapseAt != null && s.time >= q.collapseAt && !q.collapsed) {
+    } else if (q.collapseAt != null && s.time >= q.collapseAt) {
       q.collapsed = true;
       q.collapsedAt = s.time;
       if (q.cascade) event(s, "tile-drop", { platform: q.id }); // the beat
     }
+  }
+  // Platforms are sorted top-to-bottom: falling can land on a high route,
+  // while rising passes through all one-way surfaces.
+  for (const q of s.platforms) {
     if (q.collapsed) continue;
     if (
       p.x + RULES.playerWidth / 2 > q.x &&
@@ -656,7 +671,7 @@ function tick(s, dt, controls) {
       if (lead < q.x || lead > q.x + RULES.lipReach || q.x + q.width < p.x) continue;
       if (p.y <= q.y || p.y - q.y > RULES.lipDepth) continue;
       // The previous step was outside the platform's span (just arrived).
-      if (lead - (s.speed + (s.dashRemaining > 0 ? RULES.dashSpeed : 0)) * dt > q.x + 1) continue;
+      if (lead - advance > q.x + 1) continue;
       p.vy = Math.max(0, p.vy);
       landOn(s, q, wasGrounded, false);
       s.lipCatches = (s.lipCatches || 0) + 1;
