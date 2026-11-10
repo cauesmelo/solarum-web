@@ -51,6 +51,10 @@ export const RULES = Object.freeze({
   flightStepDepth: 24,
   stepUpOverlap: 10,
   smashGrace: 0.1,
+  // A dive through a lid lowers the fall allowance (and the camera) by this
+  // much: a well may be deeper than the 265 px a walk-off survives, so only
+  // the dive reaches its floor (L3's broken well).
+  smashDrop: 120,
   // Death line sits a fixed distance below the camera anchor (the last
   // grounded y). With the vertical camera in geometry.mjs this is about 60 px
   // below the visible bottom, instead of the old fixed y=850 far off-screen.
@@ -400,6 +404,7 @@ function supportOf(s) {
   );
 }
 function smash(s, q) {
+  if (q.type === "lid") s.anchorY = Math.max(s.anchorY, q.y + RULES.smashDrop);
   q.collapsed = true;
   q.smashedAt = s.time;
   s.lastSmashAt = s.time;

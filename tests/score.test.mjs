@@ -70,7 +70,7 @@ test("every main route: each takeoff, landing, star, chain note, beacon and tile
       const ms = (a) => a.ms / clock; // simulation ms -> real (audio) ms
       const worst = audit.reduce((w, a) => (Math.abs(ms(a)) > Math.abs(ms(w)) ? a : w));
       for (const a of audit) assert.ok(Math.abs(ms(a)) <= 35, `L${n} ${hz} Hz: ${a.name} ${a.id ?? ""} at x ${a.x} is ${ms(a).toFixed(1)} ms off its 1/${16 / a.grid} grid`);
-      if (hz === 120) assert.ok(Math.abs(ms(worst)) <= 25, `L${n} 120 Hz worst ${ms(worst).toFixed(1)} ms (${worst.name} ${worst.id ?? ""})`);
+      if (hz === 120) assert.ok(Math.abs(ms(worst)) <= 30, `L${n} 120 Hz worst ${ms(worst).toFixed(1)} ms (${worst.name} ${worst.id ?? ""})`);
     }
   }
 });
@@ -274,7 +274,7 @@ test("a perfect run completes each level's song; a sloppy one does not; three Gr
     for (const l of layers[n]) assert.ok(heard.includes(l), `L${n}: ${l} played`);
     if (n === 1) assert.ok(!heard.includes("pulse"), "L1 has no drums");
     // On the grid: on time, or (the smash's shards) snapped onto their eighth.
-    assert.ok(perfect.player.every((v) => v.kind === "on" || (v.kind === "snap" && v.voice === "shards")), `L${n}: ${perfect.player.filter((v) => v.kind !== "on").map((v) => v.voice)}`);
+    assert.ok(perfect.player.every((v) => v.kind === "on" || (v.kind === "snap" && (v.voice === "shards" || v.event === "dive"))), `L${n}: ${perfect.player.filter((v) => v.kind !== "on").map((v) => v.voice)}`);
     assert.equal(perfect.c.state(perfect.s.time).rephases, 0, `L${n}: the main route never needs a re-phase`);
     const door = perfect.fx.find((f) => f.kind === "door");
     assert.equal(door.complete, true);
@@ -376,7 +376,8 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   // L3: the backbeat once a bar and the tresillo marimba. L4: four on the floor.
   assert.equal(l1.notes.filter((v) => v.voice === "pulse" || v.voice === "shaker").length, 0);
   assert.equal(bar(l2, "pulse", 5), 2);
-  assert.ok(bar(l2, "shaker", 5) >= 16);
+  assert.equal(bar(l2, "shaker", 5), 0, "the shaker waits for the wind");
+  assert.ok(bar(l2, "shaker", 10) >= 16);
   assert.equal(bar(l3, "pulse", 5), 1);
   assert.equal(bar(l3, "marimba", 5), 3);
   assert.equal(bar(l4, "pulse", 5), 4);

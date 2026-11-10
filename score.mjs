@@ -71,6 +71,9 @@ export const CHORDS = Object.freeze({
   "Em/F#": { name: "Em/F#", root: 4, bass: 42, tones: [4, 7, 11], safe: [4, 7, 11, 2, 9, 6], pad: [55, 59, 64, 67] },
   "F#sus4": { name: "F#sus4", root: 6, bass: 42, tones: [6, 11, 1], safe: [6, 11, 1, 4], pad: [54, 59, 61, 66] },
   "F#": { name: "F#", root: 6, bass: 42, tones: [6, 1, 11], safe: [6, 11, 1, 4], pad: [54, 58, 61, 66] },
+  A: { name: "A", root: 9, bass: 45, tones: [9, 1, 4], safe: [9, 11, 1, 4, 6], pad: [57, 61, 64, 69] },
+  Bm7: { name: "Bm7", root: 11, bass: 47, tones: [11, 2, 6], safe: [11, 2, 4, 6, 9], pad: [57, 62, 66, 69] },
+  "F#m/A": { name: "F#m/A", root: 6, bass: 45, tones: [6, 9, 1], safe: [6, 9, 11, 1, 4], pad: [57, 61, 64, 66] },
   // D Lydian: the chapter's only sustained G#, at the door with three Great Stars.
   Earth: { name: "Dmaj7#11", root: 2, bass: 38, tones: [2, 6, 9, 1, 8], safe: [2, 4, 6, 8, 9, 11, 1], pad: [62, 66, 68, 73] },
 });
@@ -94,9 +97,56 @@ function chapterChordAt(pos) {
   if (bar === 34) return C["Gmaj7#11"];
   return C.Dadd9;
 }
+/** A level map from its sections: each has bars [from, to], a cycle of
+ * chords (one per bar, or [first half, second half]) and its bed flags. */
+function mapOf(sections, coda) {
+  return (pos) => {
+    const bar = barOf(Math.max(0, pos)),
+      sec = sections.find((q) => bar >= q.from && bar <= q.to);
+    if (!sec?.cycle) return coda;
+    const c = sec.cycle[(bar - sec.from) % sec.cycle.length];
+    return Array.isArray(c) ? c[halfOf(pos)] : c;
+  };
+}
+const CYC = CYCLE.map((b) => b);
+const CYC3 = CYCLE_III.map((b) => b);
+// L2's twist (the glide bridge and the currents): IV V iii vi, the lift.
+const L2_TWIST = [C.G, C.A, C["F#m"], C.Bm];
+const L2_SECTIONS = [
+  { id: "hearth", from: 1, to: 2, pulse: false, cycle: [[C.G, C.D]] },
+  { id: "voids", from: 3, to: 8, cycle: CYC },
+  { id: "wind", from: 9, to: 11, shaker: true, cycle: CYC3 },
+  { id: "bridge", from: 12, to: 15, shaker: true, cycle: L2_TWIST },
+  { id: "currents", from: 16, to: 19, shaker: true, cycle: [C.G, C.A, C.Bm, C["F#m"]] },
+  // The finale climbs to Bm and the theme's head sits on A: V, then home.
+  { id: "finale", from: 20, to: 22, shaker: true, cycle: [C["Gmaj7#11"], C.Bm, C.A] },
+  { id: "coda", from: 23, to: Infinity },
+];
 const L1_CYCLE = [C["Bm(add9)"], C["Bm(add9)"], C["F#m7"], C.Dmaj7, C["F#m7"], C.Dmaj7, C.Gmaj7, C.Gmaj7];
 const L3_CYCLE = [C.Em9, C.A7sus4, C["Dmaj9/F#"], C["Gmaj7#11"]];
-const L4_CYCLE = [C["Bm/F#"], C["G/F#"], C["Em/F#"], C["F#sus4"]];
+// L3's twist (the broken well): the relative minor turns dark, Bm7 G A F#m.
+const L3_SECTIONS = [
+  { id: "wake", from: 1, to: 2, cycle: [C.Em9] },
+  { id: "cracks", from: 3, to: 7, shaker: true, glass: true, cycle: L3_CYCLE },
+  { id: "ridge", from: 8, to: 12, shaker: true, glass: true, cycle: L3_CYCLE },
+  { id: "broken", from: 13, to: 16, shaker: true, cycle: [C.Bm7, C.G, C.A, C["F#m"]] },
+  { id: "crown", from: 17, to: 19, shaker: true, glass: true, cycle: [C["Gmaj7#11"], C["Dmaj9/F#"], C.A7sus4] },
+  { id: "voids", from: 20, to: 21, shaker: true, cycle: [C.Em9, C.A7sus4] },
+  { id: "close", from: 22, to: 22, cycle: [C["Gmaj7#11"]] },
+  { id: "coda", from: 23, to: Infinity },
+];
+const L4_CYCLE = [C["Bm/F#"], C["G/F#"], C["Em/F#"], [C["F#sus4"], C["F#"]]];
+// L4's twist (the voids at 128): the pedal climbs, G/F# Em/F# then F#sus4 F#.
+const L4_SECTIONS = [
+  { id: "wake", from: 1, to: 2, cycle: [C["Bm/F#"]] },
+  { id: "storm", from: 3, to: 6, cycle: L4_CYCLE },
+  { id: "wave", from: 7, to: 12, shaker: true, cycle: L4_CYCLE },
+  { id: "voids", from: 13, to: 18, shaker: true, cycle: [C["G/F#"], C["Em/F#"], [C["F#sus4"], C["F#"]], C["Bm/F#"]] },
+  { id: "finale", from: 19, to: 22, shaker: true, cycle: L4_CYCLE },
+  { id: "stair", from: 23, to: 23, shaker: true, cycle: [[C["G/F#"], C["F#"]]] },
+  { id: "close", from: 24, to: 25, cycle: [[C["F#sus4"], C["F#"]], [C.Bm, C.Bm]] },
+  { id: "coda", from: 26, to: Infinity },
+];
 /**
  * One conductor preset per level (RESEARCH_LEVELS 6): its map (sections in
  * bars, a chord per position), the Signal's bars and the bar its closing
@@ -132,18 +182,20 @@ export const SCORES = Object.freeze({
     },
   },
   2: {
-    level: 2, bpm: 107, bars: 14, pickup: 8,
+    level: 2, bpm: 107, bars: 24, pickup: 8,
     // floaty with marked beats: heartbeat on 1 and 3, a tick on 2 and 4,
-    // shaker sixteenths at about -30 dB (the chapter's Movement III).
+    // shaker sixteenths at about -30 dB from the wind on; the twist lifts.
     groove: "heartbeat", maxFlat: 15, space: { seconds: 5.5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
-    sections: [{ id: "hearth", from: 1, to: 2, pulse: false }, { id: "wind", from: 3, to: 12, shaker: true }, { id: "coda", from: 13, to: Infinity }],
-    chordAt: (pos) => chapterChordAt(pos + 22 * BAR),
-    signalBars: [3, 7, 11], closeFrom: 12,
+    sections: L2_SECTIONS,
+    chordAt: mapOf(L2_SECTIONS, C.Dadd9),
+    signalBars: [3, 7, 9, 20], closeFrom: 22,
     phrases: {
       // bar 3 (Bm): the cape opens on a falling Bm line, F#5 E5 D5 B4.
-      "flight-line": [78, 76, 74, 71],
+      "first-flight": [78, 76, 74, 71],
       // the long void (bar 5, F#m | Dadd9): C#5 E5 F#5 | A5, rising to the refill.
-      "void-song": [73, 76, 78, 81],
+      "void-song": [74, 76, 78, 81],
+      // the glide bridge: rising and settling, D5 E5 F#5 E5 D5 (fitted below).
+      "glide-song": [73, 76, 78, 76, 73],
       // the star cache (about bar 9, F#m | Dadd9): E5 F#5 A5 B5.
       "cache-song": [76, 78, 81, 83],
       // bar 11 (Bm): the last phrase climbs to the high B, B4 D5 F#5 B5.
@@ -151,21 +203,15 @@ export const SCORES = Object.freeze({
     },
   },
   3: {
-    level: 3, bpm: 118, bars: 20, pickup: 0,
+    level: 3, bpm: 118, bars: 24, pickup: 0,
     // call and response: half-time backbeat (beat 3), a 3+3+2 tresillo on
     // the rim and the marimba's low root, the world calling on the grid.
     groove: "clave", maxFlat: 20, space: { seconds: 3.5, shimmer: 0.3 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
-    sections: [{ id: "wake", from: 1, to: 2 }, { id: "cracks", from: 3, to: 17, shaker: true, glass: true }, { id: "coda", from: 18, to: Infinity }],
-    chordAt(pos) {
-      const bar = barOf(Math.max(0, pos));
-      if (bar <= 2) return C.Em9;
-      if (bar <= 17) return L3_CYCLE[(bar - 3) % 4];
-      if (bar === 18) return C["Gmaj7#11"];
-      return C.Em9;
-    },
-    signalBars: [3, 7, 11, 15], closeFrom: 18,
+    sections: L3_SECTIONS,
+    chordAt: mapOf(L3_SECTIONS, C.Em9),
+    signalBars: [3, 8, 13, 17], closeFrom: 22,
     phrases: {
-      // out of the well (bar 9, A7sus4 | Dmaj9/F#): A4 B4 D5 | E5 F#5, climbing.
+      // the optional star well (bar 9): A4 B4 D5 E5 G5, climbing.
       "well-song": [69, 71, 74, 76, 79],
       // the hearth void (about bar 15): B4 D5 E5 | A5.
       "flight-line": [71, 74, 76, 81],
@@ -174,28 +220,20 @@ export const SCORES = Object.freeze({
     },
   },
   4: {
-    level: 4, bpm: 128, bars: 18, pickup: 0,
+    level: 4, bpm: 128, bars: 26, pickup: 0,
     // agitated, tense: a felt kick on every beat, sixteenth ticks and an
     // eighth-note F# ostinato; after a fall the ostinato rests until the
     // next constellation or beacon.
     groove: "four", maxFlat: 20, space: { seconds: 2.5, shimmer: 0.25 }, tapeStop: 0.45, rewind: true, dropOnFall: true,
-    sections: [{ id: "wake", from: 1, to: 2 }, { id: "storm", from: 3, to: 15, shaker: true }, { id: "coda", from: 16, to: Infinity }],
-    chordAt(pos) {
-      const bar = barOf(Math.max(0, pos)),
-        half = halfOf(pos);
-      if (bar <= 2) return C["Bm/F#"];
-      if (bar <= 15) {
-        const c = L4_CYCLE[(bar - 3) % 4];
-        return c === C["F#sus4"] && half ? C["F#"] : c;
-      }
-      if (bar === 16) return half ? C["F#"] : C["F#sus4"];
-      if (bar === 17) return C["Bm/F#"];
-      return C.Dadd9;
-    },
-    signalBars: [1, 3, 7, 11, 15], closeFrom: 16,
+    sections: L4_SECTIONS,
+    chordAt: mapOf(L4_SECTIONS, C.Dadd9),
+    signalBars: [1, 3, 7, 11, 19], closeFrom: 24,
     phrases: {
       // the well (bar 6, G/F#): D5 B4 A4 G4 B4.
       "well-song": [74, 71, 69, 67, 71],
+      // the voids (as in L3, refitted below) and the rising stair.
+      "split-song": [78, 76, 73, 71, 69],
+      "stair-song": [71, 73, 76, 78, 83, 85],
       // the finale (bar 15, Bm/F#): F#5 E5 D5 B4.
       "finale-song": [78, 76, 74, 71],
     },
@@ -602,6 +640,13 @@ export function createConductor(options = {}) {
       } else tuning.apply("on-grid-note");
     }
     const loose = q.kind === "loose" || offBeat;
+    // Quantised across a chord change, a pitch chosen for the old chord is
+    // refitted to the one it now sounds over (a bloom's low root excepted).
+    const c = chordAt(q.pos),
+      fit = (m) => (m == null || m < 60 || isSafe(c, m) ? m : nearestSafe(c, m));
+    if (spec.midi != null) spec = { ...spec, midi: fit(spec.midi) };
+    if (spec.glideTo != null) spec = { ...spec, glideTo: fit(spec.glideTo) };
+    if (spec.midis) spec = { ...spec, midis: spec.midis.map(fit) };
     return note({
       ...spec,
       pos: q.pos,

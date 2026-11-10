@@ -182,8 +182,8 @@ test("removing a level's new action fails exactly at the challenge that teaches 
 });
 test("missing a required midair constellation leaves the cape spent over the void", () => {
   for (const [n, star, beacon, lo, hi] of [
-    [2, "void-song-3", "voids", 16380, 16710],
-    [3, "split-song-4", "voids", 16590, 16960],
+    [2, "void-song-3", "voids", 16380 + 37.85 * 35, 16710 + 37.85 * 35],
+    [3, "split-song-4", "voids", 16590 + 37.85 * 70, 16960 + 37.85 * 70],
   ]) {
     const { s } = traverse("main", 1 / 120, null, (g) => (g.pickups = g.pickups.filter((q) => q.id !== star)), n);
     assert.equal(s.status, "dead", `L${n}`);
@@ -367,16 +367,36 @@ test("a soft landing keeps a lid whole; a grounded dive breaks only drawn cracks
   assert.equal(s.platforms.find((q) => q.id === "lid").collapsed, true);
   assert.equal(s.player.grounded, false);
 });
-test("every lid has a catch 90-240 px below it (within the 265 px death line)", () => {
+test("every lid has a catch 90-280 px below it; the broken well's is deeper than a walk-off survives", () => {
   for (const n of IDS) {
     const all = createLevel(n).platforms;
     for (const lid of all.filter((q) => q.type === "lid")) {
-      assert.ok(lid.width >= 160 && lid.width <= 260);
+      assert.ok(lid.width >= 160 && lid.width <= 560, lid.id);
       const catches = all.filter(
-        (q) => q !== lid && q.x < lid.x + lid.width && q.x + q.width > lid.x && q.y - lid.y >= 90 && q.y - lid.y <= 240,
+        (q) => q !== lid && q.x < lid.x + lid.width && q.x + q.width > lid.x && q.y - lid.y >= 90 && q.y - lid.y <= 280,
       );
       assert.ok(catches.length, `L${n} ${lid.id}`);
+      // Deeper than the death line, only a dive (which lowers it) gets there.
+      if (catches.every((q) => q.y - lid.y > RULES.fallLimit)) assert.ok(catches.every((q) => q.y - lid.y < RULES.fallLimit + RULES.smashDrop), lid.id);
     }
+  }
+});
+test("L3's broken well forces the dive: walking or jumping off the lid's end dies; the dive lands", () => {
+  for (const mode of ["dive", "walk", "jump", "double"]) {
+    const s = pilotTo(start(game(3)), "main", 14700);
+    assert.equal(s.checkpoint.id, "broken");
+    const lid = s.platforms.find((q) => q.id === "broken-lid");
+    let done = 0;
+    for (let i = 0; i < 600 && s.status === "running"; i++) {
+      const p = s.player;
+      if (mode === "dive" && !done && p.grounded && p.x > lid.x + 200) (dive(s), (done = 1));
+      if (mode !== "dive" && mode !== "walk" && !done && p.grounded && p.x > lid.x + lid.width - 25) (jump(s), (done = 1));
+      if (mode === "double" && done === 1 && !p.grounded && p.vy > -40) (jump(s), (done = 2));
+      update(s, 1 / 120);
+      if (p.grounded && p.y > lid.y + 200) break;
+    }
+    if (mode === "dive") assert.ok(s.status === "running" && s.player.y > lid.y + 200, "the dive reaches the floor");
+    else assert.notEqual(s.status, "running", `${mode} off the lid's end must fail`);
   }
 });
 
@@ -633,9 +653,9 @@ test("beacons are at most 14 s of real run apart and leave 400 px before the nex
 test("a beacon (or the level's start) sits right before the first required use of each mechanic", () => {
   const firstUse = {
     1: { "double-jump": gx(84), tap: gx(164) },
-    2: { flight: 14982, constellation: 16157, updraft: 18047 },
-    3: { fragile: 7190, dive: gx(284), cascade: 11684.2, flight: 14982, constellation: 16147 },
-    4: { "super-jump": gx(68) + 63.67, cascade: createLevel(4).platforms.find((q) => q.id === "tile-0").x },
+    2: { flight: 14982, constellation: 16157 + 37.85 * 35, updraft: 18047 + 37.85 * 35, glide: 21113.2, dive: 21491.7 + 37.85 * 64 },
+    3: { fragile: 7190, cascade: 11477.2, dive: 14925, flight: 14982 + 37.85 * 70, constellation: 16147 + 37.85 * 70 },
+    4: { "super-jump": gx(68) + 63.67, cascade: createLevel(4).platforms.find((q) => q.id === "tile-0").x, constellation: 16147 - 6988.46 },
   };
   for (const d of LEVELS)
     for (const [mechanic, x] of Object.entries(firstUse[d.id])) {
@@ -664,16 +684,19 @@ test("the title card (300/1600/500 ms of simulation time) never covers a require
 test("main-route gaps and rises respect each level's authoring limits", () => {
   // L1's float allows a 180 px double rise; L4's super jump climbs 235 px;
   // L2's long void is crossed by two flights around a refill constellation.
-  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, 3: { rise: 165, gap: 400 }, 4: { rise: 235, gap: 400 } };
+  // L3's broken well is left by jump, double jump and flight (606 px).
+  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, 3: { rise: 165, gap: 400, long: { "well-bottom": 610 } }, 4: { rise: 235, gap: 400 } };
   for (const n of IDS) {
     const chains = createLevel(n).pickups.filter((q) => q.chain);
     for (const [a, b] of mainPairs(n)) {
       const gap = b.x - (a.x + a.width),
         rise = a.y - b.y;
-      if (gap <= 0 || windBetween(n, a, b)) continue;
+      // (A floor under a lid is reached by the dive through it.)
+      const lid = createLevel(n).platforms.find((q) => q.type === "lid" && q.x <= b.x + 1 && q.x + q.width > b.x);
+      if (gap <= 0 || windBetween(n, a, b) || lid) continue;
       const refill = chains.some((q) => q.x > a.x + a.width && q.x < b.x);
       assert.ok(rise <= limits[n].rise, `L${n} ${a.id}→${b.id} rise ${rise}`);
-      assert.ok(gap <= (refill && limits[n].void ? limits[n].void : limits[n].gap), `L${n} ${a.id}→${b.id} gap ${gap}`);
+      assert.ok(gap <= (limits[n].long?.[a.id] ?? (refill && limits[n].void ? limits[n].void : limits[n].gap)), `L${n} ${a.id}→${b.id} gap ${gap}`);
       assert.ok(b.y - a.y <= 240, `L${n} ${a.id}→${b.id} drop`);
     }
   }
@@ -696,7 +719,11 @@ test("no blind landings: every required landing is in view when the input that c
       // The last pilot input before the landing (a second flight after a
       // refill commits later than the takeoff, and sees further).
       const commit = Math.max(takeoff - 60, ...result.actions.filter((q) => q.x < b.x && q.x >= takeoff - 60).map((q) => q.x));
-      assert.ok(b.x + 40 - commit <= view.lookahead || catchUnder(d.id, a, b), `L${d.id} ${b.id} beyond lookahead`);
+      // (Wind and lids budget their own landings: the glide is steered in
+      // view, and a floor under a lid is reached through it.)
+      const lid = createLevel(d).platforms.find((q) => q.type === "lid" && q.x <= b.x + 1 && q.x + q.width > b.x);
+      if (lid) continue;
+      assert.ok(b.x + 40 - commit <= view.lookahead || catchUnder(d.id, a, b) || windBetween(d.id, a, b), `L${d.id} ${b.id} beyond lookahead`);
       assert.ok(b.y > band.hudBottom && b.y < band.bottom - 20, `L${d.id} ${b.id} outside the vertical view from ${a.id}`);
     }
     // Optional lines rejoin with their landing in view too.
@@ -861,7 +888,7 @@ test("Star net returns Diana to her last ground once per beacon and restores wha
   const s = start(game(3));
   setAssist(s, "starNet", true);
   // Play L3's main route to the second split void, then fall on purpose.
-  pilotTo(s, "main", 16560);
+  pilotTo(s, "main", 16560 + 37.85 * 70);
   assert.equal(s.status, "running");
   const stars = s.stars;
   Object.assign(s.player, { y: s.anchorY + RULES.fallLimit + 5 });
@@ -869,7 +896,7 @@ test("Star net returns Diana to her last ground once per beacon and restores wha
   assert.equal(s.status, "dead");
   update(s, 1.4);
   assert.equal(s.status, "running");
-  assert.ok(s.player.x < 16100 && s.player.x > 15400, `net at ${s.player.x}`);
+  assert.ok(s.player.x < 16100 + 37.85 * 70 && s.player.x > 15400 + 37.85 * 70, `net at ${s.player.x}`);
   assert.equal(s.platforms.find((q) => q.id === "split-crack").collapsed, false);
   assert.ok(s.stars <= stars);
   assert.equal(s.starNetUsed, true);

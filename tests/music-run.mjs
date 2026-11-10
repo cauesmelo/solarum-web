@@ -19,8 +19,8 @@ export const CRACKED = new Set(LEVELS.flatMap((d) => createLevel(d).platforms.fi
 /** Where each beacon's challenge is (x range of the first airborne press to block). */
 const CHALLENGE = {
   1: { drift: [gx(84), gx(96)] },
-  2: { voids: [16000, 16700] },
-  3: { voids: [16000, 16700], well: [11500, 11650] },
+  2: { voids: [16000 + 37.85 * 35, 16700 + 37.85 * 35] },
+  3: { voids: [16000 + 37.85 * 70, 16700 + 37.85 * 70], broken: [15100, 15700] },
   4: { storm: [gx(68), gx(76) + 130] },
 };
 const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJump(s)) };
@@ -29,7 +29,7 @@ const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJu
 export const SLOPPY_RUNS = Object.freeze({
   1: { level: 1, failAt: ["drift"], removeStars: ["first-song-2"], late: [[gx(36) - 1, gx(36) + 1, 14], [gx(124) - 1, gx(124) + 1, 12]] },
   2: { level: 2, failAt: ["voids"], removeStars: ["flight-line-2"], late: [[19860, 19870, 10]] },
-  3: { level: 3, failAt: ["well"], removeStars: ["split-song-1"], late: [[8090, 8100, 12]] },
+  3: { level: 3, failAt: ["broken"], removeStars: ["split-song-1"], late: [[8090, 8100, 12]] },
   4: { level: 4, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
 });
 export const SLOPPY = SLOPPY_RUNS[2];
@@ -83,7 +83,9 @@ export function drive({ route = "main", level = 2, dt = 1 / 120, failAt = [], re
   return s;
 }
 
-export function musicRun({ gentle = false, timeScale = 1, level = 2, ...options } = {}) {
+// timeScale defaults to the level's clock, as in the game (tolerances and
+// caps are real milliseconds).
+export function musicRun({ gentle = false, level = 2, timeScale = levelDef(level).clock, ...options } = {}) {
   const c = createConductor({ level, path: PATHS[level], cracked: CRACKED, gentle });
   const notes = [],
     fx = [],

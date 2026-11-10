@@ -634,6 +634,46 @@ const L1 = {
   },
 };
 
+/**
+ * Open a level at `cut` and insert a section (RESEARCH_LEVELS: content, not
+ * padding). Everything at x >= cut moves by (dx, dy): platforms, wind,
+ * constellations, stars, Great Stars, glyphs, beacons, sections, the door
+ * and the pilots' steps. dx is a whole number of sixteenths of run (plus
+ * three per inserted flight, 63.67 px per super jump), so the rest of the
+ * level keeps its grid; a whole number of bars keeps its music too.
+ * `content` holds the new section in final coordinates; `drop` removes
+ * chain or star ids from the moved part (a void repeated without stars).
+ */
+function insertSection(def, { cut, dx, dy = 0, content = {}, drop = [] }) {
+  const moveX = (x) => (x >= cut ? x + dx : x);
+  const moved = (x) => x >= cut;
+  const plat = (list) => list.map(([id, x, y, w, t, e]) => (moved(x) ? [id, x + dx, y + dy, w, t, e] : [id, x, y, w, t, e]));
+  const out = {
+    ...def,
+    level: { ...def.level, finishX: def.level.finishX + dx, finishY: def.level.finishY + dy },
+    main: [...plat(def.main), ...(content.main ?? [])],
+    high: [...plat(def.high), ...(content.high ?? [])],
+    updrafts: [...def.updrafts.map((u) => (moved(u.x) ? { ...u, x: u.x + dx, top: u.top + dy, bottom: u.bottom + dy } : u)), ...(content.updrafts ?? [])],
+    cascades: [...def.cascades, ...(content.cascades ?? [])],
+    chains: [
+      ...def.chains.filter((c) => !drop.includes(c.id)).map((c) => ({ ...c, stars: c.stars.map(([x, y]) => (moved(x) ? [x + dx, y + dy] : [x, y])) })),
+      ...(content.chains ?? []),
+    ],
+    great: [...def.great.map((g) => (moved(g.x) ? { ...g, x: g.x + dx, y: g.y + dy } : g)), ...(content.great ?? [])],
+    prompts: [...def.prompts.map((q) => (moved(q.x) ? { ...q, x: q.x + dx, y: q.y + dy, from: moveX(q.from), to: moveX(q.to), inputX: moveX(q.inputX) } : q)), ...(content.prompts ?? [])],
+    stars: [...def.stars.filter(([id]) => !drop.includes(id)).map(([id, x, y, r]) => (moved(x) ? [id, x + dx, y + dy, r] : [id, x, y, r])), ...(content.stars ?? [])],
+    checkpoints: [...def.checkpoints.map((c) => (moved(c.x) ? { ...c, x: c.x + dx, y: c.y + dy } : c)), ...(content.checkpoints ?? [])].sort((a, b) => a.x - b.x),
+    sections: [...def.sections.map((q) => ({ ...q, x: moveX(q.x) })), ...(content.sections ?? [])].sort((a, b) => a.x - b.x),
+    routes: {},
+  };
+  for (const [name, plan] of Object.entries(def.routes)) {
+    const add = content.routes?.[name] ?? content.routes?.main ?? [];
+    // Steps keep their order; inserted ones sit between the two parts.
+    out.routes[name] = [...plan.filter(([x]) => x < cut), ...add, ...plan.filter(([x]) => x >= cut).map(([x, a, w]) => [x + dx, a, w])];
+  }
+  return out;
+}
+
 /* ---- L2 · Borrowed Wind (107 BPM): floating with marked beats ----
  * Movement III at its own coordinates and today's physics: the cape, solar
  * wind and the held-cape glide, and the dive as the way into the star cache.
@@ -651,9 +691,11 @@ const L2_PLAN = {
   // The far rock is 86 px above the wind gate: a tap lands 4/16 later.
   rock: [[vx(30, 2) - 0.3, "tap", "g"]],
   wind: [[18052, "jump", "g"], [18080, "glide", "*"], [18300, "unglide", "*"]],
-  cache: [[18600, "dive", "g"], [18850, "jump", "g"], [18930, "jump", "a"], [19106.5, "jump", "g"]],
+  // (The second press comes early: later, the step-up already sets her on
+  // the shore and the pilot would wait for an airborne moment.)
+  cache: [[18600, "dive", "g"], [18850, "jump", "g"], [18895, "jump", "a"], [19106.5, "jump", "g"]],
 };
-const L2 = {
+const L2_BASE = {
   id: 2,
   key: "wind",
   numeral: "II",
@@ -711,6 +753,97 @@ const L2 = {
   },
 };
 
+/* L2's sections, inserted in order. (1) The hearth void twice: the first
+ * time along its star line, then (after a 4/16 hop up 80 px onto a second
+ * hearth) the same void with nothing to follow. Two bars and one flight:
+ * dx = 37.85 x (32 + 3). */
+const L2_X1 = 37.85 * (32 + 3);
+const L2_S1 = insertSection(L2_BASE, {
+  cut: 15098,
+  dx: L2_X1,
+  dy: -22,
+  drop: ["flight-line"],
+  content: {
+    main: [
+      ["wind-shore-1", 15435, 377, 15786.35 - 15435],
+      ["hearth-2", 15867.75, 297, 16384.75 - 15867.75],
+    ],
+    chains: [{ id: "first-flight", route: "low", stars: [[15096, 178], [15202, 178], [15343, 178], [15436, 243]] }],
+    sections: [{ x: 15440, movement: "L2", step: "introduce", name: "II · Borrowed Wind — the void again, without stars" }],
+    routes: { main: [[15776.05, "jump", "g"], [14981.5 + L2_X1, "jump", "g"], [15096 + L2_X1, "dash", "a"]] },
+  },
+});
+/* (2) Currents, before the finale: a flight ends over a low islet and a
+ * dive lands on it on the beat (dive at 7/16, 44 px down 1/16 later); a jump
+ * into a column of wind that would carry Diana over the island beneath it
+ * and on into the dark: a dive out of the wind lands on it 1/16 later; then
+ * jump and flight (the island gave the cape back) up 69 px onto the shore
+ * 7/16 later. Four bars and two flights; the finale follows 27 px lower.
+ * Lattice: x = 674.2 + 37.85 k before the section (four flights so far). */
+const cx = (k, flights = 5) => 220 + 113.55 * flights + 37.85 * k;
+const L2_X2 = cx(586, 6) - 20431.25;
+const L2_S2 = insertSection(L2_S1, {
+  cut: 20600,
+  dx: L2_X2,
+  dy: 27,
+  content: {
+    main: [
+      ["gust-gate", 20638.75, 390, cx(540, 4) + 10 - 20638.75],
+      ["dive-islet", cx(548) - 50, 434, cx(552) + 10 - (cx(548) - 50)],
+      ["under-wind", 21720, 434, cx(559) + 10 - 21720],
+      // Its lip is only 20 px before the landing: a run that never dives
+      // comes down 25-40 px short of it.
+      ["gust-exit", cx(566, 6) - 20, 365, cx(586, 6) + 123.5 - (cx(566, 6) - 20)],
+    ],
+    updrafts: [{ id: "dive-wind", x: 21700, width: 170, top: 60, bottom: 620 }],
+    checkpoints: [{ id: "currents", x: cx(528, 4) - 1, y: 390, platform: "gust-gate", story: "The wind will carry you anywhere. Even past where you meant to go.", tip: "In the wind, press down to drop out of it onto the island below." }],
+    prompts: [
+      { id: "p-islet", glyph: ["down"], action: "dive", x: cx(545), y: 330, from: cx(546), to: cx(548), inputX: cx(547) + 10 },
+      { id: "p-drop", glyph: ["down"], action: "dive", x: 21785, y: 230, from: 21712, to: 21860, inputX: 21840 },
+    ],
+    stars: [576, 580, 584].map((k, i) => [`gust-star-${i}`, cx(k, 6) + 34, 365 - 40, "low"]),
+    sections: [{ x: 20640, movement: "L2", step: "develop", name: "II · Borrowed Wind — currents" }],
+    routes: {
+      main: [
+        [cx(540, 4) - 0.3, "jump", "g"], [cx(542, 4) - 0.3, "dash", "a"], [cx(547) - 0.3, "dive", "a"],
+        [cx(552) - 0.3, "jump", "g"], [cx(554) - 0.3, "dive", "a"],
+        [cx(559) - 0.3, "jump", "g"], [cx(561) - 0.3, "dash", "a"],
+        // ...and the jump down to the finale, as from the lifted shore.
+        [20431.25 + L2_X2, "jump", "g"],
+      ],
+    },
+  },
+});
+/* (3) The glide bridge, before the currents: a jump into a column with the
+ * cape held rises 40% faster; held on past its top, the cape glides (fall
+ * capped at 140 px/s) across a void too wide to fall across, onto a far
+ * shore. Glide is required here, and only here, and only in wind. */
+// No-glide runs come down about 150 px short; the held cape lands 20/16 after the jump.
+const L2_X3 = 37.85 * 64;
+const L2_S3 = insertSection(L2_S2, {
+  cut: 20600,
+  dx: L2_X3,
+  dy: -42,
+  content: {
+    main: [
+      ["glide-gate", 20638.75, 390, cx(540, 4) + 10 - 20638.75],
+      ["glide-shore", 21751.4, 322, cx(576, 4) + 10 - 21751.4],
+      // A copy of the lifted shore's end: the currents begin with its jump.
+      ["glide-exit", cx(581, 4) - 60, 296, cx(586, 4) + 123.5 - (cx(581, 4) - 60)],
+    ],
+    updrafts: [{ id: "glide-wind", x: cx(540, 4) + 30, width: 170, top: 60, bottom: 620 }],
+    // Shown once she is in the wind: pressed before it, the cape would fly level.
+    prompts: [{ id: "p-glide", glyph: ["hold-right"], action: "glide", x: cx(542, 4), y: 230, from: cx(540, 4) + 40, to: 21770, inputX: cx(540, 4) + 100 }],
+    stars: [564, 567, 570].map((k, i) => [`glide-star-${i}`, cx(k, 4) + 34, 322 - 40, "low"]),
+    // Along the held-cape line (where the pickup box meets it on 16ths 544-552).
+    chains: [{ id: "glide-song", route: "low", stars: [[cx(544, 4) + 40, 149], [cx(546, 4) + 40, 61], [cx(548, 4) + 40, 56], [cx(550, 4) + 40, 77], [cx(552, 4) + 40, 119]] }],
+    checkpoints: [{ id: "bridge", x: cx(528, 4) - 1, y: 390, platform: "glide-gate", story: "Hold on to the wind, and it holds on to you.", tip: "Jump into the wind with the cape held, and keep holding it past the top." }],
+    sections: [{ x: 20640, movement: "L2", step: "develop", name: "II · Borrowed Wind — the glide bridge" }],
+    routes: { main: [[cx(540, 4) - 0.3, "jump", "g"], [cx(540, 4) + 30, "glide", "*"], [21851, "unglide", "g"], [cx(576, 4) - 0.3, "jump", "g"], [20431.25 + 37.85 * 64, "jump", "g"]] },
+  },
+});
+const L2 = L2_S3;
+
 /* ---- L3 · The Breaking Constellation (118 BPM): the cool intermediate ----
  * Movement II plus the hearth void and the split voids, at their own
  * coordinates. New: cracked stone. Shelves break 5/16 (sim) after their
@@ -722,7 +855,10 @@ const L2 = {
  * the same touch-down as Movement II's bounce. Cracks never refill the
  * cape, so the split voids need the split-song. */
 const L3_SIX = 15 / 107;
-const L3 = {
+// Half a sixteenth past the grid: the fall to the floor takes 2.6/16, so the
+// landing is on the grid and the dive and its shards snap onto the next 16th/8th.
+const L3_DIVE = 220 + 113.55 + 37.85 * 385.5;
+const L3_BASE = {
   id: 3,
   key: "constellation",
   numeral: "III",
@@ -746,60 +882,52 @@ const L3 = {
     { x: 17400, movement: "L3", step: "coda", name: "III · The Breaking Constellation — the far door" },
   ],
   checkpoints: [
-    { ...CHECKPOINTS.find((q) => q.id === "well"), tip: "Press down on the cracked lid to break into the well." },
+    { ...CHECKPOINTS.find((q) => q.id === "well") },
     ...byId(CHECKPOINTS, ["hearth", "voids"]),
   ],
   startTip: "Cracked stone gives way soon after you land. Jump off it quickly.",
   main: [
     ...pick(MAIN, ["gate-2", "first-crack"]),
     ["crack-floor", 7150, 569, 650],
-    ...pick(MAIN, ["second-crack", "beat-isle", "ridge-a", "ridge-stone", "ridge-b", "ridge-c", "b3-isle", "well-rim-a", "lid"]),
-    // 95 px under the lid, so a dive on the grid lands 1/16 later on the
-    // grid, and long enough for a double jump (second press 4/16 later) up
-    // 76 px onto the second tile, 9/16 after the takeoff.
-    ["well-floor", 10847.2, 527, gx(296) + 10 - 10847.2],
-    // (No first tile: the well's line comes up under it, onto the second.)
-    ...pick(MAIN, ["tile-1", "tile-2", "tile-3", "tile-4", "tile-5", "cascade-end", "last-crack", "hearth", "wind-shore", "split-crack", "split-far"]),
+    // Movement II's well stays optional here (its lid can be run over);
+    // the dive this level requires comes later, in the broken well.
+    ...pick(MAIN, ["second-crack", "beat-isle", "ridge-a", "ridge-stone", "ridge-b", "ridge-c", "b3-isle", "well-rim-a", "lid", "well-rim-b"]),
+    ...pick(MAIN, ["tile-0", "tile-1", "tile-2", "tile-3", "tile-4", "tile-5", "cascade-end", "last-crack", "hearth", "wind-shore", "split-crack", "split-far"]),
     ["door-rock", 17450, 478, 1000],
   ],
   high: [
-    ...pick(HIGH, ["chain-a", "chain-b", "chain-c", "chain-exit"]),
+    ...pick(HIGH, ["chain-a", "chain-b", "chain-c", "chain-exit", "well-floor", "well-exit"]),
     // A cracked stair off the crown: two 4/16 hops up 80 px each.
     ["crown-stair-1", gx(370) - 40, 239, gx(372) + 10 - (gx(370) - 40), "crumble"],
     ["crown-stair-2", gx(376) - 40, 159, gx(378) + 10 - (gx(376) - 40), "crumble"],
   ],
   updrafts: [],
-  // Five tiles; the first drops when Movement II's second did (one beat of
-  // run, 151.4 px, after the first tile's 551 px lead, minus the 207 px pitch).
-  cascades: [{ ...CASCADES[0], tiles: CASCADES[0].tiles.slice(1), lead: 551 + 151.4 - 207 }],
+  cascades: CASCADES,
   chains: [
-    // On the main line out of the well: one on the run, then every 2/16 up.
-    { id: "well-song", route: "low", stars: [[gx(294) + 40, 487], [gx(298) + 40, 392], [gx(300) + 40, 411], [gx(302) + 40, 326], [gx(304) + 40, 356]] },
+    ...byId(CHAINS, ["well-song"]),
     ...byId(CHAINS, ["flight-line", "split-song"]),
   ],
   great: [
     { id: "great-1", x: 9330, y: 150, line: "the cracked chain above the ridge" },
-    // An early second press (3/16) out of the well peaks 190 px up; the main
-    // route's (4/16) peaks 165 px up, 70 px under this star.
-    { id: "great-2", x: gx(301.5), y: 527 - 190 - 66, line: "out of the well: press the second jump early" },
+    { id: "great-2", x: 11087.2, y: 592, line: "the star well under the first lid (an optional dive)" },
     { id: "great-3", x: gx(380), y: 25, line: "the top of the cracked stair above the crown" },
   ],
   prompts: [
     ...byId(PROMPTS, ["p-crack"]),
-    { id: "p-lid", glyph: ["down"], action: "dive", x: 11027.2, y: 380, from: 10937.2, to: 11120, inputX: 11000 },
+    ...byId(PROMPTS, ["p-lid"]),
     ...byId(PROMPTS, ["p-cape"]),
   ],
   stars: starsIn(6260, 17400).filter(([id]) => !id.startsWith("breeze")),
   routes: {
     main: [
       ...CP.breaking, ...CP.ridge,
-      [10666.7, "jump", "g"], [gx(285) - 0.3, "dive", "g"], [gx(296) - 0.3, "jump", "g"], [gx(300) - 0.3, "jump", "a"],
-      ...CP.wave.slice(1), ...CP.crown, ...CP.hearthVoid, ...CP.splitVoids,
+      [10666.7, "jump", "g"], [11348.7, "jump", "g"],
+      ...CP.wave, ...CP.crown, ...CP.hearthVoid, ...CP.splitVoids,
     ],
     upper: [
       ...CP.breaking,
       [8536.6, "jump", "g"], [8608.6, "jump", "a"], [8908.6, "jump", "g"], [9238.6, "jump", "g"], [9568.6, "jump", "g"], [9935, "jump", "g"],
-      [10666.7, "jump", "g"], [gx(285) - 0.3, "dive", "g"], [gx(296) - 0.3, "jump", "g"], [gx(299) - 0.3, "jump", "a"],
+      [10665.2, "jump", "g"], [10947.2, "dive", "g"], [11337.2, "jump", "g"], [11390, "jump", "a"], [11597.2, "jump", "g"],
       ...CP.wave.slice(1), ...CP.crown,
       [gx(366) - 0.3, "jump", "g"], [gx(372) - 0.3, "jump", "g"], [gx(378) - 0.3, "jump", "g"],
       ...CP.hearthVoid, ...CP.splitVoids,
@@ -808,8 +936,49 @@ const L3 = {
     safe: null,
   },
 };
-L3.routes.ability = L3.routes.main;
-L3.routes.safe = L3.routes.main;
+L3_BASE.routes.ability = L3_BASE.routes.main;
+L3_BASE.routes.safe = L3_BASE.routes.main;
+/* L3 (1) The broken well, after the crown's late double: a flight onto a
+ * long cracked lid (no refill), whose end looks out over nothing. The well
+ * is 276 px deep: walking (or jumping) off the lid's end falls past the 265 px
+ * death line before reaching its floor, while a dive through the lid
+ * lowers the allowance (RULES.smashDrop) and lands on it. The floor gives
+ * the cape back: jump, jump again 3/16 later and fly 3/16 after that, out
+ * 606 px onto the far shore 13/16 later (beyond any reach from the lid's
+ * end), then a hop onto a copy of the last crack and the crown's late
+ * double as before. Four bars, two flights; the rest sits 28 px lower. */
+const bx = (k, flights) => 220 + 113.55 * flights + 37.85 * k;
+// Seventy sixteenths of run (64 of time and two flights), so beacons stay on half bars.
+const L3_X1 = 37.85 * 70;
+const L3_LID = { x: bx(380, 1) - 60, y: 307.5, w: 520 };
+const L3_S1 = insertSection(L3_BASE, {
+  cut: 13800,
+  dx: L3_X1,
+  dy: 28,
+  content: {
+    main: [
+      ["broken-gate", 13817.2, 319, gx(372) + 10 - 13817.2],
+      ["broken-lid", L3_LID.x, L3_LID.y, L3_LID.w, "lid"],
+      ["well-bottom", L3_LID.x, 584, bx(392, 1) + 10 - L3_LID.x],
+      ["far-shore-3", bx(405, 2) - 60, 566, bx(411, 2) + 10 - (bx(405, 2) - 60)],
+      ["last-crack-2", 13467.2 + L3_X1, 486, 300, "crumble"],
+    ],
+    checkpoints: [{ id: "broken", x: 13843.2, y: 319, platform: "broken-gate", story: "One star had fallen through the dark and left a door in it.", tip: "Land on the cracked lid, then press down: only a dive opens the well." }],
+    prompts: [{ id: "p-break", glyph: ["down"], action: "dive", x: L3_LID.x + 200, y: 220, from: L3_LID.x + 70, to: L3_LID.x + 470, inputX: bx(392, 1) - 90 }],
+    stars: [[384, 307.5], [388, 584], [390, 584]].map(([k, y], i) => [`broken-star-${i}`, bx(k, 1) + 34, y - 40, "low"]),
+    sections: [{ x: 13820, movement: "L3", step: "twist", name: "III · The Breaking Constellation — the broken well" }],
+    routes: {
+      main: [
+        [gx(372) - 0.3, "jump", "g"], [gx(374) - 0.3, "dash", "a"],
+        [L3_DIVE - 0.3, "dive", "g"],
+        [bx(392, 1) - 0.3, "jump", "g"], [bx(395, 1) - 0.3, "jump", "a"], [bx(398, 1) - 0.3, "dash", "a"],
+        [bx(411, 2) - 0.3, "jump", "g"],
+        [13545 + L3_X1, "jump", "g"], [13695.7 + L3_X1, "jump", "a"],
+      ],
+    },
+  },
+});
+const L3 = L3_S1;
 
 /* ---- L4 · The Far Door (128 BPM): agitated and tense, precise but fair ----
  * New: the super jump (a jump during a flight), taught over a stable floor
@@ -824,18 +993,20 @@ const SUPER = 227.1 * 2 * (15 / 107);
 // whole number of bars earlier, so the cascade still drops on the beat.
 const L4_DX_B = gx(88) + 2 * SUPER - gx(264);
 const L4_DY_B = -120;
-// The finale: the hearth's takeoff at L4 sixteenth 202 is the chapter's 490
-// (a whole number of bars), so the door lands on bar 18's downbeat.
-const L4_DX_C = gx(202) + 2 * SUPER - (gx(490) + 3 * 113.55);
+// The finale: the hearth's takeoff at L4 sixteenth 206 is the chapter's 490;
+// with the voids inserted after it (76 sixteenths) the door is on bar 23.
+const L4_DX_C = gx(206) + 2 * SUPER - (gx(490) + 3 * 113.55);
 const L4_DY_C = -161;
 // Jump on the grid, open the cape 2/16 later and jump again 2/16 into the
 // flight (where the flight has added one SUPER of extra run).
 const superAt = (k, shifts) => [[gx(k) + shifts * SUPER - 0.3, "jump", "g"], [gx(k + 2) + shifts * SUPER - 0.3, "dash", "a"], [gx(k + 4) + (shifts + 1) * SUPER - 0.3, "jump", "a"]];
 const inX = (from, to) => (q) => q[1] >= from && q[1] < to;
-// The hearth ends 10 px after the finale bridge's takeoff (sixteenth 202).
-const L4_B_PLAT = MAIN.filter(inX(10100, 15100)).map((q) => (q[0] === "hearth" ? [q[0], q[1], q[2], gx(202) + 2 * SUPER + 10 - (q[1] + L4_DX_B)] : q));
-const L4_C_PLAT = MAIN.filter(inX(19300, 23000));
-const L4 = {
+// The hearth ends 78.5 px after its takeoff (sixteenth 206), as Movement
+// III's did after the hearth void's.
+const L4_B_PLAT = MAIN.filter(inX(10100, 15100)).map((q) => (q[0] === "hearth" ? [q[0], q[1], q[2], gx(206) + 2 * SUPER + 78.5 - (q[1] + L4_DX_B)] : q));
+// (The high shore 3 px lower: at 128 its landing came 36 ms early.)
+const L4_C_PLAT = MAIN.filter(inX(19300, 23000)).map((q) => (q[0] === "finale-high" ? [q[0], q[1], q[2] + 3, q[3]] : q));
+const L4_BASE = {
   id: 4,
   key: "door",
   numeral: "IV",
@@ -858,7 +1029,7 @@ const L4 = {
     { id: "storm", x: gx(56) + SUPER - 3, y: 407, platform: "storm-step", story: "The wind was hers now. So was the sky above it.", tip: "Jump, open the cape, then jump again during the flight." },
     { id: "wave", x: 10211.2 + L4_DX_B, y: 464 + L4_DY_B, platform: "b3-isle", story: "The constellation was falling faster now.", tip: "Hop as soon as you land. The falling wave is catching up." },
     { id: "crown", x: 13843.2 + L4_DX_B, y: 319 + L4_DY_B, platform: "hearth", story: "The little blue world was close enough to hear.", tip: "Jump at the edge, then press the cape at the top of the jump." },
-    { id: "finale", x: gx(208) + 2 * SUPER - 1, y: 412 + L4_DY_C, platform: "finale-gate", story: "Somewhere ahead, a little blue world is listening.", tip: "The low road is slower, but it is safe." },
+    { id: "finale", x: gx(212) + 2 * SUPER - 1, y: 412 + L4_DY_C, platform: "finale-gate", story: "Somewhere ahead, a little blue world is listening.", tip: "The low road is slower, but it is safe." },
   ],
   startTip: "Jump, open the cape, then jump again in the air: the super jump.",
   main: [
@@ -908,7 +1079,7 @@ const L4 = {
       ...superAt(68, 1),
       [gx(81) + 2 * SUPER - 0.3, "jump", "g"],
       ...shift([[10666.7, "jump", "g"], [11348.7, "jump", "g"], ...CP.wave, ...CP.crown], L4_DX_B, 0, "plan"),
-      [gx(202) + 2 * SUPER - 0.3, "jump", "g"],
+      [gx(206) + 2 * SUPER - 0.3, "jump", "g"],
       ...shift(CP.finale, L4_DX_C, 0, "plan"),
     ],
     upper: null,
@@ -916,7 +1087,7 @@ const L4 = {
     safe: null,
   },
 };
-L4.routes.upper = [
+L4_BASE.routes.upper = [
   ...superAt(24, 0),
   // Great Star 3: the school shore is stable, so the cape is back: again.
   ...superAt(38, 1),
@@ -925,11 +1096,63 @@ L4.routes.upper = [
   ...shift([[10666.7, "jump", "g"], [10947.2, "dive", "g"], [11337.2, "jump", "g"], [11390, "jump", "a"], [11597.2, "jump", "g"], ...CP.wave.slice(1, 4), ...CP.wave.slice(4)], L4_DX_B, 0, "plan"),
   // Great Star 1: a super jump off the cascade's end.
   ...shift([[13010, "jump", "g"], [13010 + 75.7, "dash", "a"], [13010 + 151.4 + 63.67, "jump", "a"], [13545, "jump", "g"], [13695.7, "jump", "a"]], L4_DX_B, 0, "plan"),
-  [gx(202) + 2 * SUPER - 0.3, "jump", "g"],
+  [gx(206) + 2 * SUPER - 0.3, "jump", "g"],
   ...shift(CP.finale, L4_DX_C, 0, "plan"),
 ];
-L4.routes.ability = L4.routes.main;
-L4.routes.safe = [...L4.routes.main.slice(0, -5), ...shift(CP.safeFinale, L4_DX_C, 0, "plan")];
+L4_BASE.routes.ability = L4_BASE.routes.main;
+L4_BASE.routes.safe = [...L4_BASE.routes.main.slice(0, -5), ...shift(CP.safeFinale, L4_DX_C, 0, "plan")];
+/* L4 (1) The voids at 128, after the crown: Movement III's hearth void and
+ * split voids (two voids around one cracked islet that never refills, so
+ * the split-song's refill is required) translated so their first takeoff
+ * is the hearth's (sixteenth 206, as the chapter's 390 sat in its bar),
+ * then the hop onto a copy of the wind gate. 76 sixteenths, three flights;
+ * the finale follows 159 px lower. */
+const L4_DX_V = gx(206) + 2 * SUPER - 14981.5;
+const L4_DY_V = -120;
+const L4_X1 = 37.85 * (76 + 9);
+const L4_S1 = insertSection(L4_BASE, {
+  cut: 8200,
+  dx: L4_X1,
+  dy: 159,
+  content: {
+    main: [
+      ...shift(pick(MAIN, ["wind-shore", "split-crack", "split-far"]), L4_DX_V, L4_DY_V, "plat"),
+      ["storm-gate", 17450 + L4_DX_V, 478 + L4_DY_V, gx(282) + 2 * SUPER + 3 * 113.55 + 10 - (17450 + L4_DX_V)],
+    ],
+    chains: byId(CHAINS, ["split-song"]).map((c) => ({ ...c, stars: shift(c.stars, L4_DX_V, L4_DY_V, "xy") })),
+    stars: shift(starsIn(15400, 16100), L4_DX_V, L4_DY_V, "star").map(([id, x, y, r]) => [`v-${id}`, x, y, r]),
+    checkpoints: [{ ...CHECKPOINTS.find((q) => q.id === "voids"), x: 15470 + L4_DX_V, y: 377 + L4_DY_V }],
+    sections: [{ x: 15000 + L4_DX_V, movement: "L4", step: "develop", name: "IV · The Far Door — the voids" }],
+    // (The hearth's own takeoff step stays; the flight follows it.)
+    routes: { main: [...shift([...CP.hearthVoid.slice(1), ...CP.splitVoids], L4_DX_V, 0, "plan"), [gx(282) + 2 * SUPER + 3 * 113.55 - 0.3, "jump", "g"]] },
+  },
+});
+/* L4 (2) The rising stair, before the door: two double jumps (second press
+ * 4/16 after the first, landing 8/16 after it, 135 px up each), a
+ * constellation along both, and the walk-off from the top step onto the
+ * door island as from the finale's high shore. Three bars; the door sits
+ * 140 px higher. Lattice: the door island's landing is sixteenth 340. */
+const sx = (k) => 13784.2 + 37.85 * (k - 340);
+const L4_X2 = 37.85 * 48;
+const L4_S2 = insertSection(L4_S1, {
+  cut: 13680,
+  dx: L4_X2,
+  dy: -140,
+  content: {
+    main: [
+      ["stair-0", 13694.5, 468, sx(356) + 10 - 13694.5],
+      ["stair-1", sx(364) - 60, 333, sx(368) + 10 - (sx(364) - 60)],
+      // Its end is where the finale's high shore ended relative to the door
+      // island: the walk-off lands 3.4/16 later, on the grid.
+      ["stair-2", sx(376) - 60, 198, sx(384.63) - (sx(376) - 60)],
+    ],
+    chains: [{ id: "stair-song", route: "low", stars: [[358, 333], [360, 352], [362, 267], [370, 198], [372, 217], [374, 132]].map(([k, y]) => [sx(k) + 40, y]) }],
+    checkpoints: [{ id: "stair", x: sx(344) - 1, y: 468, platform: "stair-0", story: "Up, and up. The blue was close enough to touch.", tip: "Jump, then jump again near the top, twice." }],
+    sections: [{ x: 13690, movement: "L4", step: "conclude", name: "IV · The Far Door — the rising stair" }],
+    routes: { main: [[sx(356) - 0.3, "jump", "g"], [sx(360) - 0.3, "jump", "a"], [sx(368) - 0.3, "jump", "g"], [sx(372) - 0.3, "jump", "a"]] },
+  },
+});
+const L4 = L4_S2;
 
 export const LEVELS = Object.freeze([L1, L2, L3, L4].map((d) => Object.freeze(d)));
 export function levelDef(n = 1) {
