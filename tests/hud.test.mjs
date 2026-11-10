@@ -1,13 +1,13 @@
 /* The HUD's readings of the progression fields (hud.mjs) and the GET
- * moments (moments.mjs), on today's model with the eight-level fields laid
- * over it (RESEARCH_PROGRESSION 2.1, 2.3, 3.3). tests/hud-ui.test.mjs holds
- * the renderer's static contract. */
+ * moments (moments.mjs), on the eight-level model (RESEARCH_PROGRESSION 2.1,
+ * 2.3, 3.3), plus the fallbacks for a state without those fields.
+ * tests/hud-ui.test.mjs holds the renderer's static contract. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, start, update, jump, releaseJump, dash, snapshot } from "../model.mjs";
 import { owns, spriteSetName, capeMeter, capeTint, tintForCharge, TINT_STEPS, doubleInHand } from "../hud.mjs";
 import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt } from "../moments.mjs";
-import { LEVELS } from "../level.mjs";
+import { LEVELS, LEVEL_ID } from "../level.mjs";
 
 const running = (level = 2) => {
   const s = createGame(2021, { level });
@@ -15,15 +15,17 @@ const running = (level = 2) => {
   update(s, 0.6);
   return s;
 };
-/** The eight-level model's fields, laid over today's state (they are absent on this branch). */
+/** The breath rule's fields set to a known state. */
 const withBreath = (s, extra = {}) => Object.assign(s, { capeRule: "breath", capeCharge: 0, verbs: { double: true, cape: true, glide: false, dive: false, super: false } }, extra);
 
 test("breath bar: absent without a capeCharge field or the cape; continuous charge otherwise", () => {
-  const s = running(2);
-  // Today's model: no capeCharge field, so no bar (revision seven's HUD).
-  assert.equal(s.capeCharge, undefined);
-  assert.equal(capeMeter(s), null);
-  assert.equal(snapshot(s).capeCharge, undefined);
+  const s = running(LEVEL_ID["still-water"]);
+  assert.equal(typeof s.capeCharge, "number");
+  assert.equal(snapshot(s).capeCharge, s.capeCharge);
+  // A state without the field (revision seven's model): no bar.
+  assert.equal(capeMeter({ ...s, capeCharge: undefined }), null);
+  // Level I: the cape is not owned, so the bar is absent, not empty.
+  assert.equal(capeMeter(running(1)), null);
   // The breath rule: the charge as it is, full only at 1.
   withBreath(s, { capeCharge: 0.62 });
   assert.deepEqual(capeMeter(s), { charge: 0.62, full: false });
@@ -52,12 +54,13 @@ test("the cape tint has four steps (60/45/30/15% dim, clear at full) and keeps t
   assert.deepEqual(TINT_STEPS, [0.6, 0.45, 0.3, 0.15]);
   const cases = [[0, 0.6], [0.24, 0.6], [0.25, 0.45], [0.49, 0.45], [0.5, 0.3], [0.74, 0.3], [0.75, 0.15], [0.999, 0.15], [1, 0]];
   for (const [charge, dim] of cases) assert.equal(tintForCharge(charge), dim, `charge ${charge}`);
-  // Today (no bar): clear when ready, 60% once a flight is spent, nothing in flight.
-  const s = running(2);
+  // One flight per airtime (the interim levels' 'landing' rule): clear when
+  // ready, 60% once a flight is spent, nothing in flight.
+  const s = running(LEVEL_ID.wind);
   assert.equal(capeTint(s, "cape"), 0);
   jump(s);
   update(s, 0.05);
-  assert.ok(dash(s), "level II owns the cape");
+  assert.ok(dash(s), "the interim level owns the cape");
   assert.ok(s.dashRemaining > 0.08);
   assert.equal(capeTint(s, "cape"), 0, "the cape is out: no tint while she flies");
   update(s, 0.6);
@@ -69,7 +72,9 @@ test("the cape tint has four steps (60/45/30/15% dim, clear at full) and keeps t
 });
 
 test("the leaf glint: the double jump is in hand on the ground and after the first jump, spent by the double, back on landing", () => {
-  const s = running(1);
+  // (II owns the double jump from the start; I's comes at its GET.)
+  assert.equal(doubleInHand(running(1)), false, "level I before its GET");
+  const s = running(2);
   assert.equal(s.player.grounded, true);
   assert.equal(doubleInHand(s), true, "running: in hand");
   jump(s);
@@ -98,12 +103,16 @@ test("the leaf glint: the double jump is in hand on the ground and after the fir
 
 test("owned verbs and the sprite set read the progression fields defensively", () => {
   const s = running(1);
-  // Today: no verbs field, so the level's def decides (double defaults to owned).
-  assert.equal(owns(s, "double"), true);
-  assert.equal(owns(s, "cape"), LEVELS[0].verbs.cape);
-  assert.equal(spriteSetName(s), "cape", "no verbs field: Diana keeps her cape, as before");
-  assert.equal(spriteSetName({ ...s, def: { ...s.def, sprites: "nocape" } }), "nocape", "a level's own sprites still apply");
-  assert.equal(spriteSetName(s, "nocape"), "nocape", "QA override");
+  // The model's field: level I starts with neither the double jump nor the cape.
+  assert.equal(owns(s, "double"), false);
+  assert.equal(owns(s, "cape"), false);
+  assert.equal(spriteSetName(s), "nocape", "level I wears no cape");
+  assert.equal(spriteSetName(s, "cape"), "cape", "QA override");
+  // A state without the field: the level's def decides, and Diana keeps her cape.
+  const old = { ...s, verbs: undefined };
+  assert.equal(owns(old, "cape"), LEVELS[0].verbs.cape);
+  assert.equal(spriteSetName(old), "cape", "no verbs field: Diana keeps her cape, as before");
+  assert.equal(spriteSetName({ ...old, def: { ...old.def, sprites: "nocape" } }), "nocape", "a level's own sprites still apply");
   s.verbs = { double: true, cape: false };
   assert.equal(spriteSetName(s), "nocape", "the cape is not hers yet");
   assert.equal(owns(s, "cape"), false);
