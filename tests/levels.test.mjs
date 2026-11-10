@@ -462,18 +462,28 @@ test("M1: Diana's own notes on the perfect run rise at least 10% stage over stag
   // Restraint (revision five feedback): fewer bed onsets than Diana's own.
   rates.forEach((r, i) => assert.ok(r.bed < r.own, `${BUILT[i].numeral} bed ${r.bed.toFixed(2)} vs own ${r.own.toFixed(2)} per s`));
 });
-/** RESEARCH_PROGRESSION 4.2 for I-VIII (real units, main route). */
+/** RESEARCH_PROGRESSION 4.2 for I-VIII (real units, main route).
+ * `narrow` is the narrowest required window's band. Its CEILING is kept for
+ * I-III and VIII only: in IV-VII the narrowest windows used to be accidents
+ * of star gating (a required star sitting at the very press that needs what
+ * it gives, so a press 50 ms early skipped the star: the human proxies' hot
+ * spots, MOVEMENT_AUDIT 2026-11-10 round 8). Those cells now complete their
+ * song or touch their star 250 ms or more before the dependent press, so IV-VII's
+ * narrowest windows are the ordinary 290-430 ms of a hop or a double; the
+ * ladder's rise there is carried by the median and lower-quartile windows
+ * (checked below), by inputs per bar, by the beacon gaps and by the
+ * proxies' falls (tests/human-proxy.test.mjs). The floor stays everywhere. */
 const LADDER = [
   { narrow: [400, Infinity], median: 500, inputs: [1.1, 1.5], peak: 2, gap: 14 },
   { narrow: [320, 420], median: 450, inputs: [1.3, 1.7], peak: 3, gap: 13 },
   { narrow: [280, 370], median: 410, inputs: [1.5, 1.9], peak: 3, gap: 12.5 },
-  { narrow: [250, 330], median: 370, inputs: [1.7, 2.1], peak: 4, gap: 12 },
-  { narrow: [220, 290], median: 330, inputs: [1.9, 2.4], peak: 4, gap: 11.5 },
-  { narrow: [190, 260], median: 300, inputs: [2.2, 2.7], peak: 5, gap: 11 },
-  { narrow: [160, 230], median: 270, inputs: [2.5, 3.0], peak: 5, gap: 10 },
+  { narrow: [250, Infinity], median: 370, inputs: [1.7, 2.1], peak: 4, gap: 12 },
+  { narrow: [220, Infinity], median: 330, inputs: [1.9, 2.4], peak: 4, gap: 11.5 },
+  { narrow: [190, Infinity], median: 300, inputs: [2.2, 2.7], peak: 5, gap: 11 },
+  { narrow: [160, Infinity], median: 270, inputs: [2.5, 3.0], peak: 5, gap: 10 },
   { narrow: [120, 200], median: 240, inputs: [2.8, 3.5], peak: 6, gap: 9.5 },
 ];
-test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon gaps in each stage's band; windows never widen and inputs never thin out", () => {
+test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon gaps in each stage's band; median and lower-quartile windows never widen and inputs never thin out", () => {
   const rows = BUILT.map((d) => {
     const nom = nominalRun(d.id);
     const ms = nom.plan
@@ -488,11 +498,11 @@ test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon ga
     for (const q of inputs) perBar[Math.min(bars - 1, Math.floor(q.tick * TICK / SIX / 16))]++;
     const xs = [d.level.startX, ...d.checkpoints.map((c) => c.x), d.level.finishX];
     const gap = Math.max(...xs.slice(1).map((x, i) => real(d, (x - xs[i]) / 270)));
-    return { d, narrow: ms[0], median: ms[Math.floor(ms.length / 2)], inputs: inputs.length / bars, peak: Math.max(...perBar), gap };
+    return { d, narrow: ms[0], quarter: ms[Math.floor(ms.length / 4)], median: ms[Math.floor(ms.length / 2)], inputs: inputs.length / bars, peak: Math.max(...perBar), gap };
   });
   rows.forEach((r, i) => {
     const want = LADDER[i],
-      where = `${r.d.numeral}: narrowest ${r.narrow.toFixed(0)} ms, median ${r.median.toFixed(0)}, ${r.inputs.toFixed(2)} inputs a bar (peak ${r.peak}), beacons ${r.gap.toFixed(1)} s`;
+      where = `${r.d.numeral}: narrowest ${r.narrow.toFixed(0)} ms, lower quartile ${r.quarter.toFixed(0)}, median ${r.median.toFixed(0)}, ${r.inputs.toFixed(2)} inputs a bar (peak ${r.peak}), beacons ${r.gap.toFixed(1)} s`;
     assert.ok(r.narrow >= want.narrow[0] && r.narrow <= want.narrow[1], where);
     assert.ok(r.median >= want.median, where);
     assert.ok(r.inputs >= want.inputs[0] && r.inputs <= want.inputs[1], where);
@@ -500,7 +510,12 @@ test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon ga
     assert.ok(r.gap <= want.gap, where);
     if (i === 0) return;
     const p = rows[i - 1];
-    assert.ok(r.narrow <= p.narrow && r.median <= p.median, `${where}: windows never widen (${p.narrow.toFixed(0)} / ${p.median.toFixed(0)} before)`);
+    // (The narrowest window no longer has to fall every stage, see LADDER;
+    // I-III still do, and the lower quartile may rise by at most 30 ms, the
+    // slack of one hop's window against the next stage's.)
+    if (i < 3) assert.ok(r.narrow <= p.narrow, `${where}: the narrowest window never widens (${p.narrow.toFixed(0)} before)`);
+    assert.ok(r.median <= p.median, `${where}: median windows never widen (${p.median.toFixed(0)} before)`);
+    assert.ok(r.quarter <= p.quarter + 30, `${where}: lower-quartile windows never widen by more than 30 ms (${p.quarter.toFixed(0)} before)`);
     assert.ok(r.inputs >= p.inputs - 1e-9, `${where}: inputs never thin out (${p.inputs.toFixed(2)} before)`);
     assert.ok(r.d.bpm > p.d.bpm, where);
   });

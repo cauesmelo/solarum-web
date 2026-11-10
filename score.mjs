@@ -374,8 +374,11 @@ const PRESETS = {
       "glint-song": [81, 78, 76, 74],
       // bar 9 (F#m): the cache, C#5 E5 F#5 A5.
       "cache-song": [73, 76, 78, 81],
-      // bar 12 (F#m | D): out of the well, C#5 | D5 F#5 A5.
-      "well-song": [73, 74, 78, 81],
+      // bar 12 (F#m | D): along the well's floor and the jump's rise (round
+      // 2026-11-10: all four stars were moved 3-5 sixteenths earlier so the
+      // flight that follows is never gated by a star the double must hit),
+      // C#5 E5 | F#5 A5.
+      "well-song": [73, 76, 78, 81],
       // bar 16 (D, its second half): on ring-2 and up, D5 F#5 A5 B5.
       "ring-song": [74, 78, 81, 83],
       // bars 19-20 (Bm | F#m): up to the plane, B4 D5 F#5 | A5.

@@ -1305,7 +1305,7 @@ const D_CHAINS = [
   { id: "cache-song", route: "high", stars: [131, 132, 133, 134].map((k) => [wk(k, 1, 1) + 39.5, DY.cache - 40]) },
   // In the broken well: on its floor and out along the jump and the double,
   // complete on 190, before the flight (191).
-  { id: "well-song", route: "low", stars: [[wk(183, 3, 1) + 39.5, DY.well - 40], [wk(186, 3, 1) + 39.5, atY(DY.well, -64.7)], [wk(188, 3, 1) + 39.5, atY(DY.well, -104.3)], [wk(190, 3, 1) + 39.5, atY(DY.well, -190.3)]] },
+  { id: "well-song", route: "low", stars: [[wk(180, 3, 1) + 39.5, DY.well - 40], [wk(182, 3, 1) + 39.5, DY.well - 40], [wk(184, 3, 1) + 39.5, DY.well - 40], [wk(186, 3, 1) + 39.5, atY(DY.well, -64.7)]] },
   // On ring-2 and the next jump's rise: complete on 256, before its flight
   // (257), on the flight's own line (an optional flight before it cannot
   // spend its charge).
@@ -1593,7 +1593,7 @@ const V_CHAINS = [
   // Required: two stars on the first flight's line, one on its descent,
   // one on the cracked islet and one on the jump off it, complete on 192,
   // two sixteenths before the second flight; the islet gives no breath.
-  { id: "split-song", route: "low", stars: [[gk(182) + 69.69 + 39.5, vAt(VY.splitShore2, -100)], [gk(182) + 2 * 69.69 + 39.5, vAt(VY.splitShore2, -100)], vArc(187, 1, VY.splitShore2, -69), vRun(189, 1, VY.splitCrack), vArc(192, 1, VY.splitCrack, -64.7)] },
+  { id: "split-song", route: "low", stars: [[gk(182) + 69.69 + 39.5, vAt(VY.splitShore2, -100)], [gk(182) + 2 * 69.69 + 39.5, vAt(VY.splitShore2, -100)], vRun(188, 1, VY.splitCrack), vRun(190, 1, VY.splitCrack), vArc(192, 1, VY.splitCrack, -64.7)] },
   // Through the stone: under the first crack, up the double, on the middle
   // stone, at the top of the jump before the dive, under the second (274).
   { id: "stone-song", route: "low", stars: [vRun(252, 2, VY.under1), vArc(256, 2, VY.under1, -64.7), vRun(264, 2, VY.stoneMid), vArc(269, 2, VY.stoneMid, -99.3), vRun(274, 2, VY.under2)] },
@@ -1942,7 +1942,7 @@ const BORROWED_WIND = {
   // three stars on its line give 3/8). It replaced the finale-song, whose
   // last star sat at the double itself: an early double, jump or cape broke
   // it and left the second flight empty (the human proxies' VI hot spot).
-  refills: [{ id: "cape-finale", kind: "cape", x: gk(245, 2) + 36, y: jAt(JY.finaleCrack, -17.4 - 82), required: true }],
+  refills: [{ id: "cape-finale", kind: "cape", x: gk(242, 2) + 36, y: jAt(JY.finaleCrack, -75), required: true }],
   moments: [{ id: "helper-breeze", kind: "helper", k: 36, target: "hearth-breeze" }],
   decor: [],
   prompts: [
@@ -2051,11 +2051,11 @@ const R_MAIN = [
   // end. Off each stone at once (1/16), a hop climbs 84 px onto the next
   // tile (4/16).
   rTile("c0", 155, 0, RY.c0),
-  rIsle("s0", 160, 0, 161, RY.s0, 55, undefined, -6),
+  rIsle("s0", 160, 0, 161, RY.s0, 100, undefined, 30),
   rTile("c1", 165, 0, RY.c1),
-  rIsle("s1", 170, 0, 171, RY.s1, 55, undefined, -6),
+  rIsle("s1", 170, 0, 171, RY.s1, 100, undefined, 30),
   rTile("c2", 175, 0, RY.c2),
-  rIsle("s2", 180, 0, 181, RY.s2, 55, undefined, -6),
+  rIsle("s2", 180, 0, 181, RY.s2, 100, undefined, 30),
   // A double (181, 185) up onto the dive shore (189).
   rIsle("dive-shore", 189, 0, 197, RY.diveShore, 80),
   ["dive-shore-2", gk(200) - 60, RY.diveShore2, gk(211) + 10 - (gk(200) - 60)],
@@ -2073,7 +2073,7 @@ const R_MAIN = [
   // A small tile, 40 px before the grid landing and 30 after it: without
   // the double the flight comes down 91 px short, under its lip, and a late
   // double or flight overshoots it (the level's narrowest window).
-  rTile("d4", 240, 2, RY.d4, 40, 70),
+  rTile("d4", 240, 2, RY.d4, 90, 190),
   rTile("d5", 246, 2, RY.d5),
   // The leaf need (RESEARCH_REFILLS 3): up onto the crack k1 (251), jump
   // (253) and double (256); a lit leaf star at the double's top gives the
@@ -2147,7 +2147,7 @@ const R_CHAINS = [
   // Required: the first flight's line (1/16 into it), d2's touch-down,
   // the jump's top and the double's point on the falling arc (complete on
   // 230), two sixteenths before the second flight.
-  { id: "gap-song", route: "low", stars: [[gk(220) + 31.84 + 39.5, rAt(RY.d0, -104.6)], rRun(226, 1, RY.d2), rArc(228, 1, RY.d2, -99.3), rArc(230, 1, RY.d2, -79.9)] },
+  { id: "gap-song", route: "low", stars: [rArc(218, 0, RY.d0, -75), [gk(219) + 69.69 + 39.5, rAt(RY.d0, -104.6)], [gk(219) + 2 * 69.69 + 39.5, rAt(RY.d0, -104.6)], rArc(228, 1, RY.d2, -75)] },
   // The gap shore's run and the jump's rise (complete on 284),
   // before the first flight of the pair.
   { id: "spark-song", route: "low", stars: [rRun(278, 2, RY.gapShore), rRun(280, 2, RY.gapShore), rRun(282, 2, RY.gapShore), rArc(284, 2, RY.gapShore, -64.7)] },
@@ -2243,7 +2243,7 @@ const FALLING_ROAD = {
   // (at the double's top) and the cape need of the pair (on the crack's
   // jump, the bar spent by the first flight).
   refills: [
-    { id: "leaf-k1", kind: "leaf", x: gk(259, 2), y: RY.k1 - 190 - 36, required: true },
+    { id: "leaf-k1", kind: "leaf", x: gk(259, 2), y: RY.k1 - 145 - 36, required: true },
     { id: "cape-ka", kind: "cape", x: gk(295, 3), y: RY.ka - 99.3 - 36, required: true },
   ],
   moments: [],
@@ -2374,7 +2374,7 @@ const E_MAIN = [
   // Develop: land and go, a double (79, 83) down onto the wind gate (89);
   // jump into the column (92), the rise-song on its rise, the cape at its
   // top (98) and the super jump (100): down on the wind shore (108).
-  eIsle("wind-gate", 89, 92, EY.windGate, SF.storm, 40),
+  eIsle("wind-gate", 89, 92, EY.windGate, SF.storm, 100),
   eIsle("wind-shore", 108, 109, EY.windShore, SF.wind, 80),
   ["wind-shore-2", ex(112, 3) - 60, EY.windShore2, ex(123, 3) + 10 - (ex(112, 3) - 60)],
   eIsle("wind-shore-3", 126, 128, EY.windShore3, SF.wind, 60, undefined, 30),
@@ -2394,13 +2394,13 @@ const E_MAIN = [
   // The gauntlet: a hop (180) onto the launch crack (185); jump (187), cape
   // and super jump across the long void (12/16, 37 px down) onto the
   // gauntlet shore (199); the launch-song on the crack and the jump's rise.
-  eIsle("launch-crack", 185, 187, EY.crack, SF.casc, 50, "crumble", -6),
-  eIsle("gauntlet-shore", 199, 201, EY.gShore, SF.launch, 80, undefined, -6),
+  eIsle("launch-crack", 185, 187, EY.crack, SF.casc, 90, "crumble", -6),
+  eIsle("gauntlet-shore", 199, 201, EY.gShore, SF.launch, 120, undefined, -6),
   // The dive stair: a jump and a dive at its top (201/204, 207/210) land
   // 149 px down 5/16 later, on stable stones (a dive smashes cracks); a
   // double (213, 217) up onto the road shore (221), a tap onto the gate.
-  eIsle("g-stone-1", 206, 207, EY.s1, SF.launch, 55, undefined, -6),
-  eIsle("g-stone-2", 212, 213, EY.s2, SF.launch, 55, undefined, -6),
+  eIsle("g-stone-1", 206, 207, EY.s1, SF.launch, 100, undefined, -6),
+  eIsle("g-stone-2", 212, 213, EY.s2, SF.launch, 100, undefined, -6),
   eIsle("road-shore", 221, 221, EY.roadShore, SF.launch, 80, undefined, 30),
   ["road-gate", ex(224, 5) - 60, EY.gate, ex(ROAD_K, 5) + 10 - (ex(224, 5) - 60)],
   // The far shore starts where the road lands (259, 2 px high).
@@ -2410,14 +2410,14 @@ const E_MAIN = [
   // The rising stair: two doubles (284/288, 296/300), 135 px up each,
   // along the stair-song; then a super jump (308) across onto the summit
   // (12/16, 37 px down), charged by the summit-song on the second step.
-  eIsle("stair-1", 292, 296, EY.stair1, SF.far, 60),
-  eIsle("stair-2", 304, 308, EY.stair2, SF.far, 60),
+  eIsle("stair-1", 292, 296, EY.stair1, SF.far, 100),
+  eIsle("stair-2", 304, 308, EY.stair2, SF.far, 100),
   // Down from the summit: a tap (320) onto its second stone, then a jump and
   // a dive (325/328, 331/334) onto two stones; the home beacon on the second.
   eIsle("summit", 320, 320, EY.summit, SF.summit, 80, undefined, 30),
   eIsle("summit-2", 323, 325, EY.summit2, SF.summit, 60, undefined, 40),
-  eIsle("d-stone-1", 330, 331, EY.d1, SF.summit, 55, undefined, -6),
-  ["d-stone-2", ex(336, ...SF.summit) - 55, EY.d2, ex(347, ...SF.summit) + 10 - (ex(336, ...SF.summit) - 55)],
+  eIsle("d-stone-1", 330, 331, EY.d1, SF.summit, 100, undefined, -6),
+  ["d-stone-2", ex(336, ...SF.summit) - 130, EY.d2, ex(347, ...SF.summit) + 10 - (ex(336, ...SF.summit) - 130)],
   // The last road: five tiles (352 ... 374), down onto the last stone (380)
   // and a double (380, 384) up onto Earth's plain (388).
   eTile("f0", 352, SF.summit, EY.f0),
@@ -2425,7 +2425,7 @@ const E_MAIN = [
   eTile("f2", 363, SF.summit, EY.f2),
   eTile("f3", 369, SF.summit, EY.f3),
   eTile("f4", 374, SF.summit, EY.f4),
-  eIsle("last-stone", 380, 380, EY.lastStone, SF.summit, 55, undefined, 40),
+  eIsle("last-stone", 380, 380, EY.lastStone, SF.summit, 100, undefined, 40),
   ["earth-plain", ex(388, ...SF.summit) - 80, EY.plain, ex(400, ...SF.summit) + 520 - (ex(388, ...SF.summit) - 80)],
 ];
 /** The road's takeoff (X0) and its landing on the far shore (X0 + 1161). */
@@ -2458,7 +2458,7 @@ const E_CHAINS = [
   { id: "school-song", route: "low", stars: [eArc(30, SF.start, EY.floor, -99.1), eArc(33, SF.school, EY.floor, -182.3), eArc(35, SF.school, EY.floor, -267), eArc(36, SF.school, EY.floor, -265)] },
   // Required: the column's rise (complete on 96) gives the cape back for
   // the flight out of its top (98).
-  { id: "rise-song", route: "low", stars: [eRun(90, SF.storm, EY.windGate), eArc(93, SF.storm, EY.windGate, -64), eArc(95, SF.storm, EY.windGate, -136), eArc(96, SF.storm, EY.windGate, -170)] },
+  { id: "rise-song", route: "low", stars: [eRun(90, SF.storm, EY.windGate), eRun(91, SF.storm, EY.windGate), eArc(93, SF.storm, EY.windGate, -64), eArc(94, SF.storm, EY.windGate, -100)] },
   // Required: the bounces (complete on the last tile, 150), so a flight
   // spent between the tiles is given back before the super jump.
   { id: "cascade-song", route: "low", stars: [eRun(138, SF.wind, EY.t1), eRun(143, SF.wind, EY.t2), eRun(149, SF.wind, EY.t3), eRun(154, SF.wind, EY.t4)] },
