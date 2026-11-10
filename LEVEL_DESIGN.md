@@ -1,6 +1,58 @@
-# A Signal in the Dark — level design
+# Solarum — level design
 
-This describes what `level.mjs`, `model.mjs` and `geometry.mjs` actually implement (2026-11-09, revision five: the map re-timed on the soundtrack's 107 BPM grid), following the approved briefs in [RESEARCH.md](./RESEARCH.md) and [RESEARCH_MUSIC.md](./RESEARCH_MUSIC.md). Where the build departs from a brief, the reason is given. The [Beat map](#beat-map-revision-five) section explains the grid; the tables below are current.
+This describes what `level.mjs`, `model.mjs` and `geometry.mjs` implement (2026-11-10, revision six: four levels, [RESEARCH_LEVELS.md](./RESEARCH_LEVELS.md)). The chapter *A Signal in the Dark* (revision five, below) is now source material: level II keeps Movement III's geometry and level III Movement II's at their original coordinates (so every solved cell and the x lattice hold), level IV remixes translated copies, and level I re-solves Movement I's ideas on its own floaty cells. Where the build departs from a brief, the reason is given.
+
+## Four levels: one ruler, four tempos
+
+Every level is simulated in 107 BPM units: a sixteenth is 15/107 s and 37.85 px of run, a grid x is `220 + 37.85 k` (plus 113.55 px per completed flight, and 63.67 px for a super jump opened 2/16 into a flight), and a level plays at clock = BPM / 107 of real time. Human windows are multiplied by the clock so they stay constant in real seconds (coyote 0.12 s, buffer 0.14 s, respawn 1.1 s, the cascade's shake telegraph 0.35 s). Score tolerances are real milliseconds (35 ms real = 35 × clock of simulation).
+
+| | I · Waking | II · Borrowed Wind | III · The Breaking Constellation | IV · The Far Door |
+| --- | --- | --- | --- | --- |
+| BPM / clock | 96 / 0.897 | 107 / 1 | 118 / 1.103 | 128 / 1.196 |
+| Run (real) | 242 px/s | 270 | 298 | 323 |
+| Verbs | jump (tap / hold, float), double | + cape, wind, glide, dive | + cracked stone, cascade | + super jump (required) |
+| Physics (real) | g 1050, jump 510, double 460, hang ×0.5 while held and \|vy\| < 70, fall ≤ 560 | 1500 / 570 / 525 | same, cracks break 5/16 (0.64 s) | same, cracks 0.59 s |
+| Coordinates | own (x 220 → 15966) | chapter (13846 → 21984) | chapter (6276 → 18123) | own (220 → 10870) |
+| Bars / real s | 26 / 65.0 | 12½ / 28.0 (a half-bar pickup) | 19 / 38.6 | 17 / 31.9 |
+| Beacons (largest nominal gap, real) | 4 (13.8 s) | 3 (9.8 s) | 3 (13.2 s) | 4 (11.2 s) |
+| Min view (landscape / portrait) | 880 / 720 | 880 / 720 | 970 / 775 | 1050 / 840 |
+
+`scripts/arcs.mjs <level> <move>` flies a move with the real model in free space and prints its height at exactly each sixteenth; the cells below were solved with it, then every main route was baked and audited (`npm run score:bake`).
+
+### I · Waking (96 BPM): floating, calm, basics only
+
+Cells (height at k/16 after a grid takeoff, + = lower): hold 5: −104, 6: −63, **7: +5 (flat ground lands on the grid)**, 8: +91, 9: +179; tap 3: 0, 4: +52; double, second press at 3: 9: −146, 10: −72; at 4: 10: −146, 11: −72, 12: +16; at 5: 10: −177. Takeoffs are on the grid with the island's edge 10 px later; landings start 60 px before the grid landing point (a ≈ 0.45 s real window, islands ≥ 260 px).
+
+| k (bar) | Step | What |
+| --- | --- | --- |
+| 0–24 (1–2) | introduce | Home: three tap stars, three hold stars at the hang apex |
+| 24–60 (2½–4) | develop | Four hops every three beats (hold 7, 6, 7, 7); the first gap is 90 px, so a 0 ms tap clears it and a walk-off does not; *first-song* on the four hang apexes |
+| 72 (5½) | beacon *drift* | |
+| 84–96 | twist | The leap: 384 px, second press 4/16 after the first, landing 12/16 after it |
+| 104–114 | | The climb: 177 px, second press at 5/16. **GS1** floats where only an early (3/16) second press reaches (apex 222 px vs the main route's 203) |
+| 124–133 | | A 177 px drop (9/16) |
+| 152 (10½) | beacon *climb* | |
+| 164–205 | develop II | Stepping stones: two tap islets 6/16 apart (a held jump overshoots each by 28 px), a wide hold gap, two more taps, a rise |
+| 240 (16) | beacon *stones* | |
+| 252–284 | conclude | Double staircase (second press at 3/16, up 72 px twice), then a drop to the field. Off the top stair at 282 a double (press at 4/16) reaches the **high crown** (**GS2**); three float islets (gaps 215 px: only held, hanging jumps chain) end with **GS3**; a miss lands softly on the field, ≤ 232 px down |
+| 328 (21½) | beacon *crown* | |
+| 344–416 | coda | Two gentle hops, *home-song* on the last arc, the door on bar 27 |
+
+### II · Borrowed Wind (107 BPM): floating with marked beats
+
+Movement III at its own coordinates; Diana wakes on the hearth at chapter sixteenth 360 (a half bar: the score enters on a pickup and the door falls on bar 14). Changes: the split voids are one **long void** (takeoff 16003.45: jump, flight at 3/16, the four-star *void-song* along the flight refills the cape, flight at 9/16, landing 14/16 later 15 px lower on the far rock); a tap from the far rock lands on the wind gate 4/16 later. **GS2** sits above the void for a double jump between the flights. The finale's cracked launch became stable rock (no cracked stone before III). **GS1** is in the star cache under the second lid (the dive); **GS3** at the top of the finale wind, reached only with the cape held in it.
+
+### III · The Breaking Constellation (118 BPM): call and response
+
+Movement II plus the hearth void and the split voids, at their own coordinates, from chapter sixteenth 160. Cracks break 5/16 after touch-down; the first crack's floor moved to 129 px below it so the fall lands 3/16 after the break, and a 4/16 hop climbs 80 px to the second crack. The upper path ends at the lid: the main route dives through it on the grid (k 285), lands in the well 95 px down 1/16 later, and leaves with a double jump (second press 4/16 later) straight up 76 px onto the second tile, 9/16 later, the same touch-down as Movement II's bounce; the cascade has five tiles (its first drops when the chapter's second did). **GS1** on the cracked chain, **GS2** for an early (3/16) second press out of the well, **GS3** on a two-step cracked stair above the crown. The split voids' constellation is required (cracks never refill). The door is on wind-gate's rock, bar 20.
+
+### IV · The Far Door (128 BPM): agitated, precise but fair
+
+The school: from the storm floor, jump, open the cape 2/16 later and jump again 2/16 into the flight (super jump, apex 267 px at 7/16, 233 px up at 9/16) onto a high shore; the floor runs on underneath, and a plain jump climbs from it to the step. The stable school shore gives the cape back for a second super jump (**GS3** at its apex). After the beacon *storm* the same super jump is required across a void to a shore 233 px up. Then Movement II's well and cascade (translated so chapter sixteenth 264 lands on 88, whole bars earlier, so every tile still drops on a beat; **GS1** for a super jump off the wave's end landing on the last crack 11/16 later, **GS2** in the well under the lid) and Movement III's finale with its cracked launch and low safe line (translated so chapter sixteenth 490 is 202; the door is on bar 18). Earth and the recording wait behind this door only.
+
+# A Signal in the Dark (the chapter, revision five: source material)
+
+This described what `level.mjs` implemented (2026-11-09, revision five: the map re-timed on the soundtrack's 107 BPM grid), following the approved briefs in [RESEARCH.md](./RESEARCH.md) and [RESEARCH_MUSIC.md](./RESEARCH_MUSIC.md). Where the build departs from a brief, the reason is given. The [Beat map](#beat-map-revision-five) section explains the grid; the tables below are current.
 
 ## Structure
 

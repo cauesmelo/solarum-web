@@ -6,14 +6,17 @@ This revision (2026-11-09, "ink and starlight") implements the approved research
 
 **Revision five (2026-11-09, "the path is the score")** implements the approved music brief ([RESEARCH_MUSIC.md](./RESEARCH_MUSIC.md)): the main route is re-timed on the soundtrack's 107 BPM grid, and a generative score in the soundtrack's language is played by Diana's own movements. Follow the intended path and the song draws itself exactly where it belongs; make mistakes and the world drifts gently out of tune until clean play retunes it (see [Sound](#sound)). Every mechanic, the fairness rules and the approved animations are unchanged.
 
-It is still a 2D side-scrolling autorunner. There is one chapter; no endless assembler, new character art or genre pivot.
+**Revision six (2026-11-10, "four levels")** implements the approved movement and progression brief ([RESEARCH_LEVELS.md](./RESEARCH_LEVELS.md)): the climb hitbox fix (feet-anchored airborne frames, one bounded step-up rule, a fixed 1/120 s step) and four levels that each add one idea and run a little faster, each with its own musical feeling: **I · Waking** (96 BPM, floating and calm, basics only), **II · Borrowed Wind** (107, cape, wind and dive), **III · The Breaking Constellation** (118, cracked stone and the cascade) and **IV · The Far Door** (128, the super jump and everything, tense but fair). See [The four levels](#the-four-levels).
+
+It is still a 2D side-scrolling autorunner with the original Diana / cape / signal / Earth story; no endless assembler, new character art or genre pivot.
 
 ## Run independently
 
 ```sh
 npm run dev          # http://127.0.0.1:4173
-npm test             # 78 tests: model, map fairness, glyphs, camera, UI, audio and the score
-npm run score:bake   # re-bake the path clock after a geometry or pilot change
+npm test             # 85 tests: every level's routes and fairness, mechanics, glyphs, camera, UI, audio and the score
+npm run score:bake   # re-bake the four path clocks after a geometry, model or pilot change
+node scripts/arcs.mjs 1 hold tap double:4   # authoring: a move's height on every sixteenth
 npm run build:itch   # dist/solarum-itch.zip
 ```
 
@@ -26,57 +29,43 @@ Reach the far door. Stars never gate anything.
 | Action | Keyboard | Touch (landscape) | Touch (portrait) |
 | --- | --- | --- | --- |
 | Wake (title) | Space, Enter or ↑ | Tap anywhere | Tap anywhere |
+| Choose an open level (title) | ← / → or click a station | Tap a station | Tap a station |
 | Jump / jump again in the air | Space, ↑ or W (release early for a hop) | Left half of the screen | Left half of the control deck |
 | Cape flight (once per airtime) | D or → in the air | 76 px cape button, bottom right | Cape button in the deck |
 | Glide (hold the cape) | Hold D or → | Hold the cape button | Hold the cape button |
 | Super jump | Jump during a flight | Jump zone during a flight | Same |
 | Dive / smash cracked stone | S or ↓ | 64 px dive button or swipe down on the right half | Same |
 | Pause / resume | P or Esc | II button | II button |
-| Back to last light / restart chapter | R / Shift+R | Pause card | Pause card |
+| Back to last light / restart level | R / Shift+R | Pause card | Pause card |
 
-Diana runs at 270 px/s. Coyote time is 0.12 s and the landing buffer 0.14 s; a jump pressed while she is falling apart is kept and spent the moment she is back.
+Diana runs 151.4 px per beat in every level: 242 / 270 / 298 / 323 px/s of real time at 96 / 107 / 118 / 128 BPM. The simulation always runs in 107 BPM units and a level plays it at clock = BPM / 107 (like Gentle pace), so every arc, gap and cell is the same in px and sixteenths, while coyote (0.12 s), the landing buffer (0.14 s), respawn and telegraphs stay constant in real seconds. A jump pressed while she is falling apart is kept and spent the moment she is back. The cape, glide and dive arrive in II; I ignores those buttons.
 
 ### The rules a player learns
 
 - **The cape is the meter.** One flight per airtime. Stable stone, a beacon or a completed constellation breathes it back in; drawn cracks never do. A spent cape is drawn dim on Diana, and a star burst at its tip marks the refill. (`RULES.capeRule = 'landing'`; `'cooldown'` keeps the archived 6 s timer for comparison.)
-- **Cracks break.** Cracked shelves shake and fall 0.65 s after the first landing. A dive through any drawn crack breaks it at once and keeps Diana falling; every cracked lid has a catch below.
+- **Cracks break** (III and IV). Cracked shelves shake and fall 5/16 after the first landing, on the grid (0.64 s real in III, 0.59 s in IV). A dive through any drawn crack breaks it at once and keeps Diana falling; every cracked lid has a catch below.
 - **Constellations sing.** Four to six stars on a real jump or flight line; each plays its authored note of the song, and completion draws ink lines, blooms the chord, brings in the choir and refills the cape in midair. Missing one only fades the lines (and the last note sighs).
 - **The beat cascade** drops one tile per 107 BPM beat, driven by simulation time. The wave is faster than Diana (369 px/s against 270) and gains 56 px a beat. At this pitch a full jump spans about one tile, so the line is a bounce: land and jump again, hops of 5 and 6 sixteenths, up and down. The bouncing line leaves the last tile 0.7 s before it falls; lingering or late hops are caught.
 - **Solar wind** lifts Diana inside its column (−700 px/s², rise capped at 240 px/s); holding the cape catches 40% more. Inside wind the cape never dashes level (that used to run Diana under the shore she was rising to); a flight that enters a column ends and the wind takes over. A dive leaves the wind. A gentle breeze over the hearth teaches the held cape over solid stone.
 - **Ledge forgiveness:** a jump or flight that arrives up to 25 px below an island's top at its lip pops onto it. **Step-up:** rising into an island from below (or drifting under its lip) and topping out with the feet up to 20 px under the top while the body is at least 10 px over it, Diana steps up: if it looks landed, it is landed (it only applies when she could not clear the top on her own). Walking off an edge, diving and the solar wind never earn either, so short gaps still need their hop. The drawn island top spans exactly the collider (its outline wobbles ±1.5 px) and silhouettes taper right under the top, so the drawn lip never extends past it.
-- **Super jump:** a jump during a flight launches at 720 px/s (about 173 px), once per flight.
+- **Super jump:** a jump during a flight launches at 720 px/s (about 173 px), once per flight. It works from II on and is taught and required in IV.
+- **I floats:** half gravity near the top while the jump is held (|vy| < 70 px/s real, like Celeste's half-gravity threshold), gravity 1050 px/s² real, a 560 px/s fall cap; a held jump lands on flat ground exactly 7/16 later.
 - **Great Fallen Stars:** three, each on a mastery line in view of the route. One counts once Diana touches ground or a beacon after taking it; a banked one is never lost to a later fall. All three paint Earth blue inside the far door.
 
-## The map
+## The four levels
 
-78.5 s on the main route (78.45–79.35 s on the QA routes), 35 bars of the score to a door reached on the downbeat of bar 36, in three movements and a coda. Seven beacons on half bars, never more than 13.5 s apart, each right before the first required use of a mechanic. See [LEVEL_DESIGN.md](./LEVEL_DESIGN.md) for every coordinate and the beat map.
+Each is a short kishōtenketsu with beacons on half bars (never more than 14 s of real run apart), three Great Stars each visible from the route and never gating, and a far door on a downbeat. Levels open in order; progress (open levels, best Great Stars) is saved with a guarded `localStorage` write. The title shows the orbit map (four stations with their slots); the win card offers **Continue** (the next level, with its title card), **Retry** and **Title**. II–IV open with Diana stepping out of the door she entered. Each Great Star of the campaign paints a twelfth of Earth inside the arch; Earth is seen whole, and the original recording returns, only at IV's door. Coordinates, cells and beat charts: [LEVEL_DESIGN.md](./LEVEL_DESIGN.md).
 
-| Time (bar) | Movement · step | What happens |
-| --- | --- | --- |
-| 0–3 s (1–2) | I · Waking — introduce | The sprout wakes; flat ground, three tap-height and three hold-height stars; the sky enters on Bm |
-| 3–9 s (2–5) | develop | Four different hops on the grid: a forgiving 105 px first gap down to a lower island (a 0 ms tap clears it; walking off does not), a rise onto a rock, a short hop onto a slab, a drop to a long island; the first constellation plays the motif's head |
-| 10.1 s (5½) | Beacon *leap* | |
-| 10–14 s | twist | A 260 px gap that needs a late second jump; Great Star 1 on a ledge above |
-| 14–22 s (7–10) | conclude | 162 px double-jump climb, hop, long late-double gap, optional high crown |
-| 22.4 s (11) | II · The Breaking Constellation | Title card on the downbeat; beacon *breaking* (23.5 s, 11½) |
-| 25–30 s | introduce | A shelf breaks under Diana over safe ground; a second one forces an early jump |
-| 30–36 s | develop | A ridge: a wide island, a drop onto a stepping stone and straight off it, two rises; optional three-shelf cracked chain above |
-| 37.0 s (17½) | Beacon *well* | |
-| 39–47 s (18–21) | twist | A cracked lid over the star well (dive: Great Star 2 and a constellation); the six-tile beat cascade, a bounce on the beat |
-| 47–50 s | conclude | Up onto a cracked shelf, double jump onto the crown |
-| 50.5 s (23½) | Beacon *hearth* · III · Borrowed Wind | Four calm seconds (G → D), a story line and an optional breeze to learn the held cape |
-| 54–56 s (25–26) | introduce | A 375 px void; jump, then cape along a constellation's flight line |
-| 56.1 s (26) | Beacon *voids* | |
-| 58–61 s (27–28) | develop | Two voids split by a cracked shelf that does not refill: the midair constellation is required |
-| 62.8 s (29) | Beacon *updraft* | |
-| 64–68 s | twist | Jump into the solar wind to reach a shore 167 px up; glide in the wind, then cape + super jump to Great Star 3; an optional second lid on the shore drops into a star cache |
-| 69.5 s (32) | Beacon *finale* | |
-| 71–76 s (33–34) | conclude | Cracked launch → flight → constellation refill → flight → wind; a slower stable low line underneath; the Signal plays the theme |
-| 76–78.5 s (35) | Coda · The Far Door | A long calm island and the door on the downbeat of bar 36 |
+| Level | BPM · bars · real time | New | Score | Content |
+| --- | --- | --- | --- | --- |
+| I · Waking | 96 · 26 · 65.0 s | Jump (tap / hold, float), double jump, constellations | Half-time harmony (a chord a bar, maj7 / add9), no drums, 5.5 s space, detune cap 10 ¢, a short 0.35 s fall | Tap and hold star rows; four hops on flat grid cells (the first gap forgives any first input); a 384 px late-double leap; a 177 px double climb (Great Star 1 above it for an early second press); tap-only stepping stones and a wide hold gap; a double staircase to the high crown (GS2) and the float line (GS3) over a calm field; the home song into the door |
+| II · Borrowed Wind | 107 · 12½ · 28.0 s | Cape (one flight per airtime), solar wind and glide, dive | The soundtrack's cycle, heartbeat on 1 and 3, ticks on 2 and 4, shaker sixteenths; 15 ¢ | The hearth breeze (glide school) and the 375 px hearth void; one long void with nothing to land on: jump, flight, a constellation gives the cape back, flight (GS2 for a double between the flights); the updraft to the lifted shore; a lid over the star cache (GS1, the dive); the finale from a stable launch with its low safe line (GS3 at the top of the last wind, held cape) |
+| III · The Breaking Constellation | 118 · 19 · 38.6 s | Cracked stone (5/16 on the grid), the required dive into the well, the cascade | E Dorian (Em9 · A7sus4 · Dmaj9/F♯ · Gmaj7♯11), half-time backbeat, tresillo rim and marimba, 3.5 s space; 20 ¢, the last notes played backwards on a fall | Cracks over a floor, the ridge with the cracked chain above (GS1); the dive through the lid into the well and a double jump out onto the second tile (GS2 for an early second press); the five-tile cascade; a cracked stair above the crown (GS3); the hearth void and the split voids (their constellation is required) |
+| IV · The Far Door | 128 · 17 · 31.9 s | Super jump, taught over a floor and then required | B Aeolian over an F♯ pedal, a kick on every beat, an eighth-note ostinato, 2.5 s space; 20 ¢, the groove rests after a fall until the next constellation or beacon | The super-jump school (GS3 for a second super jump from the stable school shore) and the storm void; the well and the cascade at 128 (GS1 for a super jump off the wave's end, GS2 in the well); the finale with its cracked launch and low safe line; Earth |
 
 ## Camera, falling and fairness
 
-- **Lookahead ≥ 2.5 s in landscape, ≥ 2.0 s in portrait.** Diana sits 23% from the left. Landscape views are never narrower than 880 logical px (2.51 s). Narrower boxes letterbox instead of cropping: the sky keeps at least 720 px of width (2.05 s) and as much height as leaves a ≥ 200 px control deck. On a 390 × 844 phone the sky is 366 css px tall above a 418 px deck. (The brief suggested a 960 px minimum; the lower portrait floor trades lookahead above the 2.0 s rule for a 22% taller phone sky.)
+- **Lookahead ≥ 2.5 s in landscape, ≥ 2.0 s in portrait, in real seconds at every level's speed.** Diana sits 23% from the left. Landscape views are never narrower than 880 logical px (2.51 s at 270 px/s), 970 in III and 1050 in IV (a box between those widths letterboxes thinly above and below); portrait skies at least 720 / 775 / 840 px. Narrower boxes letterbox instead of cropping: the sky keeps at least 720 px of width (2.05 s) and as much height as leaves a ≥ 200 px control deck. On a 390 × 844 phone the sky is 366 css px tall above a 418 px deck. (The brief suggested a 960 px minimum; the lower portrait floor trades lookahead above the 2.0 s rule for a 22% taller phone sky.)
 - **Vertical camera** anchors on the last grounded y with 65% follow (τ 0.35 s), looks down up to 120 px after 0.35 s of falling, and never lets Diana's head into the 56 px HUD band.
 - **Death line** is 265 px below the anchor (≈60 px under the visible bottom), not a fixed far-off y.
 - **No card on a fall.** Diana breaks into six star shards that ride the camera back to the last beacon (0.45 s), an ink iris closes (0.25 s) and the sprout pops her back up (0.4 s): 1.1 s to control. After three falls at one beacon a one-line tip appears for 3 s; after five, "Assist is in pause".
@@ -94,7 +83,8 @@ The Solarum font is used for every label (never below 16 px; its missing ✦ is 
 - **Beacons** are ink cairns whose hollow star fills, with a ring pulse, a two-note chime, an orbit tick and one story line.
 - **Movement cards** (I, II, III only), 42 px, 300/1600/500 ms of *simulation* time, never over a required input (tested). Story lines and tips also run on simulation time and are dropped on respawn, so nothing lingers after a pause, fast-forward or fall.
 - **Pause card** with the large orbit, Continue / Back to last light / Restart chapter, Sound, Assist…; P/Esc resume, arrows and Tab move focus inside it; blur and hidden tabs auto-pause.
-- **Victory:** Diana stops in the door, a small blue Earth rises, and after 1.5 s a card slides up beside (never over) the door: stars, Great Star slots, time, falls, "Run again" and "Title".
+- **Victory:** Diana stops in the door (in IV a small blue Earth rises), and after 1.5 s a card slides up beside (never over) the door: the level, a line of story, stars, Great Star slots, time (real seconds), falls, the song's notes on time, **Continue**, **Retry** and **Title**.
+- **Title:** under the wake button, the orbit map's four stations (numeral, name, three slots); locked ones are faint.
 - **Touch:** targets ≥ 44 px, buttons at 35% until pressed. In landscape the cape (62 px) and dive (50 px) sit low in the right corner so the lower-right lookahead stays visible; touch devices see touch hints on the title. Story lines and tips sit on ink plates so they read over cream islands. The brief's remove-lists are gone entirely: there is no canvas text at all.
 
 ## Sound
@@ -125,6 +115,8 @@ The **body** (breath, cloth, stone, sparkle, thump) plays at once and carries no
 | Solar wind | The wind sings on three chord tones; rising runs while she rises | 1/16 |
 
 ### The score map and its layers
+
+Each level has its own conductor preset (`SCORES` in `score.mjs`: chords, sections, groove, Signal bars, detune cap, space, fall and payoff; see [The four levels](#the-four-levels)) and its own baked path (`PATHS` in `score-path.mjs`), and the transport plays at the level's tempo. The table below is the chapter map that level II's preset reuses (its bar 1 is the chapter's bar 23, entered on a half-bar pickup).
 
 | Bars | Place | Harmony | Bed |
 | --- | --- | --- | --- |
@@ -231,7 +223,8 @@ Every cue gets ±1 dB, ±3 cents (pads up to 8), fresh noise positions and crack
 | `audio.mjs` | Sound: body cue recipes and score voice recipes (pure data), event → cue map, the Web Audio engine (cues, score buses, space reverb and shimmer, tape-stop, scheduler, soundtrack bookends), offline renders |
 | `game.js` | Canvas drawing, HUD / cards, input, sound wiring (events and a per-frame score update), browser QA adapter |
 | `soundboard.html`, `soundboard.js` | Dev-only board: runs, stems, score voices, body cues, offline render hooks (excluded from the ZIP) |
-| `scripts/bake-score.mjs` | Bakes the main pilot into `score-path.mjs` and prints each anchor's offset from the grid with the px nudge that would fix it |
+| `scripts/bake-score.mjs` | Bakes each level's main pilot into `score-path.mjs` and prints any anchor beyond its tolerance (all of them with `--verbose`) with the px nudge that would fix it |
+| `scripts/arcs.mjs` | Authoring: flies a move (hold, tap, double:N, j@0,d@3,… with the real model and a level's physics) and prints its height on every sixteenth, to solve rhythm cells |
 | `index.html`, `style.css`, `embed.*` | Game surface and UI; green preview / iframe / fullscreen layout |
 | `assets/manifest.json` | Source paths, slices, pivots, clip timing, portal bounds, SFX and an on-screen vs archive `usage` record |
 | `scripts/extract-assets.py` | Reproducible, byte-for-byte extraction from `../refs/solarum/solarum-master.zip` |
@@ -243,11 +236,13 @@ The simulation uses world px and seconds with substeps of at most 1/120 s, and h
 
 ```js
 __game.ready;                       // art decoded
-__game.start();                     // wake from the title
-__game.restart();                   // fresh chapter, running
+__game.start();                     // wake from the title (the selected level)
+__game.startLevel(2);               // open level n (1-4) and wake it; { wake: false } stays on its title
+__game.levels();                    // [{ id, title, bpm, clock, verbs, unlocked, great }]
+__game.restart();                   // fresh level, running
 __game.retry();                     // back to the last beacon, running
 __game.toTitle();
-__game.jump(); __game.releaseJump(); __game.dash(); __game.dive(); __game.pause();
+__game.jump(); __game.releaseJump(); __game.tap(); __game.dash(); __game.dive(); __game.pause();
 __game.setAssist("gentle" | "endlessCape" | "starNet" | "gentleMusic", true);
 __game.setMusic({ gentle: true });  // Gentle music (no dissonance); returns { gentle }
 __game.getState();                  // snapshot (see below)
@@ -257,26 +252,34 @@ __game.step(1 / 120, { glide: true }, { render: false });
 __game.model;                       // isolated fixtures only
 ```
 
-`getState()` keeps `status` ('ready' | 'running' | 'paused' | 'dead' | 'respawning' | 'won'), `time`, `stars`, `highStars`, `ringsCrossed` (now: completed constellations), `checkpointsReached`, `checkpoint`, `progress`, `deaths`, `player` (`x`, `y`, `vy`, `jumps`, `grounded`, …) and `platforms`. New fields: `stepUps` (step-up assists so far), `capeCharges` (0/1), `capeReady`, `capeSpent`, `capeRule`, `constellations`, `greatStars`, `greatBanked`, `greatPending`, `smashes`, `flights`, `superJumps`, `refills`, `fallsHere`, `respawn`, `assist`, `anchorY`, `chains`, `prompts`, `updrafts`, `starsTotal`. `dashCooldown` stays but is 0 under the default landing rule: assert `capeSpent === true` (or `capeCharges === 0`) after an airborne D instead of `dashCooldown > 5`.
+`getState()` adds `level` (1-4), `world` (its startX / finishX / speed …) and `routes` (the level's pilots, read by `chooseAction`); it keeps `status` ('ready' | 'running' | 'paused' | 'dead' | 'respawning' | 'won'), `time`, `stars`, `highStars`, `ringsCrossed` (now: completed constellations), `checkpointsReached`, `checkpoint`, `progress`, `deaths`, `player` (`x`, `y`, `vy`, `jumps`, `grounded`, …) and `platforms`. New fields: `stepUps` (step-up assists so far), `capeCharges` (0/1), `capeReady`, `capeSpent`, `capeRule`, `constellations`, `greatStars`, `greatBanked`, `greatPending`, `smashes`, `flights`, `superJumps`, `refills`, `fallsHere`, `respawn`, `assist`, `anchorY`, `chains`, `prompts`, `updrafts`, `starsTotal`. `dashCooldown` stays but is 0 under the default landing rule: assert `capeSpent === true` (or `capeCharges === 0`) after an airborne D instead of `dashCooldown > 5`.
 
 `getAudio()` keeps `on`, `unlocked` and `decoded` (the generated buffers: noise colours, the room and space impulses; no WAV is decoded), `state` (AudioContext state), `time` (audio clock, frozen while paused), `paused`, `suspended`, `musicWanted`, `musicPlaying`, `musicRouted`, `musicDark`, `air`, `voices`, `peakVoices`, `nodes` (created so far), `dropped` (rate-gated), `played` (count per cue) and `cues`. `musicPlaying` now means the soundtrack **or the score** is audible (still `false` whenever paused); `soundtrackPlaying` is the mp3 alone. New: `score` = { `running`, `audible`, `bar`, `chord`, `section`, `H`, `detuneCents`, `gentle`, `choir`, `earth`, `voices`, `peakVoices`, `scheduled`, `lateNotes`, `maxLateMs`, `maxQuantizeMs`, `clock` { `drift`, `maxDrift`, `jumps` }, `song` { `notes`, `total`, `constellations`, `falls`, `complete` }, `layers`, `played` (per voice), `rephases`, `tapeStops`, `fades`, `restarts`, `door` }.
 
 A fall sets `status: 'dead'` for 0.7 s, then `'respawning'` for 0.4 s, then `'running'` (all in simulation time). `retry()` is immediate.
 
-`tests/routes.mjs` exports `createRouteMemory`, `chooseAction` and `playRoute(api, { route, dt, maxSeconds = 100 })`; each is self-contained for `.toString()` serialisation. Routes: `main` (alias `low`), `upper` (aliases `high`, `mastery`; 3 Great Stars), `ability`, `safe`. All finish within 79.35 s of simulation (main 78.51, upper 78.45, ability 78.51, safe 79.35), so the root's existing `maxSeconds ?? 85` still works; 95 gives headroom. The main thresholds moved onto the beat grid; the root's screenshot times 26 / 40.6 / 45 / 66 / 76 s still show their beats alive (26.4, 65.3 and 77 s frame them slightly better; LEVEL_DESIGN, "Beat map").
+`tests/routes.mjs` exports `createRouteMemory`, `chooseAction` and `playRoute(api, { route, level, dt, maxSeconds = 100 })`; each is self-contained for `.toString()` serialisation, and the plans travel with the level in `getState().routes`. `{ level }` calls `api.startLevel(level)` first. A plan step may be `tap` (press and release in one tick; `playRoute` does both). Routes per level: `main` (alias `low`), `upper` (aliases `high`, `mastery`; that level's 3 Great Stars), `ability` (I: tap and hold rows; II: glides and the cache dive; III and IV: as main) and `safe` (the low lines of II and IV; as main elsewhere). All win at 30/60/120/240 Hz; the longest takes 58.3 s of simulation (I), so `maxSeconds` 85 still works. `dt` is simulation seconds per step (a 60 Hz real frame is `clock / 60`).
 
-## Validation evidence (2026-11-09, Node 22.14.0)
+For the root checks: press **D** in level II (`__game.startLevel(2)`, then Space, then D in the air): I has no cape. Screenshot moments on each main route, in simulation seconds after waking: I 12.4 s (the leap's floating second jump), II 8.6 s (the long void between flights), III 20.2 s (the well's constellation rising onto the cascade), IV 9.9 s (the storm void's super jump).
 
-`npm test`: **80/80 pass** (about 9 s): 53 model / UI tests (including the step-up sweep), 16 audio and engine tests (`tests/audio.test.mjs`) and 11 score tests (`tests/score.test.mjs`). Every route wins at 30, 60, 120 and 240 Hz sampling with zero deaths. At 120 Hz:
+## Validation evidence (2026-11-10, Node 22.14.0)
 
-| Route | Time | Stars (of 90) | Upper stars | Great Stars | Constellations | Beacons | Jumps / flights / dives / super | Smashes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| main | 78.508 s | 62 | 3 | 0 | 5 | 7 | 43 / 5 / 0 / 0 | 0 |
-| upper | 78.450 s | 73 | 14 | 3 | 6 | 7 | 49 / 6 / 1 / 1 | 1 |
-| ability | 78.508 s | 77 | 15 | 1 | 7 | 7 | 48 / 5 / 2 / 0 | 2 |
-| safe | 79.350 s | 61 | 6 | 0 | 4 | 7 | 44 / 3 / 0 / 0 | 0 |
+`npm test`: **85/85 pass** (about 20 s): 58 model / UI tests (every level's routes at 30/60/120/240 Hz with zero deaths, the step-up sweep, F3 clearance, glyph windows, camera at each level's speed), 16 audio and engine tests and 11 score tests (every level). At 120 Hz (time in real seconds):
 
-The fairness and mechanic checks of the previous revision all still pass on the re-timed map (every star reachable and none inside an island; removing the second jump, the cape, a required constellation star or the wind fails exactly at its challenge; refills, smash, constellations, cascade, updrafts, super jump, Great Stars; beacon spacing ≤ 14 s and 400 px runways; authoring limits; no blind landings; telegraph lead; lookahead; HUD band and death line; respawn ≤ 1.2 s; star net; portal; UI contract).
+| Route | Time | Stars | Great Stars | Constellations | Beacons | Jumps / flights / dives / super | Smashes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| I main | 65.01 s | 20/29 | 0 | 3 | 4/4 | 23 / 0 / 0 / 0 | 0 |
+| I upper | 65.01 s | 19/29 | 3 | 3 | 4/4 | 28 / 0 / 0 / 0 | 0 |
+| II main | 28.04 s | 27/37 | 0 | 3 | 3/3 | 9 / 5 / 0 / 0 | 0 |
+| II upper | 28.04 s | 32/37 | 3 | 4 | 3/3 | 12 / 5 / 1 / 0 | 1 |
+| III main | 38.64 s | 29/36 | 0 | 3 | 3/3 | 23 / 3 / 1 / 0 | 1 |
+| III upper | 38.64 s | 33/36 | 3 | 2 | 3/3 | 27 / 3 / 1 / 0 | 1 |
+| IV main | 31.88 s | 13/21 | 0 | 1 | 4/4 | 19 / 4 / 0 / 2 | 0 |
+| IV upper | 31.47 s | 18/21 | 3 | 2 | 4/4 | 20 / 6 / 1 / 4 | 1 |
+
+Every star of every level is collected by some pilot and none sits inside an island; removing I's double jump, II's cape or IV's super jump fails exactly at the challenge that teaches it; removing one star of II's void-song or III's split-song leaves the cape spent over the void; the main routes never touch an optional platform; beacon spacing, runways, authoring limits, no blind landings (the landing is in view at the input that commits to it), telegraphs, lookahead, HUD band, death line, respawn ≤ 1.2 s real, star net and portal hold in every level.
+
+**Grid (bake).** All main-route anchors within 35 ms (real) of their grid at 60, 120 and 240 Hz: I 69 anchors (worst 20.8 ms at 120 Hz), II 56 (13.6), III 89 (17.9), IV 67 (9.5).
 
 **The score (tests).** Path clock fresh (hash of level, model and pilot); all 171 main-route anchors within 35 ms of their grid at 60, 120 and 240 Hz (worst 16.5 ms at 120 Hz), within the sampling at 30 Hz; constellations complete on eighths, beacons on half bars, flights move exactly 3/16, the cascade pitch is 207 px and every tile drops on a beat; the quantiser never waits past its cap (swept, and in real runs); every free note over five runs (main, upper, ability, safe, sloppy) is in its chord's safe set and G♯ sounds only as Great-Star dust; authored phrases fit their chords; a clean run stays at H = 1 and 0 cents, a sloppy run detunes only after its first error, never beyond 20 cents, and is back in tune by the door; Gentle never detunes and fades instead; a fall tape-stops with up to eight reversed notes and restarts on the beacon's half bar at the moment control returns; a perfect run fills all 62 intended notes and five constellations and plays every main layer, a sloppy one does not; a full-run scheduler simulation under 8–50 ms jitter and a 200 ms hitch holds the grid within 2 ms, recovers within a bar and schedules nothing in the past; through the real engine on a strict Web Audio mock a whole run schedules over 500 notes with no source started before the clock, at most 28 score voices, a completed song, and pause freezes scheduling, nodes and the transport.
 
@@ -288,7 +291,7 @@ Earlier browser evidence (layout at 960×640 and 390×844, touch targets, reduce
 
 ## itch.io export
 
-`npm run build:itch` writes `dist/solarum-itch.zip` (42 files, 9.22 MiB; the soundboard, tests, scripts and the archived WAVs are left out), `dist/itch/` and `dist/build-report.json`. `index.html` is at the root and every path is relative; `.mjs` runtime modules become `.js`. Use an HTML game page, 960×640 embed, click-to-play and fullscreen. See [ITCH_IO.md](./ITCH_IO.md). Nothing has been uploaded.
+`npm run build:itch` writes `dist/solarum-itch.zip` (43 files, 9.26 MiB; the soundboard, tests, scripts and the archived WAVs are left out), `dist/itch/` and `dist/build-report.json`. `index.html` is at the root and every path is relative; `.mjs` runtime modules become `.js`. Use an HTML game page, 960×640 embed, click-to-play and fullscreen. See [ITCH_IO.md](./ITCH_IO.md). Nothing has been uploaded.
 
 ## Asset provenance and credits
 
@@ -298,6 +301,10 @@ Original credits: Cauê Melo, Daniel Calônico, Lucas Santos and Rafael Lima; th
 
 ## Known limits
 
+- **Shorter than the brief's lengths.** The brief targets 65 / 72 / 73 / 79 s; I is 65 s, but II (28 s), III (39 s) and IV (32 s) reuse and remix the chapter's solved content rather than add new stretches: about 2.7 minutes on the main routes instead of 4.8. II's second hearth void, its required dive out of a wind column and the flight-over-a-missing-tile cascade, and IV's rising double stair, are not built.
+- **III's dive is the intended line, not a forced one:** walking or jumping off the lid's end also reaches the well. II and IV keep their lids optional.
+- The four score presets are synthesised from the existing voices (no new instruments): L1's "breath" is the pad's bar-line re-voicing, L3's call and response is the tresillo marimba under the Signal, and the per-level payoffs (the Signal answering at I's door, the tempo exhaling into the recording at IV's) are the existing door cadence and recording. None has had a human listen.
+- The orbit map is a row of stations on the title, not the brief's animated map between levels; Continue starts the next level directly.
 - The score has not had a human listen. The mix was balanced by measuring offline renders (stems and runs against the soundtrack); it needs ears on speakers, headphones and a Bluetooth output (whose latency the score does not yet compensate: the brief's audio-offset option is not built).
 - Only the main route is on the grid. Other lines are quantised and re-phase at anchors, so their notes are in key and in rhythm but not the authored song; a human will rarely fill all 62 intended notes, which is the intent (the payoff is for the path the level was written for).
 - The first void can be crossed without the cape by a frame-perfect late double jump from the very lip, as in earlier revisions; the test proves the main line needs the cape.
