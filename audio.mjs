@@ -1533,7 +1533,52 @@ export function safetyCurve(n = 2049) {
 const LOOKAHEAD = 0.006; // s; starting a hair ahead keeps attacks whole
 const MAX_VOICES = 20;
 const SFX_LEVEL = 1; // calibrated against the soundtrack (README, "Sound")
-export const MUSIC_LEVEL = 0.32; // the title / door soundtrack, matched to the score
+/** The title / door soundtrack. Revision seven (user: the background was
+ * "too full, too present, too loud") takes it 4 dB under its revision-five
+ * level (0.32), with the bed below. */
+export const MUSIC_LEVEL = 0.2;
+/** Mix rules, global in the mixer layer so that every level preset in
+ * score.mjs (four today, eight in the next phase) inherits them; a preset
+ * shapes harmony, groove and space, never these. The player's notes (steps,
+ * stars, strings: the path drawing the song) are the foreground; the bed
+ * (sky, Signal, pulse, choir, glass, Earth) is the room. README, "The mix". */
+export const MIX = Object.freeze({
+  bed: -9, // dB: the bed's dry bus, under Diana's notes (they are untouched)
+  bedWet: 4, // dB: its reverb sends lose only 5 dB, so the bed moves further away
+  bedLowpass: 6500, // Hz: the bed's tuning lowpass at H = 1 (was 16 kHz); it still closes with H
+  bedDip: Object.freeze({ freq: 2500, q: 0.8, gain: -4 }), // dB: tames the pads' and choir's 1-4 kHz presence
+  bedVoices: 12, // bed voices sounding at once; the oldest fades (Diana's notes are never stolen for the bed)
+  layers: Object.freeze({ sky: -1, signal: -2, pulse: -3, choir: -3, glass: -2, earth: -1 }), // dB on top of the bed bus
+  presence: Object.freeze({ freq: 3800, q: 0.7, gain: 3.5 }), // dB: now on Diana's notes only (it lifted the whole score)
+});
+/** The revision-six mix, kept only for the soundboard's before / after A/B
+ * (createAudioEngine({ mix: "before" })): the bed as loud as Diana's notes,
+ * open to 16 kHz, the presence lift on everything, no bed voice cap, and the
+ * soundtrack at 0.32. */
+export const MIX_BEFORE = Object.freeze({ bed: 0, bedWet: 0, bedLowpass: 16000, bedDip: Object.freeze({ freq: 2500, q: 0.8, gain: 0 }), bedVoices: 99, layers: Object.freeze({}), presence: MIX.presence, presenceOnBed: true, closing: 1, music: 0.32 });
+/** Player volume settings: Music (the bed and the soundtrack) and Sounds
+ * (Diana's bodies and notes, stars, beacons, the interface), each 0-1, 1 by
+ * default = the mix above. Guarded storage like the sound setting. */
+export const VOLUME_KEY = "solarum.volume";
+export function readVolumes(storage) {
+  try {
+    const s = typeof storage === "function" ? storage() : storage;
+    const v = JSON.parse(s?.getItem(VOLUME_KEY) || "null");
+    const ok = (x) => (Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 1);
+    return { music: ok(v?.music), sounds: ok(v?.sounds) };
+  } catch {
+    return { music: 1, sounds: 1 };
+  }
+}
+export function writeVolumes(storage, v) {
+  try {
+    const s = typeof storage === "function" ? storage() : storage;
+    s?.setItem(VOLUME_KEY, JSON.stringify({ music: v.music, sounds: v.sounds }));
+    return !!s;
+  } catch {
+    return false;
+  }
+}
 /** The score's output level, calibrated by offline renders to sit where the
  * soundtrack sat under the cues (README, "Sound"). */
 export const SCORE_LEVEL = 0.55;
@@ -1593,7 +1638,7 @@ export function createAudioEngine(options = {}) {
     musicEl = null,
     musicRouted = false,
     musicWanted = false,
-    musicLevel = MUSIC_LEVEL,
+    musicLevel = options.mix === "before" ? MIX_BEFORE.music : MUSIC_LEVEL,
     resumingUntil = 0,
     bed = null,
     melody = null,
@@ -1602,6 +1647,7 @@ export function createAudioEngine(options = {}) {
     dropped = 0,
     peakVoices = 0,
     peakMusic = 0,
+    peakBed = 0,
     darkened = false,
     doorTimer = null,
     pauseTimer = null;
@@ -1615,6 +1661,8 @@ export function createAudioEngine(options = {}) {
     buffers = {},
     plucks = new Map();
   let level = options.level ?? 1;
+  const vol = { music: options.volumes?.music ?? 1, sounds: options.volumes?.sounds ?? 1 };
+  const mix = options.mix === "before" ? MIX_BEFORE : MIX;
   // A cue book override (the soundboard's before / after A/B); the game
   // always plays CUES.
   const book = options.cues ? { ...CUES, ...options.cues } : CUES;
@@ -1687,6 +1735,10 @@ export function createAudioEngine(options = {}) {
     musicTone.type = "lowpass";
     musicTone.frequency.value = 20000;
     musicTone.Q.value = 0.5;
+    // The player's Music setting, after the soundtrack's own fades and ducks.
+    const musicVol = node("Gain");
+    musicVol.gain.value = vol.music;
+    sfx.gain.value = SFX_LEVEL * vol.sounds;
     sfx.connect(comp);
     comp.connect(master);
     verbIn.connect(verb);
@@ -1694,7 +1746,8 @@ export function createAudioEngine(options = {}) {
     verbTone.connect(verbOut);
     verbOut.connect(master);
     musicGain.connect(musicTone);
-    musicTone.connect(master);
+    musicTone.connect(musicVol);
+    musicVol.connect(master);
     let last = limiter;
     if (safety) {
       const shaper = node("WaveShaper");
@@ -1707,7 +1760,7 @@ export function createAudioEngine(options = {}) {
     for (const color of ["white", "pink", "brown"]) {
       buffers[color] = makeBuffer([noiseSamples(sr, 3, color, r)]);
     }
-    graph = { sfx, comp, master, output, verbIn, music: musicGain, musicTone, out: last };
+    graph = { sfx, comp, master, output, verbIn, music: musicGain, musicTone, musicVol, out: last };
     // A browser without delay lines or constant sources still gets every cue;
     // only the score stays silent.
     try {
@@ -1773,17 +1826,21 @@ export function createAudioEngine(options = {}) {
     scoreIn.connect(tape);
     tape.connect(tapeTone);
     tapeTone.connect(tapeGain);
-    // A little air: +3.5 dB around 3.8 kHz (the score was measured dark).
+    tapeGain.connect(scoreOut);
+    scoreOut.connect(graph.master);
+    // Diana's notes: a little air (+3.5 dB around 3.8 kHz) on them alone, so
+    // the path's song sits in front of the room, then the Sounds setting.
+    const playerIn = node("Gain");
     const presence = node("BiquadFilter");
     presence.type = "peaking";
-    presence.frequency.value = 3800;
-    presence.Q.value = 0.7;
-    presence.gain.value = 3.5;
-    tapeGain.connect(presence);
-    presence.connect(scoreOut);
-    scoreOut.connect(graph.master);
-    const playerIn = node("Gain");
-    playerIn.connect(scoreIn);
+    presence.frequency.value = mix.presence.freq;
+    presence.Q.value = mix.presence.q;
+    presence.gain.value = mix.presence.gain;
+    const playerVol = node("Gain");
+    playerVol.gain.value = vol.sounds;
+    playerIn.connect(presence);
+    presence.connect(playerVol);
+    playerVol.connect(scoreIn);
     // The bed: tape wow (H) and a lowpass that closes a little as H falls.
     const bedIn = node("Gain");
     const wow = ctx.createDelay(0.05);
@@ -1798,14 +1855,43 @@ export function createAudioEngine(options = {}) {
     wowLfo.start(t());
     const bedTone = node("BiquadFilter");
     bedTone.type = "lowpass";
-    bedTone.frequency.value = 16000;
+    bedTone.frequency.value = mix.bedLowpass;
     bedTone.Q.value = 0.5;
+    // The room, not the singer: 1-4 kHz tamed, the whole bed mix.bed under
+    // Diana's notes, then the Music setting.
+    const bedDip = node("BiquadFilter");
+    bedDip.type = "peaking";
+    bedDip.frequency.value = mix.bedDip.freq;
+    bedDip.Q.value = mix.bedDip.q;
+    bedDip.gain.value = mix.bedDip.gain;
+    const bedVol = node("Gain");
+    bedVol.gain.value = dbToGain(mix.bed) * vol.music;
     bedIn.connect(wow);
     wow.connect(bedTone);
-    bedTone.connect(scoreIn);
+    bedTone.connect(bedDip);
+    if (mix.presenceOnBed) {
+      // (The revision-six mix lifted the whole score, bed included.)
+      const lift = node("BiquadFilter");
+      lift.type = "peaking";
+      lift.frequency.value = mix.presence.freq;
+      lift.Q.value = mix.presence.q;
+      lift.gain.value = mix.presence.gain;
+      bedDip.connect(lift);
+      lift.connect(bedVol);
+    } else bedDip.connect(bedVol);
+    bedVol.connect(scoreIn);
     // Space: a long, blooming, darkening reverb whose return passes the tape
     // (so a tape-stop drags the tail down too), plus the octave shimmer.
     const spaceIn = node("Gain");
+    // Reverb sends come in through two doors, so each setting also scales
+    // its own tails: the bed's (mix.bed + mix.bedWet: further away) and
+    // Diana's.
+    const bedSend = node("Gain"),
+      playerSend = node("Gain");
+    bedSend.gain.value = dbToGain(mix.bed + mix.bedWet) * vol.music;
+    playerSend.gain.value = vol.sounds;
+    bedSend.connect(spaceIn);
+    playerSend.connect(spaceIn);
     const space = node("Convolver");
     space.normalize = false;
     // Each level has its own space (5.5 s floating to 2.5 s close, RESEARCH_LEVELS 6).
@@ -1850,8 +1936,9 @@ export function createAudioEngine(options = {}) {
     flat.start(t());
     // Rewind notes sound while the score bus is stopped, so they bypass it.
     const rewind = node("Gain");
+    rewind.gain.value = vol.music;
     rewind.connect(graph.master);
-    score = { scoreOut, tapeGain, tapeTone, tape, scoreIn, playerIn, bedIn, wowDepth, bedTone, spaceIn, fb, det, detDown, flat, rewind, space, shimmerOut, spaceSeconds, rng: r };
+    score = { scoreOut, tapeGain, tapeTone, tape, scoreIn, playerIn, playerVol, bedIn, bedVol, bedSend, playerSend, wowDepth, bedTone, spaceIn, fb, det, detDown, flat, rewind, space, shimmerOut, spaceSeconds, rng: r };
   }
   function routeMusic() {
     if (!musicEl || musicRouted || !graph || offline) return;
@@ -1862,7 +1949,7 @@ export function createAudioEngine(options = {}) {
       musicRouted = true;
       musicEl.volume = 1; // the level now lives in the music gain (and works on iOS)
     } catch {
-      musicEl.volume = Math.min(1, musicLevel * OUTPUT_GAIN);
+      musicEl.volume = Math.min(1, musicLevel * OUTPUT_GAIN * vol.music);
     }
   }
   function unlock() {
@@ -2182,10 +2269,19 @@ export function createAudioEngine(options = {}) {
       const live = active(now, music);
       if (live.length >= MAX_MUSIC) fadeOut(live.find((v) => v.bed && !v.hold) ?? live[0], 0.05);
       const spec = recipe.build(rng, n);
+      // The layer decides the bus (LAYERS in score.mjs): a voice that serves
+      // both, like the marimba of the pulse, follows the layer it plays in.
+      if (LAYERS[n.layer]) spec.bed = LAYERS[n.layer].bed;
+      if (spec.bed) {
+        // mix.bedVoices: a thinner room. The oldest bed voice (never a held
+        // pad mid-bar, never one of Diana's notes) gives way.
+        const beds = live.filter((v) => v.bed && !v.stolen);
+        if (beds.length >= mix.bedVoices) fadeOut(beds.find((v) => !v.hold) ?? beds[0], 0.25);
+      }
       const list = [];
       const out = node("Gain");
       list.push(out);
-      out.gain.value = spec.gain * dbToGain(spread(rng, 0.5));
+      out.gain.value = spec.gain * dbToGain(spread(rng, 0.5) + (spec.bed ? mix.layers[n.layer] ?? 0 : 0));
       let head = out;
       if (spec.filter) {
         const f = node("BiquadFilter");
@@ -2232,7 +2328,7 @@ export function createAudioEngine(options = {}) {
         const send = node("Gain");
         send.gain.value = spec.send;
         head.connect(send);
-        send.connect(score.spaceIn);
+        send.connect(spec.bed ? score.bedSend : score.playerSend);
         list.push(send);
       }
       const sources = [...(spec.grouped ? renderPad(spec, at, out, list) : spec.layers.flatMap((L) => renderLayer(L, at, out, list, { bed: !!spec.bed }))), ...(spec.extra ?? [])];
@@ -2247,6 +2343,7 @@ export function createAudioEngine(options = {}) {
       music.push(v);
       sc.scheduled++;
       peakMusic = Math.max(peakMusic, active(now, music).length);
+      if (v.bed) peakBed = Math.max(peakBed, active(now, music).filter((q) => q.bed && !q.stolen).length);
       return v;
     } catch {
       return null;
@@ -2494,7 +2591,8 @@ export function createAudioEngine(options = {}) {
       score.det.offset.setTargetAtTime(m.padCents, now, 0.27);
       score.flat.offset.setTargetAtTime(-m.flatCents, now, 0.27);
       score.wowDepth.gain.setTargetAtTime(m.wowCents * WOW_PER_CENT, now, 0.27);
-      score.bedTone.frequency.setTargetAtTime(Math.min(16000, m.lowpass), now, 0.27);
+      // The bed's ceiling is mix.bedLowpass; mistakes still close it (H 0.6: 4.2 kHz).
+      score.bedTone.frequency.setTargetAtTime(Math.min(mix.bedLowpass, m.lowpass * (mix.closing ?? 0.6)), now, 0.27);
       score.fb.gain.setTargetAtTime(m.shimmer, now, 0.3);
     } catch {
       /* ignore */
@@ -2519,7 +2617,7 @@ export function createAudioEngine(options = {}) {
         const send = node("Gain");
         send.gain.value = 0.5;
         p.connect(send);
-        send.connect(score.spaceIn);
+        send.connect(score.playerSend);
         o.start(now);
         sc.whistle = { o, g, p, send, on: false };
       }
@@ -2820,6 +2918,30 @@ export function createAudioEngine(options = {}) {
     unlock,
     play,
     duck,
+    /** The player's Music and Sounds settings (0-1 each), applied over 80 ms. */
+    setVolumes({ music = vol.music, sounds = vol.sounds } = {}) {
+      vol.music = Math.max(0, Math.min(1, Number(music) || 0));
+      vol.sounds = Math.max(0, Math.min(1, Number(sounds) || 0));
+      try {
+        if (musicEl && !musicRouted) musicEl.volume = Math.min(1, musicLevel * OUTPUT_GAIN * vol.music);
+        if (!graph) return { ...vol };
+        const at = t();
+        const to = (param, v) => (param.cancelScheduledValues(at), param.setValueAtTime(param.value, at), param.linearRampToValueAtTime(v, at + 0.08));
+        to(graph.musicVol.gain, vol.music);
+        to(graph.sfx.gain, SFX_LEVEL * vol.sounds);
+        if (score) {
+          to(score.bedVol.gain, dbToGain(mix.bed) * vol.music);
+          to(score.bedSend.gain, dbToGain(mix.bed + mix.bedWet) * vol.music);
+          to(score.rewind.gain, vol.music);
+          to(score.playerVol.gain, vol.sounds);
+          to(score.playerSend.gain, vol.sounds);
+        }
+      } catch {
+        /* ignore */
+      }
+      return { ...vol };
+    },
+    volumes: () => ({ ...vol }),
     setAir,
     hush,
     attachMusic(el, { level } = {}) {
@@ -2828,7 +2950,7 @@ export function createAudioEngine(options = {}) {
       try {
         // Unrouted (before the first gesture) the element plays on its own at
         // the level it will have through the graph.
-        if (!musicRouted) el.volume = Math.min(1, musicLevel * OUTPUT_GAIN);
+        if (!musicRouted) el.volume = Math.min(1, musicLevel * OUTPUT_GAIN * vol.music);
       } catch {
         /* ignore */
       }
@@ -3069,7 +3191,7 @@ export function createAudioEngine(options = {}) {
           choir: st.choir,
           earth: st.earth,
           voices: ctx ? active(now, music).length : 0,
-          peakVoices: peakMusic,
+          peakVoices: peakMusic, peakBed,
           scheduled: sc.scheduled,
           lateNotes: sc.lateCount,
           maxLateMs: +(sc.maxLate * 1000).toFixed(1),
@@ -3111,10 +3233,10 @@ export async function renderCueOffline(name, { OfflineContext = globalThis.Offli
  * before `from` keep the conductor in step without sound; the render covers
  * [from, from + seconds). `only` limits the output to some score layers
  * (stems): the others are rendered silent. */
-export async function renderRunOffline({ frames, from = 0, seconds = 20, OfflineContext = globalThis.OfflineAudioContext, sampleRate = 48000, seed = 1, gentle = false, cues = true, only = null, safety = true, level = 1 } = {}) {
+export async function renderRunOffline({ frames, from = 0, seconds = 20, OfflineContext = globalThis.OfflineAudioContext, sampleRate = 48000, seed = 1, gentle = false, cues = true, only = null, safety = true, level = 1, mix = null } = {}) {
   const ctx = new OfflineContext(2, Math.ceil((seconds + 3) * sampleRate), sampleRate);
   let now = 0;
-  const engine = createAudioEngine({ context: ctx, seed, safety, gentle, only, level, clock: () => now });
+  const engine = createAudioEngine({ context: ctx, seed, safety, gentle, only, level, mix, clock: () => now });
   engine.unlock();
   for (const f of frames) {
     if (f.wall >= from + seconds) break;

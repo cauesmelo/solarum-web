@@ -736,3 +736,40 @@ test("an engine can play an overriding cue book (the soundboard's before / after
   assert.match(board, /createAudioEngine\(\{ enabled: true, seed: 7, cues: BODY_BEFORE \}\)/);
   assert.ok(BODY_BEFORE.jump.build && CUES.jump.build !== BODY_BEFORE.jump.build);
 });
+
+/* ---------- revision seven: the bed sits behind Diana; Music / Sounds ---------- */
+test("mix rules are global: the bed bus sits under Diana's notes, darker, thinner and further away", async () => {
+  const { MIX, MIX_BEFORE, MUSIC_LEVEL } = await import("../audio.mjs");
+  assert.ok(MIX.bed <= -6 && MIX.bed >= -10, `bed ${MIX.bed} dB`);
+  assert.ok(MIX.bed + MIX.bedWet < 0 && MIX.bedWet > 0, "the bed is wetter (further away) but still lower");
+  assert.ok(MIX.bedLowpass <= 8000 && MIX.bedDip.gain < 0 && MIX.bedDip.freq >= 1000 && MIX.bedDip.freq <= 4000);
+  assert.ok(MIX.bedVoices > 0 && MIX.bedVoices < 28);
+  assert.ok(MUSIC_LEVEL < MIX_BEFORE.music, "the title / door soundtrack is lower too");
+  // No level preset can override them: score.mjs never mentions the mix.
+  const score = await read("score.mjs");
+  assert.ok(!/\bMIX\b|bedVoices|bedLowpass/.test(score));
+});
+test("a whole run through the engine never holds more bed voices than MIX.bedVoices", async () => {
+  const { MIX } = await import("../audio.mjs");
+  const run = scoreRun();
+  assert.equal(run.s.status, "won");
+  assert.ok(run.stats.score.peakBed > 0 && run.stats.score.peakBed <= MIX.bedVoices, `${run.stats.score.peakBed} bed voices at once`);
+});
+test("Music and Sounds volumes: guarded storage, defaults 1, clamped", async () => {
+  const { readVolumes, writeVolumes, VOLUME_KEY } = await import("../audio.mjs");
+  assert.deepEqual(readVolumes(null), { music: 1, sounds: 1 });
+  assert.deepEqual(readVolumes(() => { throw new Error("blocked"); }), { music: 1, sounds: 1 });
+  const store = new Map();
+  const s = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  assert.equal(writeVolumes(s, { music: 0.4, sounds: 0.9 }), true);
+  assert.deepEqual(readVolumes(s), { music: 0.4, sounds: 0.9 });
+  store.set(VOLUME_KEY, JSON.stringify({ music: 7, sounds: "x" }));
+  assert.deepEqual(readVolumes(s), { music: 1, sounds: 1 });
+  assert.equal(writeVolumes(() => { throw new Error("blocked"); }, { music: 1, sounds: 1 }), false);
+  const html = await read("index.html"),
+    js = await read("game.js");
+  const pause = html.slice(html.indexOf('id="pause-main"'), html.indexOf('id="pause-assist"'));
+  assert.match(pause, /id="vol-music" type="range"/);
+  assert.match(pause, /id="vol-sounds" type="range"/);
+  assert.match(js, /volumes: readVolumes\(\(\) => window\.localStorage\)/);
+});

@@ -147,11 +147,11 @@ function frames(kind, level = runLevel) {
   }
   return frameCache.get(key).frames;
 }
-async function renderRun({ kind = "main", from = 0, seconds = 20, only = null, cues = true, safety = true, level = runLevel } = {}) {
+async function renderRun({ kind = "main", from = 0, seconds = 20, only = null, cues = true, safety = true, level = runLevel, mix = null } = {}) {
   const f = frames(kind, level);
   if (from === "fall") from = Math.max(0, (f.find((q) => q.status === "dead")?.wall ?? 3) - 3);
   else if (from < 0) from = Math.max(0, f.at(-1).wall + from);
-  return renderRunOffline({ frames: f, from, seconds, only, cues, safety, gentle: kind === "gentle", seed: 3, level });
+  return renderRunOffline({ frames: f, from, seconds, only, cues, safety, gentle: kind === "gentle", seed: 3, level, mix });
 }
 /** ITU-R BS.1770-4 integrated loudness (K-weighting at 48 kHz, 400 ms blocks,
  * absolute and relative gates) and true sample peak of a rendered buffer. */
@@ -254,18 +254,21 @@ for (const [layer, about, opts] of STEMS)
   });
 
 /* ---------- A/B: perfect and sloppy, sample-locked, switch while playing ---------- */
-let ab = null;
-$("ab").addEventListener("click", async () => {
+let ab = null,
+  abLabels = ["A (perfect)", "B (sloppy)"];
+async function startAB(button, renders, labels) {
   ready();
   if (ab) {
     for (const s of ab.sources) s.stop();
+    const was = ab.button;
     ab = null;
-    $("ab").setAttribute("aria-pressed", "false");
+    for (const id of ["ab", "ab-mix"]) $(id).setAttribute("aria-pressed", "false");
     $("ab-switch").disabled = true;
-    return;
+    if (was === button) return;
   }
-  log("Rendering A (perfect) and B (sloppy)...");
-  const [a, b] = await Promise.all([renderRun({ kind: "main", from: 0, seconds: 27 }), renderRun({ kind: "sloppy", from: 0, seconds: 27 })]);
+  abLabels = labels;
+  log(`Rendering ${labels.join(" and ")}...`);
+  const [a, b] = await Promise.all(renders());
   const ctx = engine.context,
     at = ctx.currentTime + 0.1;
   const gains = [1, 0].map((v) => {
@@ -281,16 +284,20 @@ $("ab").addEventListener("click", async () => {
     src.start(at);
     return src;
   });
-  ab = { sources, gains, side: 0 };
-  sources[0].onended = () => ab && ab.sources[0] === sources[0] && $("ab").click();
-  $("ab").setAttribute("aria-pressed", "true");
+  ab = { sources, gains, side: 0, button };
+  sources[0].onended = () => ab && ab.sources[0] === sources[0] && $(button).click();
+  $(button).setAttribute("aria-pressed", "true");
   $("ab-switch").disabled = false;
-  $("ab-switch").textContent = "Now: A (perfect)";
+  $("ab-switch").textContent = `Now: ${labels[0]}`;
   const la = loudness(a.buffer),
     lb = loudness(b.buffer);
-  $("loudness").textContent = `A ${la.lufs.toFixed(1)} LUFS · B ${lb.lufs.toFixed(1)} LUFS`;
-  log("A/B playing: switch at any time (the sloppy run falls at the leap, so B drifts later after it)");
-});
+  $("loudness").textContent = `${labels[0]} ${la.lufs.toFixed(1)} LUFS · ${labels[1]} ${lb.lufs.toFixed(1)} LUFS`;
+  log("A/B playing: switch at any time");
+}
+$("ab").addEventListener("click", () => startAB("ab", () => [renderRun({ kind: "main", from: 0, seconds: 27 }), renderRun({ kind: "sloppy", from: 0, seconds: 27 })], ["A (perfect)", "B (sloppy)"]));
+// Revision seven (user: the background was "too full, too present, too
+// loud"): the same perfect run through the revision-six mix and the new one.
+$("ab-mix").addEventListener("click", () => startAB("ab-mix", () => [renderRun({ kind: "main", from: 0, seconds: 27, mix: "before" }), renderRun({ kind: "main", from: 0, seconds: 27 })], ["A (mix before)", "B (mix after)"]));
 $("ab-switch").addEventListener("click", () => {
   if (!ab) return;
   ab.side = 1 - ab.side;
@@ -300,7 +307,7 @@ $("ab-switch").addEventListener("click", () => {
     g.gain.setValueAtTime(g.gain.value, now);
     g.gain.linearRampToValueAtTime(i === ab.side ? 1 : 0, now + 0.03);
   });
-  $("ab-switch").textContent = ab.side ? "Now: B (sloppy)" : "Now: A (perfect)";
+  $("ab-switch").textContent = `Now: ${abLabels[ab.side]}`;
 });
 
 /* ---------- tuning value H: the bed against Diana's in-tune voice ---------- */
@@ -541,5 +548,6 @@ window.__soundboard = {
   voice: (name, chordName = "D") => engine.voice(name, sampleNote(name, CHORDS[chordName])),
   tuning: (H) => engine.auditionTuning(H),
   loudness: async (opts) => loudness((await renderRun(opts)).buffer),
+  // opts.mix: "before" renders through the revision-six mix (A/B, README).
   stats: () => engine.stats(),
 };

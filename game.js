@@ -26,7 +26,7 @@ import {
   clampCameraY,
   stepCamera,
 } from "./geometry.mjs";
-import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetting, writeGentleSetting } from "./audio.mjs";
+import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetting, writeGentleSetting, readVolumes, writeVolumes } from "./audio.mjs";
 import { createFrameClock } from "./frame-clock.mjs";
 import { emergenceAt, emergenceSeconds, resolveSet } from "./emergence.mjs";
 
@@ -111,10 +111,12 @@ const ui = {
 const sound = {
   on: readSoundSetting(() => window.localStorage),
   gentle: readGentleSetting(() => window.localStorage),
+  // Music and Sounds (pause card), 0-1 each; 1 is the balanced mix.
+  volumes: readVolumes(() => window.localStorage),
   music: new Audio(),
 };
 // Phones get a shorter space reverb (at most 4 s) to save CPU.
-const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, spaceSeconds: coarse ? 4 : 5.5, level: state.level });
+const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, spaceSeconds: coarse ? 4 : 5.5, level: state.level, volumes: sound.volumes });
 /** Simulation seconds per real second: the level's clock (BPM / 107) times
  * Gentle pace, so the arcs stay identical and only time is scaled. */
 const simScale = () => pace * (state.clock ?? 1);
@@ -173,6 +175,17 @@ function syncAudio() {
   audio.setAir({ wind: live && p.inWind, glide: live && p.gliding && !p.inWind });
   // The score follows the simulation clock (never the other way round).
   audio.scoreFrame({ simTime: state.time, x: p.x, y: p.y, status: state.status, timeScale: simScale(), inWind: p.inWind, gliding: p.gliding, fallsHere: state.fallsHere });
+}
+function setVolumes(v) {
+  sound.volumes = audio.setVolumes({ ...sound.volumes, ...v });
+  writeVolumes(() => window.localStorage, sound.volumes);
+  for (const [id, key] of [["vol-music", "music"], ["vol-sounds", "sounds"]]) {
+    const input = $(id),
+      pct = Math.round(sound.volumes[key] * 100);
+    if (Number(input.value) !== pct) input.value = String(pct);
+    input.setAttribute("aria-valuetext", `${pct}%`);
+  }
+  return { ...sound.volumes };
 }
 function setGentleMusic(on) {
   sound.gentle = !!on;
@@ -1903,9 +1916,10 @@ const GAME_KEYS = ["Space", "ArrowUp", "ArrowRight", "ArrowDown", "KeyW", "KeyD"
 window.addEventListener("keydown", (e) => {
   const onButton = e.target instanceof HTMLElement && e.target.matches("button");
   if (state.status === "paused") {
+    const onSlider = e.target instanceof HTMLInputElement && e.target.type === "range";
     if (e.code === "Tab") {
       // Keep keyboard focus inside the pause card (aria-modal).
-      const buttons = [...$("pause-card").querySelectorAll("button")].filter((b) => b.offsetParent);
+      const buttons = [...$("pause-card").querySelectorAll("button, input")].filter((b) => b.offsetParent);
       const i = buttons.indexOf(document.activeElement),
         d = e.shiftKey ? -1 : 1;
       e.preventDefault();
@@ -1918,9 +1932,11 @@ window.addEventListener("keydown", (e) => {
       else closePause();
       return;
     }
+    // On a volume slider ←/→ move the slider (natively); ↑/↓ still move focus.
+    if (onSlider && ["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.code)) return;
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
       e.preventDefault();
-      const buttons = [...$("pause-card").querySelectorAll("button")].filter((b) => b.offsetParent);
+      const buttons = [...$("pause-card").querySelectorAll("button, input")].filter((b) => b.offsetParent);
       const i = buttons.indexOf(document.activeElement);
       const d = ["ArrowUp", "ArrowLeft"].includes(e.code) ? -1 : 1;
       buttons[(i + d + buttons.length) % buttons.length]?.focus();
@@ -2082,6 +2098,8 @@ function showAssist(open) {
   (open ? $("pause-assist").querySelector(".toggle") : $("assist-open")).focus({ preventScroll: true });
 }
 $("assist-open").addEventListener("click", () => showAssist(true));
+for (const [id, key] of [["vol-music", "music"], ["vol-sounds", "sounds"]])
+  $(id).addEventListener("input", (e) => setVolumes({ [key]: Number(e.target.value) / 100 }));
 $("assist-back").addEventListener("click", () => showAssist(false));
 for (const b of document.querySelectorAll("[data-assist]")) {
   b.addEventListener("click", () => {
@@ -2174,11 +2192,13 @@ window.__game = {
   // Harmony feedback: { gentle: true } removes every dissonance (no detune,
   // a fade instead of the tape-stop). Persisted like the sound setting.
   setMusic: ({ gentle } = {}) => (gentle != null && setGentleMusic(gentle), { gentle: sound.gentle }),
+  // Music / Sounds volumes (0-1, saved): setVolumes({ music: 0.5 }).
+  setVolumes: (v = {}) => setVolumes(v),
   getState: () => snapshot(state),
   // { on, unlocked, decoded, state, paused, suspended, musicPlaying, voices,
   //   nodes, played, dropped, cues, score: { running, bar, chord, H,
   //   detuneCents, gentle, song, ... }, ... } (see audio.mjs stats()).
-  getAudio: () => ({ ...audio.stats(), on: sound.on }),
+  getAudio: () => ({ ...audio.stats(), on: sound.on, volumes: audio.volumes() }),
   getRenderGeometry: () => {
     const view = viewGeometry(W);
     return {
@@ -2244,6 +2264,7 @@ async function load() {
     if (coarse) $("title-keys").textContent = "tap left to jump · right thumb: cape, dive";
     setSound(sound.on);
     setGentleMusic(sound.gentle);
+    setVolumes(sound.volumes);
     // The title song: where the browser allows it (itch's click-to-play
     // iframe does) it starts now, on the plain element (no AudioContext
     // before a gesture); otherwise the first gesture that does not wake starts it.

@@ -110,6 +110,12 @@
               <button id="pause-sound" class="ink-btn small" type="button" aria-pressed="true">♫ Sound</button>
               <button id="assist-open" class="ink-btn small" type="button" aria-controls="pause-assist">Assist…</button>
             </div>
+            <!-- Music: the sky, its pulse and choir, the title and door song.
+                 Sounds: Diana's own sounds and notes, the stars, the menus. -->
+            <div class="volumes" role="group" aria-label="Volume">
+              <label class="volume"><span>Music</span><input id="vol-music" type="range" min="0" max="100" step="5" value="100" /></label>
+              <label class="volume"><span>Sounds</span><input id="vol-sounds" type="range" min="0" max="100" step="5" value="100" /></label>
+            </div>
           </div>
           <div class="card-page" id="pause-assist" hidden>
             <h2>Assist</h2>
