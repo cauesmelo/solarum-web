@@ -7,7 +7,7 @@
  * definition (clock 1). */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGame, start, update, jump, dash, retry, snapshot, setAssist, TICK } from "../model.mjs";
+import { createGame, start, update, jump, releaseJump, dash, dive, retry, snapshot, setAssist, TICK } from "../model.mjs";
 import { levelDef, LEVEL_ID } from "../level.mjs";
 
 function world({ verbs = {}, refills = [], gets = [], updrafts = [], checkpoints = [], clock = null, def: extra = {} } = {}) {
@@ -244,4 +244,49 @@ test("relics: every GET is a relic in getState (id, verb, x, y, taken) and its p
   assert.ok(s.events.some((q) => q.serial > serial && q.name === "get" && q.verb === "double"), "the get event stays");
   assert.equal(snapshot(s).relics[0].taken, true);
   assert.equal(s.verbs.double, true);
+});
+
+/* ---------- per level (RESEARCH_REFILLS 3 and 5) ---------- */
+import { LEVELS } from "../level.mjs";
+import { playRoute } from "./routes.mjs";
+const routeApi = (s) => ({ getState: () => snapshot(s), step: (dt, c) => (update(s, dt, c), snapshot(s)), jump: () => jump(s), releaseJump: () => releaseJump(s), dash: () => dash(s), dive: () => dive(s) });
+test("C8/C10: every required refill star is touched lit on every route at 30-240 Hz; the door needs no optional star; removing a required one fails at its gap, after its beacon", () => {
+  const counts = { cape: 0, leaf: 0 };
+  for (const d of LEVELS.filter((q) => q.refills?.length)) {
+    const required = d.refills.filter((q) => q.required);
+    for (const q of d.refills) counts[q.kind] += q.required ? 1 : 0;
+    for (const route of ["main", "upper", "ability", "safe"])
+      for (const hz of [30, 60, 120, 240]) {
+        const s = start(createGame(2021, { def: d }));
+        const lit = [];
+        let seen = s.eventSerial;
+        const a = routeApi(s);
+        const step = a.step;
+        a.step = (dt, c) => {
+          const r = step(dt, c);
+          for (const e of s.events) if (e.serial > seen) ((seen = e.serial), e.name === "refill-star" && lit.push(e.id));
+          return r;
+        };
+        playRoute(a, { route, dt: 1 / hz });
+        assert.equal(s.status, "won", `${d.numeral} ${route} ${hz} Hz`);
+        for (const q of required) assert.ok(lit.includes(q.id), `${d.numeral} ${route} ${hz} Hz: ${q.id} touched lit`);
+      }
+    // C10: only the required refills and the constellations kept.
+    const bare = start(createGame(2021, { def: { ...d, refills: required } }));
+    bare.pickups = bare.pickups.filter((q) => q.chain || q.great);
+    playRoute(routeApi(bare), { route: "main" });
+    assert.equal(bare.status, "won", `${d.numeral}: the door needs no optional star`);
+    // Removal: each required star's gap fails without it, after a beacon.
+    for (const q of required) {
+      const s = start(createGame(2021, { def: { ...d, refills: d.refills.filter((r) => r.id !== q.id) } }));
+      playRoute(routeApi(s), { route: "main" });
+      assert.equal(s.status, "dead", `${d.numeral} without ${q.id}`);
+      assert.ok(s.checkpoint && s.checkpoint.x < q.x && s.player.x > q.x - 300 && s.player.x < q.x + 900, `${d.numeral} without ${q.id}: fell at ${Math.round(s.player.x)}`);
+    }
+  }
+  // RESEARCH_REFILLS 3's table: at most 1 cape + 1 leaf required in VII.
+  const vii = LEVELS.find((q) => q.key === "falling-road");
+  assert.deepEqual(vii.refills.filter((q) => q.required).map((q) => q.kind).sort(), ["cape", "leaf"]);
+  // Leaf stars only where the double is owned, cape stars where the cape is (C16).
+  for (const d of LEVELS) for (const q of d.refills ?? []) assert.ok(q.kind === "leaf" ? d.verbs.double || d.gets.some((g) => g.verb === "double" && g.x < q.x) : d.verbs.cape || d.gets.some((g) => g.verb === "cape" && g.x < q.x), `${d.numeral} ${q.id}`);
 });

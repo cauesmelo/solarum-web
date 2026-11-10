@@ -138,7 +138,7 @@ test("each main route reaches every beacon and uses its level's kit through publ
     [LEVEL_ID["way-down"]]: { dash: 8, dive: 1, "double-jump": 2, constellations: 5 },
     [LEVEL_ID["borrowed-wind"]]: { dash: 3, "double-jump": 5, constellations: 6 },
     // VII: the dives land on stable stones (a dive smashes a tile), so it smashes nothing.
-    [LEVEL_ID["falling-road"]]: { dash: 4, "double-jump": 6, constellations: 7, cascade: true },
+    [LEVEL_ID["falling-road"]]: { dash: 4, "double-jump": 7, constellations: 6, cascade: true },
     [LEVEL_ID.breaking]: { dash: 2, dive: 1, "double-jump": 2, constellations: 7 },
     [LEVEL_ID.door]: { dash: 4, "super-jump": 2, constellations: 1, cascade: true },
   };
@@ -503,7 +503,7 @@ test("no required crossing depends on a chain unless a beacon sits right before 
   // The required chains are V's split-song and VI's launch-song and
   // finale-song (tested above); each one's beacon is the last before it,
   // within 6 s of run.
-  for (const [n, chain, beacon] of [[LEVEL_ID.breaking, "split-song", "split"], [LEVEL_ID["borrowed-wind"], "launch-song", "storm"], [LEVEL_ID["borrowed-wind"], "finale-song", "storm"], [LEVEL_ID["falling-road"], "gap-song", "dive"], [LEVEL_ID["falling-road"], "red-song", "gap"]]) {
+  for (const [n, chain, beacon] of [[LEVEL_ID.breaking, "split-song", "split"], [LEVEL_ID["borrowed-wind"], "launch-song", "storm"], [LEVEL_ID["borrowed-wind"], "finale-song", "storm"], [LEVEL_ID["falling-road"], "gap-song", "dive"]]) {
     const stars = createLevel(n).pickups.filter((q) => q.chain === chain);
     const before = levelDef(n).checkpoints.filter((c) => c.x < stars[0].x).at(-1);
     assert.equal(before.id, beacon);
@@ -753,8 +753,9 @@ test("the title card (300/1600/500 ms of simulation time) never covers a require
 test("main-route gaps and rises respect each level's authoring limits", () => {
   // L1's float allows a 180 px double rise; L4's super jump climbs 235 px;
   // L2's long void is crossed by two flights around a refill constellation.
-  // V: the split voids are two flights around the split-song.
-  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.breaking]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["borrowed-wind"]]: { rise: 165, gap: 400, void: 800 }, [LEVEL_ID["falling-road"]]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
+  // V: the split voids are two flights around the split-song. VII: the
+  // leaf star's third jump climbs 185 px onto k2.
+  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.breaking]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["borrowed-wind"]]: { rise: 165, gap: 400, void: 800 }, [LEVEL_ID["falling-road"]]: { rise: 190, gap: 400, void: 700 }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
   for (const n of IDS) {
     const chains = createLevel(n).pickups.filter((q) => q.chain);
     for (const [a, b] of mainPairs(n)) {
