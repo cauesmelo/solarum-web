@@ -117,7 +117,7 @@ export function chooseAction(s, m) {
       // From the chain's exit straight down to the beacon island.
       [9935, "jump", "g"],
       [10665.2, "jump", "g"], [10947.2, "dive", "g"],
-      [11337.2, "jump", "g"], [11417.2, "jump", "a"],
+      [11337.2, "jump", "g"], [11390, "jump", "a"],
       [11597.2, "jump", "g"],
       ...common.wave.slice(1), ...common.crown, ...common.wind,
       [18052, "jump", "g"],
@@ -138,7 +138,7 @@ export function chooseAction(s, m) {
       ...common.breaking,
       ...common.ridge,
       [10665.2, "jump", "g"], [10947.2, "dive", "g"],
-      [11337.2, "jump", "g"], [11417.2, "jump", "a"],
+      [11337.2, "jump", "g"], [11390, "jump", "a"],
       [11597.2, "jump", "g"],
       ...common.wave.slice(1), ...common.crown,
       // The hearth breeze: jump into it and hold the cape to float up.

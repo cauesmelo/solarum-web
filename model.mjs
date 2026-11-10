@@ -44,6 +44,13 @@ export const RULES = Object.freeze({
   lipDepth: 25,
   lipReach: 40,
   lipRiseLimit: 120,
+  // Step-up assist: rising into an island from below (or drifting under its
+  // lip), Diana can top out with her feet a little under the drawn top while
+  // her body is over it. On screen she made it, so if her feet are within
+  // stepUpDepth px below the top, her body overlaps it by stepUpOverlap px
+  // and she cannot clear it on her own, she steps up (user report, rev. 5).
+  stepUpDepth: 20,
+  stepUpOverlap: 10,
   // Death line sits a fixed distance below the camera anchor (the last
   // grounded y). With the vertical camera in geometry.mjs this is about 60 px
   // below the visible bottom, instead of the old fixed y=850 far off-screen.
@@ -658,6 +665,24 @@ function tick(s, dt, controls) {
       break;
     }
   }
+  if (!p.grounded && s.launched && !p.diving && !wind) {
+    // The rise still ahead of her at this speed (none while falling, and the
+    // wind would carry her: skipped above). Platforms are sorted top-down, so
+    // the highest one she is just under wins.
+    const rise = p.vy < 0 ? (p.vy * p.vy) / (2 * RULES.gravity) : 0;
+    for (const q of s.platforms) {
+      if (q.collapsed || (q.collapseAt != null && s.time >= q.collapseAt)) continue;
+      const depth = p.y - q.y;
+      if (depth <= 0 || depth > RULES.stepUpDepth || rise >= depth) continue;
+      const overlap = Math.min(p.x + RULES.playerWidth / 2, q.x + q.width) - Math.max(p.x - RULES.playerWidth / 2, q.x);
+      if (overlap < RULES.stepUpOverlap) continue;
+      p.vy = 0;
+      landOn(s, q, wasGrounded, false);
+      s.stepUps = (s.stepUps || 0) + 1;
+      event(s, "lip-catch", { platform: q.id, step: true });
+      break;
+    }
+  }
   if (!p.grounded && s.launched && p.vy > -RULES.lipRiseLimit && !p.diving) {
     // Lip catch: the leading edge has just crossed a platform's left lip and
     // the feet are a little below its top. Pop up instead of sliding down the
@@ -793,6 +818,7 @@ export function snapshot(s) {
     refills: s.refills,
     smashes: s.smashes,
     lipCatches: s.lipCatches,
+    stepUps: s.stepUps ?? 0,
     flights: s.flights,
     superJumps: s.superJumps,
     anchorY: s.anchorY,

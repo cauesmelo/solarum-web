@@ -850,6 +850,81 @@ test("lip catch: a jump that arrives up to 25 px below a lip pops onto it; walk-
   assert.equal(make(20, { launched: false }).player.grounded, false, "walking off never earns it");
   assert.equal(make(20, { vy: -300 }).player.grounded, false, "not while rising fast");
 });
+test("step-up: an approach from below that tops out within 20 px of the top lands; clearly short ones never do", () => {
+  // User report: "it looks like you made it, but you don't go up". Sweep
+  // shelves above a floor, takeoffs from well before the lip to deep under
+  // the shelf, held, tapped and double jumps; track how close the feet came
+  // to the top while the body was over the shelf.
+  const shelfX = 1000;
+  let landed = 0,
+    short = 0,
+    assisted = 0;
+  for (const rise of [40, 70, 90, 100, 104, 108, 112, 116, 120, 124, 128, 132, 140, 160, 180, 200])
+    for (const dx of [-200, -150, -110, -80, -50, -20, 10, 40, 90])
+      for (const kind of ["held", "tap", "double"]) {
+        const top = 600 - rise;
+        const s = fixture([
+          { id: "floor", x: 0, y: 600, width: 3000 },
+          { id: "shelf", x: shelfX, y: top, width: 400 },
+        ]);
+        Object.assign(s.player, { x: shelfX + dx - 80, y: 600, grounded: true });
+        s.anchorY = 600;
+        let jumped = false,
+          doubled = kind !== "double",
+          closest = Infinity,
+          closestAir = Infinity,
+          lipClosest = Infinity,
+          result = null;
+        for (let i = 0; i < 300 && s.status === "running"; i++) {
+          const p = s.player;
+          if (!jumped && p.x >= shelfX + dx) {
+            jump(s);
+            if (kind === "tap") releaseJump(s);
+            jumped = true;
+          } else if (jumped && !doubled && p.vy > -60) (jump(s), (doubled = true));
+          update(s, 1 / 120);
+          if (!jumped) continue;
+          const overlap = Math.min(p.x + 16, shelfX + 400) - Math.max(p.x - 16, shelfX);
+          const depth = p.y - top;
+          if (overlap >= RULES.stepUpOverlap) closest = Math.min(closest, depth);
+          if (overlap >= RULES.stepUpOverlap && !p.grounded) closestAir = Math.min(closestAir, depth);
+          if (overlap > 0) lipClosest = Math.min(lipClosest, depth);
+          if (p.grounded) {
+            result = Math.abs(p.y - top) < 0.01 ? "shelf" : "floor";
+            break;
+          }
+        }
+        const where = `rise ${rise} dx ${dx} ${kind}: closest ${closest.toFixed(1)} px`;
+        if (closest <= RULES.stepUpDepth) {
+          assert.equal(result, "shelf", `${where} looked landed but fell back`);
+          landed++;
+          if (closestAir > 0 && Number.isFinite(closestAir)) assisted++; // never above the top: the assist did it
+        } else if (Number.isFinite(lipClosest) && lipClosest > RULES.lipDepth + 1) {
+          assert.notEqual(result, "shelf", `${where} was clearly short but stepped up`);
+          short++;
+        }
+      }
+  assert.ok(assisted >= 20 && landed >= 100 && short >= 40, `${landed} landed (${assisted} by the assist), ${short} short`);
+  // Walking off an edge and diving never earn it.
+  const walk = fixture([
+    { id: "high", x: 0, y: 480, width: 500 },
+    { id: "shelf", x: 500, y: 470, width: 300 },
+  ]);
+  Object.assign(walk.player, { x: 490, y: 490, vy: 50, grounded: false, jumps: 1 });
+  walk.anchorY = 480;
+  walk.launched = false;
+  update(walk, 0.2);
+  assert.equal(walk.stepUps ?? 0, 0, "no step-up without a jump or flight");
+  const diver = fixture([{ id: "shelf", x: 0, y: 470, width: 400 }]);
+  Object.assign(diver.player, { x: 200, y: 480, vy: -50, grounded: false, jumps: 1 });
+  diver.launched = true;
+  diver.anchorY = 600;
+  dive(diver);
+  update(diver, 0.05);
+  assert.equal(diver.stepUps ?? 0, 0, "a dive never steps up");
+  // The main route never needs it (its takeoffs and landings are on the grid).
+  assert.equal(traverse("main").s.stepUps ?? 0, 0);
+});
 test("the first gap forgives a first input (a held jump or a 0 ms tap clears it) but still needs one", async () => {
   const { followGlyph } = await import("./glyphs.mjs");
   const p = createLevel().prompts.find((q) => q.id === "p-jump");

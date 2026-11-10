@@ -31,6 +31,7 @@ World px, y down; a platform's y is its walkable top and Diana's y is her feet (
 | Crumble | collapses 0.65 s after first landing | — | — |
 | Cascade | one tile per 107 BPM beat, 207 px pitch | — | bounce of 5 and 6 sixteenths |
 | Coyote / buffer | 0.12 s / 0.14 s | — | — |
+| Lip catch / step-up | arriving ≤ 25 px under a lip; topping out ≤ 20 px under a top with the body ≥ 10 px over it | jumps and flights only | the main route needs neither (tested) |
 
 Every required landing leaves ≥ 135 px of runway; every beacon leaves ≥ 400 px before the next required input (tested). Drops on any intended line stay under 240 px so the camera shows the landing and the death line never cuts a catch (tested).
 
