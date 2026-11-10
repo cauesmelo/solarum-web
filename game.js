@@ -1456,7 +1456,10 @@ function drawMoments() {
     const d = g.x - p.x;
     if (d > W * 1.6 || d < -40) continue;
     const y = runLineAt(g.x);
-    if (g.verb === "glide" && !g.relic) {
+    // III's helper drifts to its GET; VIII's helper still runs to the rising
+    // star when the level aims a scripted helper moment at it.
+    const aimed = S.list.some((m) => m.kind === "helper" && m.target === g.id);
+    if (!g.relic && (g.verb === "glide" || (g.verb === "super" && aimed))) {
       const a = helperApproach(g.verb, d, clock);
       // A scripted helper moment aimed at this GET (III's helper-drift)
       // decides when the helper appears: it fades in from that moment.
