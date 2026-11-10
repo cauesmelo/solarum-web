@@ -1,25 +1,25 @@
 # Solarum — level design
 
-This describes what `level.mjs`, `model.mjs` and `geometry.mjs` implement (2026-11-10, revision five's progression, [RESEARCH_PROGRESSION.md](./RESEARCH_PROGRESSION.md)). The campaign has eight planned stages (`CAMPAIGN`); **I · Waking, II · The Gift, III · Still Water, IV · The Way Down, V · The Breaking Constellation, VI · Borrowed Wind and VII · The Falling Road are built**. Revision six's Far Door (below, unchanged) plays after them as interim level VIII until VIII is built; V and VI replaced revision six's Breaking Constellation and Borrowed Wind, which are retired. Tests and tools name the interim level by key (`LEVEL_ID.door`), so building a stage renumbers nothing by hand. The chapter *A Signal in the Dark* (further below) is source material. Where the build departs from a brief, the reason is given.
+This describes what `level.mjs`, `model.mjs` and `geometry.mjs` implement (2026-11-10, revision five's progression, [RESEARCH_PROGRESSION.md](./RESEARCH_PROGRESSION.md)). The campaign has eight stages (`CAMPAIGN`), **all built**: I · Waking, II · The Gift, III · Still Water, IV · The Way Down, V · The Breaking Constellation, VI · Borrowed Wind, VII · The Falling Road and VIII · The Far Door. No interim level is left: V, VI and VIII replaced revision six's Breaking Constellation, Borrowed Wind and Far Door (described below as retired). Tests and tools name levels by key (`LEVEL_ID`); VIII keeps the old Far Door's key `door`. The chapter *A Signal in the Dark* (further below) is source material. Where the build departs from a brief, the reason is given.
 
 ## One ruler, one tempo per level
 
 Every level is simulated in 107 BPM units: a sixteenth is 15/107 s and 37.85 px of run, a grid x is `220 + 37.85 k` (plus 113.55 px per completed flight, and 63.67 px for a super jump opened 2/16 into a flight), and a level plays at clock = BPM / 107 of real time. Human windows are multiplied by the clock so they stay constant in real seconds (coyote 0.12 s, buffer 0.14 s, respawn 1.1 s, the cascade's shake telegraph 0.35 s). Score tolerances are real milliseconds (35 ms real = 35 × clock of simulation).
 
-| | I · Waking | II · The Gift | III · Still Water | IV · The Way Down | V · The Breaking Constellation | VI · Borrowed Wind | VII · The Falling Road |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| BPM / clock | 88 / 0.822 | 94 / 0.879 | 100 / 0.935 | 107 / 1 | 112 / 1.047 | 118 / 1.103 | 123 / 1.150 |
-| Run (real) | 222 px/s | 237 | 252 | 270 | 283 | 298 | 310 |
-| Owns at the start | jump | jump, double | jump, double, cape | jump, double, cape, glide | jump, double, cape, glide, dive | the same | the same |
-| GET | double jump, sixteenth 120 (bar 8) | cape, sixteenth 4 (bar 1) | glide (the helper), 44 (bar 3) | dive (the necklace), 44 (bar 3) | none: cracked stone is the world's | none: the solar wind is the world's | none: the beat cascade is the world's |
-| Cape rule | (no cape) | breath | breath | breath | breath | breath (and the wind refund) | breath (refill stars: one cape, one leaf, required) |
-| Physics (sim) | g 1640, jump 635, double 570, hang ×0.5 below 66, fall ≤ 681 (560 real), tap cap 308 | 1500 / 570 / 525 | same (glide 350 px/s², ≤ 140 px/s) | same | same, cracks 5/16 | same, cracks 5/16, wind 700 px/s² ≤ 240 (×1.4 held) | same, cracks 5/16, wind as VI |
-| Bars / real s | 19 / 51.8 | 19 / 48.5 | 22 / 52.8 | 21 / 47.1 | 23 / 49.3 | 23 / 46.8 | 25 / 48.8 |
-| Inputs (main; `inputsOf`) | 23, 1.21 a bar, peak 2 | 25, 1.32 a bar, peak 3 | 34 (26 presses, 4 held capes, 4 releases), 1.55 a bar, peak 3 | 36 (33 presses, 3 held capes), 1.71 a bar, peak 4 | 45 presses, 1.96 a bar, peak 3 | 52 (46 presses, 3 held capes, 3 releases), 2.26 a bar, peak 3 | 63 (61 presses, 1 held cape, 1 release), 2.52 a bar, peak 5 |
-| Narrowest / median required window | 618 / 628 ms | 332 / 626 ms | 321 / 606 ms | 300 / 583 ms | 263 / 549 ms | 204 / 537 ms | 203 / 428 ms |
-| Diana's own notes (perfect run) / bed onsets | 1.41 / 0.98 per s | 1.92 / 1.83 | 2.23 / 1.74 | 2.61 / 2.23 | 2.98 / 2.15 | 3.95 / 2.12 | 4.39 / 1.91 |
-| Beacons (largest gap, real) | 4 (13.6 s) | 6 (10.7 s) | 6 (11.7 s) | 5 (9.8 s) | 5 (10.7 s) | 4 (10.2 s) | 5 (9.5 s) |
-| Look | home | pluto | neptune | uranus | saturn | jupiter | mars |
+| | I · Waking | II · The Gift | III · Still Water | IV · The Way Down | V · The Breaking Constellation | VI · Borrowed Wind | VII · The Falling Road | VIII · The Far Door |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| BPM / clock | 88 / 0.822 | 94 / 0.879 | 100 / 0.935 | 107 / 1 | 112 / 1.047 | 118 / 1.103 | 123 / 1.150 | 128 / 1.196 |
+| Run (real) | 222 px/s | 237 | 252 | 270 | 283 | 298 | 310 | 323 |
+| Owns at the start | jump | jump, double | jump, double, cape | jump, double, cape, glide | jump, double, cape, glide, dive | the same | the same | the same |
+| GET | double jump, sixteenth 120 (bar 8) | cape, sixteenth 4 (bar 1) | glide (the helper), 44 (bar 3) | dive (the necklace), 44 (bar 3) | none: cracked stone is the world's | none: the solar wind is the world's | none: the beat cascade is the world's | super jump (the rising star), sixteenth 24 (bar 2) |
+| Cape rule | (no cape) | breath | breath | breath | breath | breath (and the wind refund) | breath (refill stars: one cape, one leaf, required) | breath (refill stars: two cape, one leaf, required, over the low line; one optional cape) |
+| Physics (sim) | g 1640, jump 635, double 570, hang ×0.5 below 66, fall ≤ 681 (560 real), tap cap 308 | 1500 / 570 / 525 | same (glide 350 px/s², ≤ 140 px/s) | same | same, cracks 5/16 | same, cracks 5/16, wind 700 px/s² ≤ 240 (×1.4 held) | same, cracks 5/16, wind as VI | same, cracks 5/16, wind as VI, super 720 |
+| Bars / real s | 19 / 51.8 | 19 / 48.5 | 22 / 52.8 | 21 / 47.1 | 23 / 49.3 | 23 / 46.8 | 25 / 48.8 | 25 / 46.9 |
+| Inputs (main; `inputsOf`) | 23, 1.21 a bar, peak 2 | 25, 1.32 a bar, peak 3 | 34 (26 presses, 4 held capes, 4 releases), 1.55 a bar, peak 3 | 36 (33 presses, 3 held capes), 1.71 a bar, peak 4 | 45 presses, 1.96 a bar, peak 3 | 52 (46 presses, 3 held capes, 3 releases), 2.26 a bar, peak 3 | 63 (61 presses, 1 held cape, 1 release), 2.52 a bar, peak 5 | 71 presses, 2.84 a bar, peak 4 |
+| Narrowest / median required window | 618 / 628 ms | 332 / 626 ms | 321 / 606 ms | 300 / 583 ms | 263 / 549 ms | 204 / 537 ms | 203 / 428 ms | 195 / 411 ms |
+| Diana's own notes (perfect run) / bed onsets | 1.41 / 0.98 per s | 1.92 / 1.83 | 2.23 / 1.74 | 2.61 / 2.23 | 2.98 / 2.15 | 3.95 / 2.12 | 4.39 / 1.91 | 4.86 / 1.96 |
+| Beacons (largest gap, real) | 4 (13.6 s) | 6 (10.7 s) | 6 (11.7 s) | 5 (9.8 s) | 5 (10.7 s) | 4 (10.2 s) | 5 (9.5 s) | 6 (7.7 s) |
+| Look | home | pluto | neptune | uranus | saturn | jupiter | mars | moon-earth |
 
 **Inputs** (`scripts/movement-audit.mjs` `inputsOf`, used by the level report and the L3 ladder test): every press (jump, tap, cape, dive), every press of the cape that only holds it (a glide that does not start with a flight at the same x) and every release of a held cape in the air (a timed letting-go); a release after a touch-down is not one, like a jump's release, and letting go and jumping in the same instant is one gesture. I and II are unchanged by this rule (they have no glide).
 
@@ -224,7 +224,37 @@ Beacon gaps 7.8 / 8.8 / 7.8 / 9.5 / 9.5 / 6.8 s real (≤ 10). Charge sources (R
 
 Departures from the brief's VII table: 25 bars and five beacons (5, 9½, 12½, 17, 22) instead of six, each lit by a landing on or before its beat (the beacons' runs carry optional breezes and taps); the six-tile wave is re-solved to exact cells (not copied); the dives land on stable stones (a dive smashes a tile); the missing tile is two missing tiles, the second charged by a required song (it gives the narrowest window) rather than a long stable run; the "cracks under the landing" are the cracked k1 and ka the flights reach; the leaf need is 3¾ bars after the *dive* beacon (the missing tiles come first; RESEARCH_REFILLS asks 2½). The addendum's sky road over the last road (two cape stars, three flights toward the lock) is not built yet. The brief's full backbeat and the onset band of 4.3 (7-8/s) are not adopted, under the user's restraint.
 
-## Interim level VIII (revision six's IV) and the retired interim levels
+### VIII · The Far Door (128 BPM): tense but fair; the super jump, then everything
+
+GET: the super jump, the **rising star** (relic `rising-star`, verb `super`) on sixteenth 24, right after the title card; the helper leaps ahead (`moment` *helper-leap*). VIII starts with every other verb (cape rule breath). Clock 1.196; shared physics, cracks 5/16, wind as VI. A grid x is `ex(k, s, f) = 220 + 37.85 k + 64.34 s + 113.55 f` (s super jumps opened 2/16 into a flight: 64.34 px is the 120 Hz pilot's measured extra, so the beacons and the door fall on the half bars of the baked path; f full flights). New cells (a scratch probe on the real model, dy at n/16 after a ground jump, up < 0): super (jump, cape 2, jump 4) **9: −233.8, 10: −173, 11: −82.7, 12: +37.1**; a jump into a standard column, cape 6, jump 8 **16: −94.2**; the star road below **23: −196.7** (+291.44 px); a breeze 160 × 203 px lands its hop 9/16 later at 60/120/240 Hz (200 px: 8.91). Heights follow the main route's landings (`EY`), kept within −44…584 so the camera's death line stays near the view's bottom.
+
+| k (bar) | Step | What |
+| --- | --- | --- |
+| 24-56 (2-4) | GET, safe first use | The rising star (24); the school: jump, cape, jump again in the flight (28, 30, 32; the optional ↑ · → · ↑ glyph) onto the school shore 233 px up (37), the *school-song* on the arc; the moon floor runs under it and ends 150 px before the step, so a missed super is a jump up onto it. A tap down (38), a jump and a dive (43, 46) 149 px down onto the step (48), taps down (48, 53) onto the storm beacon's stone |
+| 56 (4½) | beacon *storm* | |
+| 68-77 (5) | need | The storm void (revision six's, same sixteenths): the super jump (68, 70, 72; the ↑ · → · ↑ glyph) onto a shore 233 px up |
+| 79-112 (6-8) | develop | Out of the wind: a double (79, 83) down onto the wind gate (89); jump into the column (92), the required *rise-song* on its rise (complete on 96) gives the cape back, the cape at its top (98) and the super jump (100) land on the wind shore (108); a tap down onto the wind beacon's stone |
+| 112 (8) | beacon *wind* | A breeze hop (113), optional |
+| 123-165 (8-11) | develop | Off the falling road: a tap (123) and a hop (128) up 84 px onto five tiles (132, 138, 143, 149, 154: bounces of 6 and 5, down 51, up 31), the required *cascade-song* on the bounces (complete on the last tile), and a super jump off the last tile (154, 156, 158) onto the cascade shore (165), 83 px up; a tap down onto the launch beacon's stone |
+| 168 (11½) | beacon *launch* | A breeze hop (169), optional |
+| 180-221 (12-14) | twist | The gauntlet: a hop onto the launch crack (185), jump (187), cape and super jump across a 444 px void (12/16, 37 px down) onto the gauntlet shore (199), the required *launch-song* on the crack and the rise; a jump-and-dive stair (201/204, 207/210) down 149 px twice onto stable stones (a dive smashes cracks); a double (213, 217) up 135 onto the road shore, a tap onto the gate |
+| 224 (14) | beacon *road* | No hop: nothing may spend the bar before the road |
+| 236-259 (15-17) | twist | **The star road** (RESEARCH_REFILLS 3, required, over the low line): jump (236), cape (238) and a lit cape star taken on that tick, the super jump (240), a lit leaf star at its top, the double (245), cape (249) and the second lit cape star on that tick, cape (253), down on the far shore (259), 199 px up, 1161 px on; the *road-song* along it (the climax phrase). The low line: a tap down onto the low floor, a hop 84 px up onto the low step and a double up onto the far shore (only jumps; never more than 240 px under the road); a miss anywhere on the road lands on it. The ↑ · → · ↑ glyph |
+| 261-266 | | A jump and a dive (261, 264) down onto the summit beacon's stone |
+| 272 (17½) | beacon *summit* | A breeze hop (273), optional |
+| 284-320 (18-21) | conclude | The rising stair (revision six's): two doubles (284/288, 296/300) 135 px up each along the *stair-song*; the required *summit-song* on the second step (complete on 308); the super jump (308, 310, 312) across onto the summit (12/16, 37 px down). An optional cape star on that jump's rise is lit only if a flight was spent on the stair |
+| 320-336 (21-22) | conclude | A tap (320) onto the summit's second stone, a jump and a dive (325/328, 331/334) twice down onto the home beacon's stone |
+| 336 (22) | beacon *home* | A breeze hop (337), optional |
+| 347-389 (22-25) | finish | The last road, no glyph: a hop onto five tiles (352 ... 374), down onto the last stone (380), a double (380, 384) up onto Earth's plain (388), the *home-song*; a breeze hop on the plain (389) |
+| 400 (26) | door | Earth's door (`level.earth`), the downbeat of bar 26 |
+
+Beacon gaps 6.8 / 7.0 / 6.8 / 6.8 / 6.5 / 7.7 / 7.5 s real (≤ 9.5). Charge sources (RESEARCH_PROGRESSION 3.4, C2): the storm beacon for the void; the *rise-song*, *cascade-song*, *launch-song* and *summit-song*, each completing in or just before its own flight's airtime, so an optional flight spent earlier is always given back; the road beacon (no airtime between it and the road) and the road's two cape stars. The leaf star is VIII's required leaf. Removing any of the three road refills drops the main route onto the low line at its gap, after the road beacon (tested). Great Stars: GS1 at the apex of a second super jump from the school's second stone; GS2 high over the star road (a super jump in its second flight, then its last flight from the refilled bar); GS3 over the last road's last tile (a flight and a super jump onto Earth's plain); none gates (D2).
+
+**Ladder (L3):** narrowest 195 ms (the road's double after the leaf star; VII 203), median 411 (VII 428), 71 inputs in 25 bars = 2.84 a bar (VII 2.52), peak 4, beacon gap 7.7 s; grid within 34 ms real at 60 Hz, 27 at 120 and 13 at 240. **Music:** preset `door`, B Aeolian over the F♯ pedal; Diana's own notes 4.86/s (VII 4.39, +11%), bed 1.96/s; no groove and no shaker (the falling roads' knocks are the world's, her touch-downs on the tiles are hers).
+
+Departures from the brief's VIII table: 25 bars (46.9 s) and six beacons (4½, 8, 11½, 14, 17½, 22) instead of 30 bars and eight; the school's super is optional (the safe first use; the storm void is the first need, two bars after the GET); the star road is 23/16 in the air (RESEARCH_REFILLS asks ≥ 4 bars, which needs more than its three required refills); the develop's "flight that ends before the column" is a column whose rise-song gives the cape back for the flight out of its top; the gauntlet has no land-and-go cascade (the falling roads are the develop and the finish) but a jump-and-dive stair; the high finish is the summit (a super across, 37 px down) with GS3 over the last tile instead; the four-on-the-floor groove and the eighth-note ostinato are left out under the owner's restraint. One optional cape star (`cape-summit`) is added for C2; RESEARCH_REFILLS lists one optional leaf instead (not built).
+
+## Retired interim levels
 
 ### Retired: Borrowed Wind (107 BPM, revision six's II), interim until VI was built
 
@@ -238,7 +268,7 @@ Added (2026-11-10): Movement II's lid is optional again (the main route runs ove
 
 Movement II plus the hearth void and the split voids, at their own coordinates, from chapter sixteenth 160. Cracks break 5/16 after touch-down; the first crack's floor moved to 129 px below it so the fall lands 3/16 after the break, and a 4/16 hop climbs 80 px to the second crack. The upper path ends at the lid: the main route dives through it on the grid (k 285), lands in the well 95 px down 1/16 later, and leaves with a double jump (second press 4/16 later) straight up 76 px onto the second tile, 9/16 later, the same touch-down as Movement II's bounce; the cascade has five tiles (its first drops when the chapter's second did). **GS1** on the cracked chain, **GS2** for an early (3/16) second press out of the well, **GS3** on a two-step cracked stair above the crown. The split voids' constellation is required (cracks never refill). The door is on wind-gate's rock, bar 20.
 
-### VIII (interim) · The Far Door (128 BPM, revision six's IV): agitated, precise but fair
+### Retired: The Far Door (128 BPM, revision six's IV), interim until VIII was built
 
 Added (2026-11-10): **the voids at 128** after the crown (Movement III's hearth void and split voids translated so their first takeoff is the hearth's, at 16th 206; beacon *voids*; the split-song refill is required; the finale follows 159 px lower) and **the rising stair** before the door (beacon *stair*; two double jumps, second press 4/16 after the first, 135 px up each, along the six-star stair-song; the walk-off from the top step lands on the door island as from the finale's high shore).
 
