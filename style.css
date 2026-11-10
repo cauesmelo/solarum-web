@@ -1260,7 +1260,7 @@ button:disabled {
   margin: 0;
   display: grid;
   grid-template-columns: repeat(5, auto);
-  gap: 6px 18px;
+  gap: 6px 14px;
   align-items: center;
 }
 .results div {

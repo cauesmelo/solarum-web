@@ -46,9 +46,9 @@ with ZipFile(ARCHIVE) as z:
 # Which retained files are actually drawn or played (the rest stay as an archive).
 manifest['usage']={
  'onScreen':{
-  'run':'Diana running','idle':'Diana at rest after the victory stop','air':'Diana airborne','dash':'cape layer during flight',
+  'run':'Diana running','idle':'Diana at rest after the victory stop, and rising out of the soil on the wake','air':'Diana airborne','dash':'cape layer during flight',
   'bodyDash':'no-cape body under the flight cape','drop':'dive roll','jumpLanding':'takeoff and hard landing','softLanding':'soft landing',
-  'startStop':'wake / respawn start and the victory stop','sprout':'title sprout (Diana hidden in the soil) and respawn pop',
+  'startStop':'wake / respawn start and the victory stop','sprout':'title sprout (Diana hidden in the soil), the leaves that twitch as she emerges, and the respawn pop',
   'star':'pickups, constellations, Great Stars, HUD slots, beacon tops, death shards, refill bursts','background':'twinkling sky stars',
   'saturn':'very faint distant planet','portal':'the far door (visible-alpha crop)','logo':'title logo','titleground':'title ground and tinted back hills',
   'cadent1':'occasional shooting star','cadent2':'occasional shooting star','tailStar':'updraft wind streaks and Great Star tails',

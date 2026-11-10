@@ -3168,7 +3168,7 @@
   "usage": {
     "onScreen": {
       "run": "Diana running",
-      "idle": "Diana at rest after the victory stop",
+      "idle": "Diana at rest after the victory stop, and rising out of the soil on the wake",
       "air": "Diana airborne",
       "dash": "cape layer during flight",
       "bodyDash": "no-cape body under the flight cape",
@@ -3176,7 +3176,7 @@
       "jumpLanding": "takeoff and hard landing",
       "softLanding": "soft landing",
       "startStop": "wake / respawn start and the victory stop",
-      "sprout": "title sprout (Diana hidden in the soil) and respawn pop",
+      "sprout": "title sprout (Diana hidden in the soil), the leaves that twitch as she emerges, and the respawn pop",
       "star": "pickups, constellations, Great Stars, HUD slots, beacon tops, death shards, refill bursts",
       "background": "twinkling sky stars",
       "saturn": "very faint distant planet",

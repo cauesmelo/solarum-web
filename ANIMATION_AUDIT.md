@@ -70,7 +70,7 @@ No clip, pivot, frame order or layer was changed. `animation.mjs` and the body /
 | Moment | Clip / frames | Notes |
 | --- | --- | --- |
 | Title | `sprout` (18 frames, 2.25 s loop) | Diana hidden in the soil, centred on the original title ground |
-| Wake | `sprout` fades for 0.16 s, then `start` | The leaves pop and Diana stands into the run |
+| Wake | `sprout` fades for 0.16 s, then `start` | The leaves pop and Diana stands into the run (since revision seven only for wakes without the emergence: QA's `start()`, Restart) |
 | Respawn | `sprout` for 0.14 s at the beacon, then `start` | Same pop as the wake, inside the 0.4 s respawn window |
 | Victory | `stop`, then `idle` | Unchanged hold-last-frame behaviour |
 | Flight | `dash` = `bodyDash` body + `dash` cape layer | Unchanged; faint after-images skipped under reduced motion |
@@ -84,3 +84,48 @@ No clip, pivot, frame order or layer was changed. `animation.mjs` and the body /
 | Wind | `tail-star.png` turned upward | Rising streaks inside each updraft column |
 
 The extractor now also resolves `Animations/stars/cadent1.anim` and `cadent2.anim`; note that `cadent1` starts at 0.0417 s on frame 1 and shows frame 0 at 0.708 s, exactly as authored.
+
+## Revision seven (2026-11-10): Diana emerges from the earth on the wake
+
+The user remembered an animation from the original game in which Diana comes out of the earth, and asked that pressing start should make her emerge and start running.
+
+### Where the original animation is
+
+- **It is not in the Unity archive.** The archive has the 18-frame `sprout` (her two leaves in the soil, the title) and the `start` / `stopping` clips, nothing in between.
+- **It is in the original trailer** (`refs/solarum/…Solarum-Trailer_001_1080p.mp4`, about 91–99 s). It is thin black line art on cream, a different drawing from the game sprites:
+  1. The sprout grows.
+  2. A round head with two leaves rises out of the soil.
+  3. It squints, opens its eyes and ducks.
+
+### The choice: Diana's own sprites, masked by the soil
+
+Option (b), rotoscoping the trailer, was rejected. Its frames are an outline-only chibi head on cream, not the game's cream-fill, ink-outline Diana, and it has no body or cape to hand over to the `start` clip. Cleaning it into the sprite style would mean drawing new character art, which this project avoids.
+
+Option (a) keeps every approved clip, pivot and layer unchanged. `emergence.mjs` is a pure timeline and `game.js` draws it:
+
+| Beat (trailer) | Time | What is drawn |
+| --- | --- | --- |
+| Leaves twitch | 0–0.26 s | `sprout` at 3× speed with a decaying 9 Hz shiver (±0.09 rad), lifted 3 px; two soil crumbs; the soil parts (two short ink strokes) |
+| Head rises | 0.26–0.68 s | The body clip (`idle`, the 12-frame loop), feet from 92 px under the soil (fully hidden) to 40 px under it, ease-out: her leaves, head, eyes and chin come out. The big title leaves stay rooted and fade (and shrink to 0.32) as her own leaves reach them; three crumbs |
+| A beat of looking | 0.68–0.98 s | Head out, the `idle` loop breathing (±1.5 px) |
+| She pops up | 0.98–1.22 s | One small hop: feet from 40 px under to 12 px over the soil and down onto it; eight crumbs |
+| Start → run | +0.333 s | The original `start` clip from the model (`animation.mjs`, unchanged), the unchanged wake camera move (0.9 s) and the title ground's fade (0.6 s) |
+
+How it is drawn:
+- **The mask.** The soil is the original title ground, which the renderer already draws after the world. Diana is drawn in the world layer, so whatever is still below the soil is hidden along the ground's own hand-drawn contour: no clip path and no new art.
+- **The crumbs.** They are paper chips with an ink edge, drawn over the ground. Each one disappears when it falls back onto the soil line.
+- **The total.** 1.22 s + 0.33 s = 1.55 s from the press to running; the brief's ceiling was about 1.6 s.
+- **Skipping.** A second press skips straight to the run.
+- **Reduced motion.** A 0.36 s rise with no shiver, hop or crumbs.
+
+### Sprite sets
+
+`SPRITE_SETS` maps the roles the emergence draws to manifest clips:
+- `cape`: `idle`, `start`, `run`.
+- `nocape`: `nocapeIdle`, `nocapeStart`, `nocapeRun`. These are the names an extraction of the archive's `No Cape/nocape-idle`, `nocape-start` and `nocape-running` overrides would get.
+
+A level chooses its set with `sprites: "nocape"` in its definition (or QA with `__game.setSpriteSet`). `resolveSet` falls back to the cape set, flagged `fallback`, while those clips are not in the manifest, so the emergence never draws a missing clip. Once they are extracted it uses them without a code change. The no-cape sheets are the same 200 px centred-pivot cells as the cape idle and start sheets, so the depths above apply to both.
+
+### Unchanged
+
+The approved clips, pivots, frame order, body-first / cape-second layering, `animation.mjs` and the model's animation state machine are all unchanged. The renderer draws the `idle` body clip itself during the emergence, and the model's `start` clip begins with the run.

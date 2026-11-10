@@ -15,13 +15,20 @@ This revision (2026-11-09, "ink and starlight") implements the approved research
 
 Routes, art, animation timing and the music grid are unchanged.
 
+**Revision seven (2026-11-10, front end, sound and the wake)** answers the user's play feedback and the playtest critic:
+- **Title:** one opaque ink panel with the paper frame on the title ground holds wake, an orbit line of numbered stops built from `LEVELS` (it holds 8-10 levels) and the selected level's name and slots, shown once; nothing in the sky can draw over it. See [UI](#ui-ink-and-starlight).
+- **Pause → Main menu**; the victory card is **Continue** and **Retry** only (Continue returns to the title after the last level).
+- **Diana emerges from the earth** under the sprout when the player wakes her, then starts running ([ANIMATION_AUDIT.md](./ANIMATION_AUDIT.md)).
+- **Soft movement bodies** (breath, cloth, settling air; no thumps or clicks) and **a quieter, thinner bed** behind Diana's notes, with **Music / Sounds** sliders in the pause card. See [Sound](#sound).
+- No silent transitions (the closing chord holds under the victory card, the map counts in the next level), a smooth wake (the audio graph is warmed while the title rests), glyphs that never cover Diana, the map hint on a plate and touch controls for touch laptops.
+
 It is still a 2D side-scrolling autorunner with the original Diana / cape / signal / Earth story; no endless assembler, new character art or genre pivot.
 
 ## Run independently
 
 ```sh
 npm run dev          # http://127.0.0.1:4173
-npm test             # 86 tests: every level's routes and fairness, mechanics, glyphs, camera, UI, audio and the score
+npm test             # 119 tests: every level's routes and fairness, mechanics, glyphs, camera, UI, the wake, audio and the score
 npm run score:bake   # re-bake the four path clocks after a geometry, model or pilot change
 node scripts/arcs.mjs 1 hold tap double:4   # authoring: a move's height on every sixteenth
 npm run build:itch   # dist/solarum-itch.zip
@@ -35,7 +42,7 @@ Reach the far door. Stars never gate anything.
 
 | Action | Keyboard | Touch (landscape) | Touch (portrait) |
 | --- | --- | --- | --- |
-| Wake (title) | Space, Enter or ↑ | Tap anywhere | Tap anywhere |
+| Wake (title) | Space, Enter or ↑ (again to skip her emergence) | Tap anywhere | Tap anywhere |
 | Choose an open level (title) | ← / → or click a station | Tap a station | Tap a station |
 | Jump / jump again in the air | Space, ↑ or W (release early for a hop) | Left half of the screen | Left half of the control deck |
 | Cape flight (once per airtime) | D or → in the air | 76 px cape button, bottom right | Cape button in the deck |
@@ -44,6 +51,7 @@ Reach the far door. Stars never gate anything.
 | Dive / smash cracked stone | S or ↓ | 64 px dive button or swipe down on the right half | Same |
 | Pause / resume | P or Esc | II button | II button |
 | Back to last light / restart level | R / Shift+R | Pause card | Pause card |
+| Main menu, Music / Sounds volume | Pause card (↑ ↓ move, ← → on a slider) | Pause card | Pause card |
 
 Diana runs 151.4 px per beat in every level: 242 / 270 / 298 / 323 px/s of real time at 96 / 107 / 118 / 128 BPM. The simulation always runs in 107 BPM units and a level plays it at clock = BPM / 107 (like Gentle pace), so every arc, gap and cell is the same in px and sixteenths, while coyote (0.12 s), the landing buffer (0.14 s), respawn and telegraphs stay constant in real seconds. A jump pressed while she is falling apart is kept and spent the moment she is back (released by then, it is a tap). A press just before touch-down is the ground jump on the landing tick even with the double jump still in hand. Every key, touch or click acts on the 1/120 s tick its own timestamp falls in, whatever the frame rate or a hitch ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)). The cape, glide and dive arrive in II; I ignores those buttons.
 
@@ -61,7 +69,7 @@ Diana runs 151.4 px per beat in every level: 242 / 270 / 298 / 323 px/s of real 
 
 ## The four levels
 
-Each is a short kishōtenketsu with beacons on half bars (never more than 14 s of real run apart), three Great Stars each visible from the route and never gating, and a far door on a downbeat. Levels open in order; progress (open levels, best Great Stars) is saved with a guarded `localStorage` write. The title shows the orbit map (four stations with their slots); the win card offers **Continue** (the next level, with its title card), **Retry** and **Title**. II–IV open with Diana stepping out of the door she entered. Each Great Star of the campaign paints a twelfth of Earth inside the arch; Earth is seen whole, and the original recording returns, only at IV's door. Coordinates, cells and beat charts: [LEVEL_DESIGN.md](./LEVEL_DESIGN.md).
+Each is a short kishōtenketsu with beacons on half bars (never more than 14 s of real run apart), three Great Stars each visible from the route and never gating, and a far door on a downbeat. Levels open in order; progress (open levels, best Great Stars) is saved with a guarded `localStorage` write. The title shows the orbit line of levels (one stop per level, the selected one's name and slots below); the win card offers **Continue** (the next level, with its title card, or the title after the last level) and **Retry**. II–IV open with Diana stepping out of the door she entered. Each Great Star of the campaign paints a twelfth of Earth inside the arch; Earth is seen whole, and the original recording returns, only at IV's door. Coordinates, cells and beat charts: [LEVEL_DESIGN.md](./LEVEL_DESIGN.md).
 
 | Level | BPM · bars · real time | New | Score | Content |
 | --- | --- | --- | --- | --- |
@@ -84,17 +92,31 @@ Between levels, **Continue** plays the orbit map: the line grows from the finish
 
 The Solarum font is used for every label (never below 16 px; its missing ✦ is replaced by the original star sprite). Colours are the original title-art tokens `--ink #0C0C0F`, `--paper #FBFBEA`, `--hill #CECEC1`, `--mute #AEAEA3`, `--dim #777771`; `--earth #6FA8DC` is the only colour and is reserved for Earth. Paper cards carry a hand-drawn ink frame (an SVG displacement filter that boils at 8 fps unless reduced motion is set).
 
-- **Title:** the original logo over the original title ground (with a tinted copy as back hills) and the 18-frame sprout; "Press space or tap to wake"; ♫ and fullscreen in the corners. Waking drifts the logo away, pops Diana out of the leaves and eases the camera to the run framing. Sound is on by default and starts with that gesture (the choice persists with a guarded `localStorage` write); see [Sound](#sound).
+- **Title (revision seven):** the original logo in the sky; the original title ground (with a tinted copy as back hills) and the 18-frame sprout, framed with the soil at the same fraction of the stage for every level (60% of the height, 50% on short landscape screens, 80% of a portrait sky; the levels' start heights differ by 220 px); and **one opaque ink panel with the paper frame** standing on the ground. The user found the old see-through station cards illegible under the sky's star sprites. The panel holds, in order of importance:
+  - The **wake** button (paper on ink, a slow breath of light instead of a fading label).
+  - The **orbit line**: one numbered stop per level, built from `LEVELS` and joined by the dotted orbit (solid between finished levels), ending at Earth. Ten fit in one row at 960 px; phones get balanced rows (5 + 5 at 390 px wide). Short landscape screens put the line beside the wake button, or across the panel's first row when it is long.
+  - The **selected level's name and three Great Star slots**, shown once. Hovering or focusing a stop previews it.
+  - Under it, the key hint.
+
+  Stops: open = ink with a paper ring; selected = paper with Diana's two leaves above; finished = a small star at the rim; locked = a dashed `--dim` ring and a `--mute` numeral (8.6:1 on ink, not faded), focusable for the preview ("opens after III") but not playable. ←/→ choose among open levels. The world (stars, glyphs, beacons, islands) is not drawn on the title and fades in with the run, and the shooting stars never run there, so nothing in the sky can sit over or show through the options. In portrait the panel stands on the sky's strip of ground and runs into the deck, with ♫ and fullscreen moved up to the empty HUD bar; on a phone turned sideways it goes compact. Sound is on by default and starts with the wake gesture (the choice persists with a guarded `localStorage` write); see [Sound](#sound).
+- **The wake: Diana emerges from the earth** (the original trailer's beats, [ANIMATION_AUDIT.md](./ANIMATION_AUDIT.md)). The press fades the title UI and plays her emergence on the unchanged title camera:
+  1. The leaves twitch (0.26 s).
+  2. Her head rises out of the soil into them (0.42 s).
+  3. A beat of looking (0.30 s).
+  4. She hops out with soil crumbs (0.24 s).
+
+  Then the original `start` clip runs into the run, with the wake camera move and the title ground's fade, as before: 1.55 s from the press to running, 0.36 s + the start clip under reduced motion. A second press skips straight to the run, and ←/→ are ignored while she wakes.
 - **HUD:** star count, three Great Star slots (hollow frame 0, filled frame 2, pulsing while carried), the orbit line home → Earth with beacon ticks and a two-leaf Diana marker, fullscreen and II. Nothing else.
 - **World glyphs** instead of words: paper discs with drawn arrows (↑, ↑ ↑, ↑ · →, → · ↑, hold →, ↑ · hold →, ↓), shown about 2.2 s ahead of first need, hidden once the action is done, shown again after a fall. One at a time: a glyph can wait for an earlier one (`after`), and optional glyphs hide while a required one is due. Each glyph's window is tested: following it at its first valid moment (and, for required ones, its last) survives. Touch devices see the jump glyph as the rounded square of the jump zone.
 - **Visual language:** stable stone is plain paper; optional stable stone has a dotted rim and a star tick; grey appears only on stone that is breaking now; crumbling shelves and cascade tiles have zigzag edge cracks; lids have one star-shaped break with light glinting out. World stars always use the filled frames (the hollow frame means an empty Great Star slot).
 - **Why she runs:** a tiny Earth glint pulses the signal far ahead in the sky from the first second, and the first beacon's line names it.
 - **Beacons** are ink cairns whose hollow star fills, with a ring pulse, a two-note chime, an orbit tick and one story line.
 - **Movement cards** (I, II, III only), 42 px, 300/1600/500 ms of *simulation* time, never over a required input (tested). Story lines and tips also run on simulation time and are dropped on respawn, so nothing lingers after a pause, fast-forward or fall.
-- **Pause card** with the large orbit, Continue / Back to last light / Restart chapter, Sound, Assist…; P/Esc resume, arrows and Tab move focus inside it; blur and hidden tabs auto-pause.
-- **Victory:** Diana stops in the door (in IV a small blue Earth rises), and after 1.5 s a card slides up beside (never over) the door: the level, a line of story, stars, Great Star slots, time (real seconds), falls, the song's notes on time, **Continue**, **Retry** and **Title**.
-- **Title:** under the wake button, the orbit map's four stations (numeral, name, three slots); locked ones are faint.
-- **Touch:** targets ≥ 44 px, buttons at 35% until pressed. In landscape the cape (62 px) and dive (50 px) sit low in the right corner so the lower-right lookahead stays visible; touch devices see touch hints on the title. Story lines and tips sit on ink plates so they read over cream islands. The brief's remove-lists are gone entirely: there is no canvas text at all.
+- **Pause card** with the large orbit, Continue / Back to last light / Restart level / **Main menu**, Sound, Assist…, and **Music** and **Sounds** sliders (see [The mix](#the-mix-measured)). Main menu goes back to the title: the level's score stops, the title song returns and the saved progress is kept. P/Esc resume; ↑/↓ (and ←/→ outside a slider) and Tab move focus inside the card; ←/→ move a focused slider. On a phone turned sideways the card is two columns so it fits. Blur and hidden tabs auto-pause.
+- **Victory:** Diana stops in the door (in IV a small blue Earth rises), and after 1.5 s a card slides up beside (never over) the door: the level, a line of story, stars, Great Star slots, time (real seconds), falls, the song's notes on time, **Continue** (default focus: the next level, or the title after the last one) and **Retry**. The user disliked the third Title button, which is gone; Main menu lives in the pause card.
+- **Between levels** the orbit map grows the line for one bar of the next tempo. Its hint sits on an ink plate near the bottom, clear of the dimmed island. With 8-10 levels only the finished and the next station are named.
+- **Glyphs never cover Diana:** a row of discs that would touch her rises until it clears her head by 8 px. Portrait skies scale discs up to 1.8x, and IV's ↑ → ↑ used to sit on her head. This only changes the drawing; the glyph windows are unchanged.
+- **Touch:** targets ≥ 44 px, buttons at 35% until pressed. A device that reports a fine pointer but has a touchscreen gets the touch controls on its first real touch. In landscape the cape (62 px) and dive (50 px) sit low in the right corner so the lower-right lookahead stays visible; touch devices see touch hints on the title. Story lines and tips sit on ink plates so they read over cream islands. The brief's remove-lists are gone entirely: there is no canvas text at all.
 
 ## Sound
 
@@ -102,7 +124,7 @@ The Solarum font is used for every label (never below 16 px; its missing ✦ is 
 
 ### Every action has two parts
 
-The **body** (breath, cloth, stone, sparkle, thump) plays at once and carries no free pitch. The **voice** is a note from the current chord's safe set, quantised to the grid: within 35 ms of a grid point it plays at once; otherwise it waits for the next point under a hard cap, or plays *loose* (3 dB softer, 20% wetter, slightly blurred). Safe sets: Bm B D E F♯ A · F♯m F♯ A B C♯ E · D D E F♯ A B · G G A B D E (D pentatonic's D rubs over F♯m, so each chord has its own set).
+The **body** (breath, cloth, air, stone, sparkle) plays at once and carries no free pitch; since revision seven Diana's own movements have no thumps or clicks at all (see [Body cues](#body-cues)). The **voice** is a note from the current chord's safe set, quantised to the grid: within 35 ms of a grid point it plays at once; otherwise it waits for the next point under a hard cap, or plays *loose* (3 dB softer, 20% wetter, slightly blurred). Safe sets: Bm B D E F♯ A · F♯m F♯ A B C♯ E · D D E F♯ A B · G G A B D E (D pentatonic's D rubs over F♯m, so each chord has its own set).
 
 | Event | Voice (Diana's own notes are never detuned) | Grid / cap |
 | --- | --- | --- |
@@ -154,6 +176,8 @@ All 62 intended stars on time, all five main constellations, no fall: the song i
 
 - The score never delays or drives gameplay: the simulation runs on its own clock and the engine follows it. `game.js` passes `{ simTime, x, y, status, timeScale, inWind, gliding, fallsHere }` every frame; events go to the conductor even in quiet QA steps so the song keeps its place.
 - Simulation seconds map to audio seconds through a clock that ignores the audio clock's 2.7 ms render-quantum steps (4 ms dead band), slews real drift at 1% of tempo (3% for a residual over 20 ms) and, after a hitch over 50 ms, re-anchors by **whole sixteenths** so the grid keeps its phase; the wake anchors on its first frame. Bed notes are scheduled from the rAF loop 120 ms ahead and sound 15 ms after their grid point, which centres Diana's notes (they arrive a frame after their event); a note whose grid point just went by sounds at once, never in the past. Gentle pace (0.8×) slows the transport to 85.6 BPM, so everything stays aligned. The simulation is never held for the audio (after a pause, `ctx.resume()` settles in the background and the clock slews the residual).
+- **A smooth wake (revision seven).** The playtest critic measured the first frames after the wake stalling 83-350 ms, only with sound on: the AudioContext construction (60-150 ms on the main thread here) and the graph build ran inside the press. 400 ms after the title appears, `prepare()` now creates the context, which a browser leaves suspended without a gesture. It then builds the graph one step per task (impulses, noise, convolvers, the wake's kalimba strings) from the same seeded rng, so the buffers are identical to a cold build. The press only resumes the context and routes the soundtrack. Chrome, a real Space press, rAF intervals from the press through 2 s of running: the worst frame was 33-67 ms before and is 17 ms now (no frame over 25 ms); under 4x CPU throttling, 183 ms before and 33 ms now. With sound off nothing is created, as before.
+- **Transitions are never silent.** After a door without the recording (I-III) the cadence used to decay to about -70 dBFS under the victory card. Now the closing chord stays in the sky: a soft bed pad from 2 s after the door, re-voiced every 5.5 s, ended by any reset. The map between levels plays a one-bar count-in of the next level's pulse at its tempo (felt beats, the first accented, the Signal on the downbeat) that lands its downbeat when the level begins. The next level's sky swells in under the held chord (a 1.4 s handover) instead of starting cold.
 - **Pause freezes everything** with a 15 ms fade on each side (no click). Every pause path suspends the AudioContext and the soundtrack; the score's clock and transport hold with the frozen simulation and nothing is scheduled until Continue, which resumes in place. Sound off creates no context and no nodes (the conductor still follows, so switching sound on mid-run joins the song where it is). Sound is on unless the player turned it off.
 
 ### Palette and signal flow
@@ -161,12 +185,12 @@ All 62 intended stars on time, all five main constellations, no fall: the song i
 Voices (`VOICES` in `audio.mjs`): sky pad, choir and cape vowel (saws through two formant band-passes with a vibrato that blooms in), glass harmonica (sine plus a third harmonic 20 dB down and a wet-finger noise rub at twice the pitch), music-box glass and felt kalimba for stars, felt bass (sine under 400 Hz with an 8 ms mallet), felt heartbeat, shaker, FM celesta, inharmonic star-dust bells, glass shards, stone marimba, bloom, beacon chime.
 
 ```
-cue -> sfx bus -> compressor -> master -> safety clipper -> out    (+ 2.4 s room reverb)
-bed voice -> bed bus -> tape wow (H) -> lowpass (H) ------> score bus
-player voice ---------------------------------------------> score bus
-voices -> 5.5 s space reverb (30 ms pre-delay, 120 ms bloom) + octave shimmer loop -> score bus
-score bus -> tape delay (tape-stop) -> tape lowpass -> tape gain -> presence (+3.5 dB @ 3.8 kHz) -> score out (0.55) -> master
-rewind notes -> master        soundtrack element -> music gain (0.32) -> master (title, door)
+cue -> sfx bus (x Sounds) -> compressor -> master -> safety clipper -> out    (+ 2.4 s room reverb)
+bed voice -> bed bus -> tape wow (H) -> lowpass (6.5 kHz ceiling, H) -> dip (-4 dB @ 2.5 kHz) -> MIX.bed (-9 dB) x Music -> score bus
+player voice -> presence (+3.5 dB @ 3.8 kHz) -> x Sounds --------------------------------------------------> score bus
+bed sends (-5 dB x Music) / player sends (x Sounds) -> 5.5 s space reverb (30 ms pre-delay, 120 ms bloom) + octave shimmer loop -> score bus
+score bus -> tape delay (tape-stop) -> tape lowpass -> tape gain -> score out (0.55) -> master
+rewind notes (x Music) -> master        soundtrack element -> music gain (0.2) -> x Music -> master (title, door)
 master -> output (+7.7 dB) -> limiter (-3 dBFS, ratio 20) -> safety clipper -> out
 ```
 
@@ -175,6 +199,35 @@ The shimmer is an octave-up granular shifter (two delay lines driven by looping 
 **The soundtrack's bookends.** On the title it starts on the plain element where the browser allows it (itch's click-to-play iframe does), otherwise with the first gesture that does not wake; waking fades it under the sky. It is preloaded, and one bar after the door it fades in on a downbeat at its full section (bar 26 of the file), 3 dB up to match the door's bloom.
 
 ### The mix (measured)
+
+**Revision seven: the room, not the singer.** The user found the background "too full, too present, too loud". The rules below are global, in the mixer layer (`MIX` in `audio.mjs`). Every level preset in `score.mjs` inherits them: today's four and the eight the next phase adds. A preset shapes harmony, groove and space, never these. The player's notes (steps, stars, strings: the path drawing the song) are the foreground; the bed (sky, Signal, pulse, choir, glass, Earth) is the room.
+
+| Rule | Value | Why |
+| --- | --- | --- |
+| Bed bus | -9 dB under Diana's untouched notes | the measured bed sat level with her notes |
+| Bed reverb sends | -5 dB (MIX.bed + 4) | wetter than its dry signal: further away |
+| Bed lowpass | 6.5 kHz ceiling (was 16 kHz); mistakes still close it (H 0.6: 4.2 kHz) | less air and edge in the room |
+| Bed dip | -4 dB at 2.5 kHz, Q 0.8 | tames the pads' and choir's 1-4 kHz presence |
+| Presence (+3.5 dB at 3.8 kHz) | on Diana's notes only (it lifted the whole score) | her song in front |
+| Bed voices | at most 12 at once; the oldest non-held one fades over 0.25 s | a thinner room; her notes are never stolen for it |
+| Layer trims on the bed | sky -1, Signal -2, pulse -3, choir -3, glass -2, Earth -1 dB | fewer walls of sound |
+| Bus by layer | a voice follows its layer's bus (`LAYERS`) | the pulse's marimba used to go out on the player bus |
+| Soundtrack (title, door) | 0.2 (was 0.32): -4.1 dB | the same restraint at the bookends |
+
+Tension comes from rhythm and harmony, never from volume or density. A new preset should therefore not raise layer gains to make a level "bigger": it chooses tempo, groove, harmony and space.
+
+Offline renders (Chrome `OfflineAudioContext`, 48 kHz, the full chain) of each level's perfect main route, first 27 s, integrated LUFS / sample peak in dBFS. The "before" column is `createAudioEngine({ mix: "before" })`, the revision-six mix kept for the A/B:
+
+| Level | Whole mix before → after | Bed alone before → after | Diana's notes (unchanged) | Bed minus notes before → after |
+| --- | --- | --- | --- | --- |
+| I | -18.2 / -3.8 → -21.2 / -4.1 | -20.9 / -9.5 → -28.5 / -16.8 | -21.5 → -21.8 | +0.6 → -6.7 dB |
+| II | -17.0 / -1.8 → -19.2 / -2.9 | -20.6 / -3.9 → -28.2 / -14.8 | -19.5 → -20.2 | -1.1 → -8.0 dB |
+| III | -18.7 / -1.7 → -21.4 / -2.5 | -21.6 / -4.4 → -29.9 / -15.4 | -22.5 → -22.8 | +0.9 → -7.1 dB |
+| IV | -17.6 / -1.7 → -20.2 / -1.8 | -20.8 / -3.4 → -29.6 / -14.3 | -21.7 → -22.2 | +0.9 → -7.4 dB |
+
+**Music and Sounds** (pause card): Music scales the bed bus, its reverb sends, the rewind notes and the soundtrack; Sounds scales the body cues, Diana's notes and their sends, the stars and the menus. Each runs from 0 to 100% in steps of 5. Both default to 100%, which is the balanced mix above. They are saved as `solarum.volume` with the same guarded storage as the sound setting. In QA: `__game.setVolumes({ music, sounds })`, `getAudio().volumes`.
+
+*Revision five / six measurements (historical, before the rules above):*
 
 Offline renders through the full chain as shipped (Chrome `OfflineAudioContext`, 48 kHz, safety clipper on; WAVs kept outside the repo), against the soundtrack through its own path as reference (−16.5 LUFS, peak 0.806). The audio critic measured the first mix at −27.5 LUFS against the soundtrack file's −15; the output now gains 7.7 dB into a limiter.
 
@@ -197,12 +250,13 @@ Every cue gets ±1 dB, ±3 cents (pads up to 8), fresh noise positions and crack
 | Cue | Event | Sound |
 | --- | --- | --- |
 | `wake` | wake | Leaf rustle, a rising breath and two kalimba notes (A5, D6) as the sprout pops |
-| `jump` / `double-jump` | jump / double-jump | A soft breath "hup" over a felt lift; the second is higher and lighter with a spark tick |
-| `super-jump` | super-jump | A rising whoosh with a glittering trail |
+| `emerge` | the wake press (title) | The soil stirs: a slow low breath of air and two soft leaf whispers while Diana rises |
+| `jump` / `double-jump` | jump / double-jump | An airy upward breath with a whisper of cloth; the second is thinner and higher, with a soft airy shimmer instead of a tick |
+| `super-jump` | super-jump | A long rising wash of air with a soft shimmer above it |
 | `cape` | dash | A breathy whoosh that opens and settles over the flight, with a 13-16 Hz fabric flutter |
-| `dive` | dive | A descending air rush (2.6 kHz → 380 Hz) |
-| `land-soft` / `land-hard` | land (`hard`) | A muted padded thump; hard landings are deeper with a little gravel |
-| `lip-catch` | lip-catch | A tiny pat |
+| `dive` | dive | A falling rush of air (1.7 kHz → 320 Hz) |
+| `land-soft` / `land-hard` | land (`hard`) | Feet settling into soft ground: a short hush of air and cloth; hard landings settle deeper and longer, with a little dust in the air |
+| `lip-catch` | lip-catch (ledge catch and step-up) | A soft brush of cloth |
 | `crumble-shake` / `crumble-fall` | shelf state | Dry stone crackle that builds over the 0.65 s shake; a crunch, thud and pebbles when it gives |
 | `cascade` / `tile-drop` | cascade / tile-drop | A distant rumble on the chord's root; a stone knock per tile |
 | `smash` | smash | Cracking stone and chips over a soft low boom |
@@ -217,7 +271,37 @@ Every cue gets ±1 dB, ±3 cents (pads up to 8), fresh noise positions and crack
 | `win` | win | The closing chord blooms with bells; the Earth chord's G♯ with three Great Stars; the motif's cadence when the song is complete |
 | `ui-hover` / `ui-select` / `ui-resume` | menu buttons | A paper tick, a wooden A5 tock, two ticks rising F♯5→A5 |
 
-**Soundboard (dev only, not in the ZIP):** `npm run dev`, then open http://127.0.0.1:4173/soundboard.html. *Runs* renders the real model and pilots offline and plays them: perfect bars 1–12, the same sloppy (broken constellation, late hops, a fall), the same with Gentle music, the fall and tape-stop on its own, Movement III, the perfect door and the mastery door with Earth, and the score without bodies. *Stems* renders each layer alone from a run. *Score voices* plays each voice over the chord chosen in the toolbar. The toolbar's *Tuning H* slider and *Hear H* play the bed at any tuning value under Diana's in-tune notes; *A/B* plays the perfect and sloppy bars 1–12 sample-locked and switches between them live; every render shows its BS.1770 loudness and peak. Below are the body cues and short sequences, a soundtrack toggle, pause and a peak meter. `window.__soundboard.renderRun({ kind: "main" | "sloppy" | "gentle" | "upper", from, seconds, only, cues })`, `render(cue)` and `renderWithMusic(cue)` return PCM for QA.
+**Revision seven: soft movement bodies.** The user: the jump and landing sounds were "too hard" and clashed with the atmosphere. Offline renders showed that the score's voices on those moves were already soft: the glass harmonica has a 90 ms attack and a 371 Hz centroid, the felt bass a 23 ms attack and a 74 Hz centroid. The quantised voice system is therefore unchanged. The harsh part was the bodies:
+- 3-6 ms felt sine thumps at 160-200 Hz under the jump and the landings;
+- 1-2 ms white ticks and pats on the double jump and the ledge catch;
+- a crackle trail of 2 ms grains on the super jump.
+
+Every movement body is now filtered noise only: no sine, no grain, no white noise. Every attack is 12 ms or longer and every band sits under 5 kHz (tested). The super jump and dive sit 3-6 dB lower. Measured through the shipped chain (renders of seed 1):
+- sample peak (dBFS);
+- RMS over the first 150 ms (dBFS);
+- crest factor over those 150 ms (dB);
+- attack (10 → 90% of a 5 ms RMS envelope);
+- spectral centroid over the first 300 ms.
+
+| Body | Peak | RMS 150 ms | Crest | Attack | Centroid |
+| --- | --- | --- | --- | --- | --- |
+| Jump | -24.4 → -24.9 | -38.7 → -41.0 | 14.2 → 16.1 | 6 → 22 ms | 200 → 465 Hz |
+| Double jump | -33.0 → -31.2 | -52.7 → -47.2 | 19.6 → 16.0 | 4 → 17 ms | 2379 → 1296 Hz |
+| Soft landing | -27.9 → -26.9 | -43.0 → -43.4 | 15.1 → 16.5 | 6 → 10 ms | 183 → 224 Hz |
+| Hard landing | -25.9 → -27.2 | -36.2 → -40.9 | 10.2 → 13.7 | 6 → 33 ms | 162 → 173 Hz |
+| Ledge catch / step-up | -41.2 → -37.5 | -63.0 → -54.6 | 21.8 → 17.1 | 3 → 14 ms | 2095 → 1091 Hz |
+| Super jump | -12.5 → -16.5 | -23.9 → -29.5 | 10.3 → 13.0 | 130 → 78 ms | 1510 → 1215 Hz |
+| Dive | -12.8 → -17.1 | -23.8 → -30.2 | 11.1 → 13.0 | 91 → 89 ms | 1414 → 1089 Hz |
+| *(voice) harmonica, felt bass* | -13.6, -13.2 | -20.3, -20.3 | 6.3, 7.0 | 90, 23 ms | 371, 74 Hz |
+
+Reading the table:
+- **Attack and centroid change the character.** The thumps became breath (centroid 200 → 465 Hz on the jump), and the ticks lost their edge (2.1-2.4 kHz → 1.1-1.3 kHz).
+- **Crest factor rises slightly.** Noise is spikier sample-to-sample than a sine, so the crest is not the measure of hardness here; the attack is.
+- **Loudness stays well under Diana's voice.** The bodies sit 20-34 dB under it in RMS (the ledge catch was nearly inaudible and is now a soft brush).
+
+The soundboard plays each body before and after, and a run of moves both ways (with or without Diana's notes): `BODY_BEFORE` keeps the old recipes, and the game never plays them. None of this has had a human listen yet.
+
+**Soundboard (dev only, not in the ZIP):** `npm run dev`, then open http://127.0.0.1:4173/soundboard.html. *Runs* renders the real model and pilots offline and plays them: perfect bars 1–12, the same sloppy (broken constellation, late hops, a fall), the same with Gentle music, the fall and tape-stop on its own, Movement III, the perfect door and the mastery door with Earth, and the score without bodies. *Stems* renders each layer alone from a run. *Score voices* plays each voice over the chord chosen in the toolbar. The toolbar's *Tuning H* slider and *Hear H* play the bed at any tuning value under Diana's in-tune notes; *A/B* plays the perfect and sloppy bars 1–12 sample-locked and switches between them live; *A/B: mix before vs after* does the same with the revision-six mix and the new one (the selected level's perfect run); every render shows its BS.1770 loudness and peak. *Movement bodies: before / after* plays each redesigned body both ways and a run of moves. Below are the body cues and short sequences, a soundtrack toggle, pause and a peak meter. `window.__soundboard.renderRun({ kind: "main" | "sloppy" | "gentle" | "upper", from, seconds, only, cues })`, `render(cue)` and `renderWithMusic(cue)` return PCM for QA.
 
 ## Architecture
 
@@ -227,6 +311,7 @@ Every cue gets ±1 dB, ±3 cents (pads up to 8), fresh noise positions and crack
 | `model.mjs` | Pure simulation: movement, cape rule, smash, constellations, cascade, wind, super jump, banking, beacons, death and respawn timing, assists |
 | `geometry.mjs` | Pure camera: letterboxing, lookahead, vertical anchor / look-down / headroom, contours, portal contact |
 | `animation.mjs` | Source-timed clips and layered body / cape selection |
+| `emergence.mjs` | Pure timeline of the wake: Diana emerging from the earth (beats, depth under the soil, sprout fade, crumbs) and the sprite sets it can draw (cape; no-cape with a cape fallback) |
 | `score.mjs` | Pure adaptive score: 107 BPM grid, chord map and safe sets, authored phrases, quantiser, transport, sim → audio clock, tuning value H, the conductor |
 | `score-path.mjs` | Generated path clock: world x → sixteenth of the main route, its anchors and a source hash (`npm run score:bake`) |
 | `audio.mjs` | Sound: body cue recipes and score voice recipes (pure data), event → cue map, the Web Audio engine (cues, score buses, space reverb and shimmer, tape-stop, scheduler, soundtrack bookends), offline renders |
@@ -239,7 +324,7 @@ Every cue gets ±1 dB, ±3 cents (pads up to 8), fresh noise positions and crack
 | `index.html`, `style.css`, `embed.*` | Game surface and UI; green preview / iframe / fullscreen layout |
 | `assets/manifest.json` | Source paths, slices, pivots, clip timing, portal bounds, SFX and an on-screen vs archive `usage` record |
 | `scripts/extract-assets.py` | Reproducible, byte-for-byte extraction from `../refs/solarum/solarum-master.zip` |
-| `tests/model.test.mjs`, `tests/movement-audit.test.mjs`, `tests/audio.test.mjs`, `tests/score.test.mjs`, `tests/routes.mjs`, `tests/music-run.mjs`, `tests/glyphs.mjs`, `tests/png.mjs` | Tests, route pilots, the route driver with fault injection (score tests and soundboard renders), glyph follower, PNG alpha inspector |
+| `tests/model.test.mjs`, `tests/movement-audit.test.mjs`, `tests/audio.test.mjs`, `tests/score.test.mjs`, `tests/title.test.mjs` (the emergence, title, pause and victory UI), `tests/routes.mjs`, `tests/music-run.mjs`, `tests/glyphs.mjs`, `tests/png.mjs` | Tests, route pilots, the route driver with fault injection (score tests and soundboard renders), glyph follower, PNG alpha inspector |
 
 The simulation uses world px and seconds with substeps of at most 1/120 s, and has no DOM, image, sound, storage or wall-clock dependency. Events (`s.events`, monotonic `eventSerial`) drive sound and particles in the renderer.
 
@@ -247,7 +332,11 @@ The simulation uses world px and seconds with substeps of at most 1/120 s, and h
 
 ```js
 __game.ready;                       // art decoded
-__game.start();                     // wake from the title (the selected level)
+__game.start();                     // wake from the title at once (pilots; no emergence)
+__game.pressWake();                 // a player's press: Diana emerges first (~1.2 s); again to skip
+__game.getTitle();                  // { emerging, phase, t, total, set, fallback, body, soil, stops }
+__game.setSpriteSet("nocape");      // the level's sprite set override (falls back to "cape" until extracted)
+__game.setVolumes({ music: 0.5 });  // Music / Sounds, 0-1, saved; getAudio().volumes
 __game.startLevel(2);               // open level n (1-4) and wake it; { wake: false } stays on its title
 __game.levels();                    // [{ id, title, bpm, clock, verbs, unlocked, great }]
 __game.restart();                   // fresh level, running
@@ -265,6 +354,8 @@ __game.model;                       // isolated fixtures only
 
 `getState()` adds `level` (1-4), `world` (its startX / finishX / speed …) and `routes` (the level's pilots, read by `chooseAction`); it keeps `status` ('ready' | 'running' | 'paused' | 'dead' | 'respawning' | 'won'), `time`, `stars`, `highStars`, `ringsCrossed` (now: completed constellations), `checkpointsReached`, `checkpoint`, `progress`, `deaths`, `player` (`x`, `y`, `vy`, `jumps`, `grounded`, …) and `platforms`. New fields: `stepUps` (step-up assists so far), `capeCharges` (0/1), `capeReady`, `capeSpent`, `capeRule`, `constellations`, `greatStars`, `greatBanked`, `greatPending`, `smashes`, `flights`, `superJumps`, `refills`, `fallsHere`, `respawn`, `assist`, `anchorY`, `chains`, `prompts`, `updrafts`, `starsTotal`. `dashCooldown` stays but is 0 under the default landing rule: assert `capeSpent === true` (or `capeCharges === 0`) after an airborne D instead of `dashCooldown > 5`.
 
+Revision seven adds `getAudio().volumes`, `score.peakBed` (most bed voices at once, ≤ `MIX.bedVoices`) and `score.rest` (the closing chord held after a door, or `null`). A real Space press or tap on the title starts the emergence, with `status` still `'ready'`; after `getTitle().total` seconds (or a second press) the run starts. The root browser check does that with real keys.
+
 `getAudio()` keeps `on`, `unlocked` and `decoded` (the generated buffers: noise colours, the room and space impulses; no WAV is decoded), `state` (AudioContext state), `time` (audio clock, frozen while paused), `paused`, `suspended`, `musicWanted`, `musicPlaying`, `musicRouted`, `musicDark`, `air`, `voices`, `peakVoices`, `nodes` (created so far), `dropped` (rate-gated), `played` (count per cue) and `cues`. `musicPlaying` now means the soundtrack **or the score** is audible (still `false` whenever paused); `soundtrackPlaying` is the mp3 alone. New: `score` = { `running`, `audible`, `bar`, `chord`, `section`, `H`, `detuneCents`, `gentle`, `choir`, `earth`, `voices`, `peakVoices`, `scheduled`, `lateNotes`, `maxLateMs`, `maxQuantizeMs`, `clock` { `drift`, `maxDrift`, `jumps` }, `song` { `notes`, `total`, `constellations`, `falls`, `complete` }, `layers`, `played` (per voice), `rephases`, `tapeStops`, `fades`, `restarts`, `door` }.
 
 A fall sets `status: 'dead'` for 0.7 s, then `'respawning'` for 0.4 s, then `'running'` (all in simulation time). `retry()` is immediate.
@@ -274,6 +365,26 @@ A fall sets `status: 'dead'` for 0.7 s, then `'respawning'` for 0.4 s, then `'ru
 For the root checks: press **D** in level II (`__game.startLevel(2)`, then Space, then D in the air): I has no cape. Screenshot moments on each main route, in simulation seconds after waking: I 12.41 s (the leap's floating second jump), II 25.93 s (gliding off the glide bridge's wind along its constellation), III 31.85 s (falling through the broken well's lid), IV 50.6 s (the rising stair). The longest pilot takes 58.3 s of simulation (I main; II 50.5, III 51.6, IV 56.9 at most), so `maxSeconds` 85 is unchanged. `__game.showMap(n)` plays the map between levels.
 
 ## Validation evidence (2026-11-10, Node 22.14.0)
+
+**Revision seven (front end, sound, the wake), measured 2026-11-10.** `npm test`: **119/119 pass**. New tests:
+- the emergence's beats, its 1.6 s ceiling, reduced motion and the sprite-set fallback;
+- the victory card (Continue and Retry only) and the pause card's Main menu;
+- an opaque, data-built level select with the world hidden on the title;
+- soft movement bodies (no thump, grain or white noise; attacks of at least 12 ms) and the cue-book override;
+- the global mix rules, a whole run never over 12 bed voices, and guarded Music / Sounds storage;
+- the staged warm-up (identical graph, no context with sound off);
+- the door's held chord and the map's count-in;
+- glyph clearance and hybrid touch.
+
+The root browser QA (`cd ../common && ONLY=Solarum npm run test:browser`, the packaged ZIP in Chrome) passes **15/15**. Its new checks:
+- The title panel and its stops are opaque ink, the canvas is never on top anywhere across the panel, there is one stop per level, and locked stops use `--mute` without fading.
+- A real Space press starts the emergence (`status` still `'ready'`, phase `twitch`, `rise` at 0.5 s) and runs in 1.55 s with no main-thread long task. A second press skips it.
+- Pause: ↑/↓ walk Continue → … → Main menu → Sound → Assist → Music, and ←/→ move the slider (saved). Main menu returns to the title with the engine resumed, the score stopped, the title song wanted and progress kept.
+- The victory card holds only Continue (focused) and Retry; after IV, Continue returns to the title.
+- Phone portrait (390×844) and landscape (844×390) titles keep the panel on screen, with a 0.36 s reduced-motion emergence.
+- A fine-pointer page shows the touch controls after its first touch.
+
+Screenshots: `common/artifacts/revision-4/solarum-title*.png`, `solarum-emergence.png`, `solarum-pause-main-menu.png`, `solarum-victory.png`. The pilots, routes, glyph windows, movement audit and grid are unchanged; nothing in this revision touches the simulation.
 
 `npm test`: **105/105 pass** (about 22 s): 62 model / UI tests (every level's routes at 30/60/120/240 Hz with zero deaths, the step-up sweep, F3 clearance, crisp input and identical arcs at every rate in every level, glyph windows, camera at each level's speed), 16 movement-audit tests ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)), 16 audio and engine tests and 11 score tests (every level). At 120 Hz (time in real seconds):
 
@@ -304,7 +415,7 @@ Earlier browser evidence (layout at 960×640 and 390×844, touch targets, reduce
 
 ## itch.io export
 
-`npm run build:itch` writes `dist/solarum-itch.zip` (44 files, 9.28 MiB; the soundboard, tests, scripts and the archived WAVs are left out), `dist/itch/` and `dist/build-report.json`. `index.html` is at the root and every path is relative; `.mjs` runtime modules become `.js`. Use an HTML game page, 960×640 embed, click-to-play and fullscreen. See [ITCH_IO.md](./ITCH_IO.md). Nothing has been uploaded.
+`npm run build:itch` writes `dist/solarum-itch.zip` (47 files, 9.33 MiB as of revision seven; the soundboard, tests, scripts and the archived WAVs are left out), `dist/itch/` and `dist/build-report.json`. `index.html` is at the root and every path is relative; `.mjs` runtime modules become `.js`. Use an HTML game page, 960×640 embed, click-to-play and fullscreen. See [ITCH_IO.md](./ITCH_IO.md). Nothing has been uploaded.
 
 ## Asset provenance and credits
 
@@ -313,6 +424,12 @@ Everything comes unchanged from the original Unity archive (`../refs/solarum/sol
 Original credits: Cauê Melo, Daniel Calônico, Lucas Santos and Rafael Lima; the GDD thanks Amanda (meromei) and Bruno Mareto (Bu Maré) for the soundtrack. Ownership stays with the original project.
 
 ## Known limits
+
+- **Revision seven:**
+  - The soft bodies, the quieter bed, the held door chord and the count-in were balanced by offline measurement only; none has had a human listen.
+  - The archive's no-cape sheets are not extracted yet, so a level naming `sprites: "nocape"` emerges with the cape set (flagged `fallback`). Extracting `nocapeIdle` / `nocapeStart` / `nocapeRun` into the manifest switches it with no code change.
+  - Ten levels on a 320×568 phone in portrait need three rows of stops and overflow the panel by about 18 px; eight fit there, and ten fit at 360×640 and up.
+  - The warm-up creates the AudioContext before a gesture. Desktop Chrome may log its autoplay warning for that (headless Chrome logged nothing; it is a warning, not an error). Safari and Firefox are untested here.
 
 - **Movement WARNs** ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)):
   - I's floaty apex (0.54 s).
