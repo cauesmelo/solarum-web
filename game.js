@@ -3928,6 +3928,16 @@ root.addEventListener(
 );
 window.addEventListener("keydown", (e) => {
   const onButton = e.target instanceof HTMLElement && e.target.matches("button");
+  // The credits (v1.0) sit over the title: Esc, Backspace or C close them,
+  // Tab stays on their one button, and nothing else reaches the game, so
+  // Space cannot wake Diana behind the card (Enter and Space on Back act
+  // natively). Arrows, Page and Home/End scroll a short phone's card.
+  if (!$("credits-veil").hidden) {
+    if (["Escape", "KeyC", "Backspace"].includes(e.code)) (e.preventDefault(), showCredits(false));
+    else if (e.code === "Tab") (e.preventDefault(), $("credits-back").focus({ preventScroll: true }));
+    else if (!(onButton && ["Space", "Enter"].includes(e.code)) && !["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.code)) e.preventDefault();
+    return;
+  }
   if (state.status === "paused" || trans?.paused) {
     const onSlider = e.target instanceof HTMLInputElement && e.target.type === "range";
     if (e.code === "Tab") {
@@ -4138,6 +4148,32 @@ $("assist-open").addEventListener("click", () => showAssist(true));
 for (const [id, key] of [["vol-music", "music"], ["vol-sounds", "sounds"]])
   $(id).addEventListener("input", (e) => setVolumes({ [key]: Number(e.target.value) / 100 }));
 $("assist-back").addEventListener("click", () => showAssist(false));
+/* The credits (v1.0): a paper card over the title with the original team, the
+ * soundtrack, the font and the note that the level audio is synthesised. It
+ * opens from the title's footer link; focus moves to Back and returns to the
+ * link on close, as a dialog should. Nothing here touches the game state. */
+let creditsFrom = null;
+function showCredits(open) {
+  const veil = $("credits-veil");
+  if (open === !veil.hidden) return;
+  if (open && state.status !== "ready") return; // reachable from the title only
+  veil.hidden = !open;
+  if (open) {
+    creditsFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    $("credits-card").scrollTop = 0;
+    $("credits-back").focus({ preventScroll: true });
+  } else {
+    const back = creditsFrom?.isConnected && creditsFrom.offsetParent ? creditsFrom : $("credits-open");
+    back.focus({ preventScroll: true });
+    creditsFrom = null;
+  }
+}
+$("credits-open").addEventListener("click", () => showCredits(true));
+$("credits-back").addEventListener("click", () => showCredits(false));
+// A tap on the dimmed sky outside the card closes it.
+$("credits-veil").addEventListener("pointerdown", (e) => {
+  if (e.target === $("credits-veil")) showCredits(false);
+});
 for (const b of document.querySelectorAll("[data-assist]")) {
   b.addEventListener("click", () => {
     const name = b.dataset.assist,
@@ -4222,6 +4258,9 @@ window.__game = {
   // only, so it switches at once and back losslessly; returns the style.
   setPlatformStyle: (style) => (isPlatformStyle(style) && (platformStyle = style), ready && draw(), platformStyle),
   getPlatformStyle: () => platformStyle,
+  // The credits card (v1.0): { open, version, text } for QA; open/close for previews.
+  getCredits: () => ({ open: !$("credits-veil").hidden, version: $("version").textContent, text: $("credits-card").innerText }),
+  showCredits,
   // The breath bar on a model without `capeCharge`: previewCape(0.6) shows
   // that charge (bar, touch rim and the cape's tint); previewCape(null) ends it.
   previewCape: (charge) => {

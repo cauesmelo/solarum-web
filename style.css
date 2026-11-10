@@ -324,6 +324,48 @@ button:disabled {
   color: var(--mute);
   font-size: 16px;
 }
+/* The panel's footer (v1.0): the controls on the left, the release label and
+ * the Credits link on the right; on a narrow phone they wrap onto two
+ * centred lines. The link keeps a 44 px tap target through padding that its
+ * negative margin takes back, so the panel does not grow. */
+.title-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  column-gap: 18px;
+  row-gap: 0;
+}
+.edition {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--mute);
+  font-size: 16px;
+}
+.version {
+  color: var(--paper);
+}
+.link-btn {
+  min-height: 44px;
+  margin: -12px 0;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--mute);
+  font-size: 16px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.link-btn:hover {
+  color: var(--paper);
+}
+.link-btn:focus-visible {
+  outline: 3px solid var(--hill);
+  outline-offset: 2px;
+  color: var(--paper);
+}
 /* The orbit line: one numbered station per level (built from LEVELS, so it
  * holds 8-10 as well as 4), joined by the dotted orbit and ending at Earth.
  * The selected level's name and Great Star slots are shown once, below. */
@@ -1539,6 +1581,59 @@ button:disabled {
   display: grid;
   gap: 12px;
   justify-items: center;
+}
+/* The credits card (v1.0): the team, the music, the font and the note that
+ * the in-level audio is synthesised. It scrolls on a short phone. */
+.credits-card {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  width: min(480px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 18px 26px;
+  text-align: center;
+}
+.credits-card:focus {
+  outline: none;
+}
+.credits-name {
+  margin: 0;
+  font-size: 20px;
+  color: var(--ink-soft);
+}
+.credit-list {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  margin: 0;
+}
+.credit-list > div {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+.credit-list dt {
+  color: var(--ink-soft);
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.credit-list dd {
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.1;
+}
+.credit-list small {
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+.credit-list .credit-note {
+  display: block;
+  max-width: 34ch;
 }
 .orbit.big {
   width: 100%;

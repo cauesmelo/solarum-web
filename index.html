@@ -46,7 +46,15 @@
               <ol class="stations" id="stations"></ol>
               <p class="station-info" id="station-info" aria-live="polite"></p>
             </nav>
-            <p class="keys" id="title-keys" aria-hidden="true">↑ jump · → cape · ↓ dive</p>
+            <!-- v1.0: the release label and the credits stay one tap away from
+                 the title, on the footer line of the panel. -->
+            <div class="title-foot">
+              <p class="keys" id="title-keys" aria-hidden="true">↑ jump · → cape · ↓ dive</p>
+              <p class="edition">
+                <span class="version" id="version">v1.0</span>
+                <button id="credits-open" class="link-btn" type="button" aria-haspopup="dialog" aria-controls="credits-card">Credits</button>
+              </p>
+            </div>
           </div>
           <p class="load-error" id="load-error" hidden>
             The stars could not be gathered.
@@ -130,6 +138,46 @@
       <div class="credits" id="credits" aria-hidden="true" hidden>
         <img id="credits-logo" src="./assets/logo.png" alt="" width="1217" height="254" />
         <p id="credits-text"></p>
+      </div>
+
+      <!-- The credits (v1.0): reachable from the title; Esc, Back or a tap
+           outside the card closes them. Paper card like the pause card. -->
+      <div class="veil" id="credits-veil" hidden>
+        <div class="card credits-card" id="credits-card" role="dialog" aria-modal="true" aria-labelledby="credits-title" tabindex="-1">
+          <h2 id="credits-title">Credits</h2>
+          <p class="credits-name">Solarum · A Signal in the Dark</p>
+          <dl class="credit-list">
+            <div>
+              <dt>Original game</dt>
+              <dd>
+                <span>Cauê Melo</span>
+                <span>Daniel Calônico <small>“raenkumi”</small></span>
+                <span>Lucas Santos <small>“LSdS”</small></span>
+                <span>Rafael Lima <small>“Kimoh”</small></span>
+              </dd>
+            </div>
+            <div>
+              <dt>Soundtrack</dt>
+              <dd>
+                <span>Amanda <small>“meromei”</small> and Bruno Mareto <small>“Bu Maré”</small></span>
+                <small class="credit-note">The original music, heard on the title and at the far door.</small>
+              </dd>
+            </div>
+            <div>
+              <dt>Typeface</dt>
+              <dd><span>Solarum Basic</span><small class="credit-note">The original game’s own font.</small></dd>
+            </div>
+            <div>
+              <dt>In the levels</dt>
+              <dd><span>Every sound and each level’s song is synthesised live in your browser.</span></dd>
+            </div>
+            <div>
+              <dt>Browser version</dt>
+              <dd><span>v1.0 · 2026</span></dd>
+            </div>
+          </dl>
+          <button id="credits-back" class="ink-btn primary" type="button">Back</button>
+        </div>
       </div>
 
       <div class="veil" id="pause-veil" hidden>
