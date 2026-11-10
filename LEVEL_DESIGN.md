@@ -1,24 +1,27 @@
 # Solarum — level design
 
-This describes what `level.mjs`, `model.mjs` and `geometry.mjs` implement (2026-11-10, revision five's progression, [RESEARCH_PROGRESSION.md](./RESEARCH_PROGRESSION.md)). The campaign has eight planned stages (`CAMPAIGN`); **I · Waking and II · The Gift are built**. Revision six's levels II–IV (below, unchanged) play after them as interim levels III–V until III–VIII are built. The chapter *A Signal in the Dark* (further below) is source material. Where the build departs from a brief, the reason is given.
+This describes what `level.mjs`, `model.mjs` and `geometry.mjs` implement (2026-11-10, revision five's progression, [RESEARCH_PROGRESSION.md](./RESEARCH_PROGRESSION.md)). The campaign has eight planned stages (`CAMPAIGN`); **I · Waking, II · The Gift, III · Still Water and IV · The Way Down are built**. Revision six's levels II–IV (below, unchanged) play after them as interim levels V–VII until V–VIII are built. Tests and tools name the interim levels by key (`LEVEL_ID.wind`, `.constellation`, `.door`), so building a stage renumbers nothing by hand. The chapter *A Signal in the Dark* (further below) is source material. Where the build departs from a brief, the reason is given.
 
 ## One ruler, one tempo per level
 
 Every level is simulated in 107 BPM units: a sixteenth is 15/107 s and 37.85 px of run, a grid x is `220 + 37.85 k` (plus 113.55 px per completed flight, and 63.67 px for a super jump opened 2/16 into a flight), and a level plays at clock = BPM / 107 of real time. Human windows are multiplied by the clock so they stay constant in real seconds (coyote 0.12 s, buffer 0.14 s, respawn 1.1 s, the cascade's shake telegraph 0.35 s). Score tolerances are real milliseconds (35 ms real = 35 × clock of simulation).
 
-| | I · Waking | II · The Gift | III (interim) · Borrowed Wind | IV (interim) · The Breaking Constellation | V (interim) · The Far Door |
-| --- | --- | --- | --- | --- | --- |
-| BPM / clock | 88 / 0.822 | 94 / 0.879 | 107 / 1 | 118 / 1.103 | 128 / 1.196 |
-| Run (real) | 222 px/s | 237 | 270 | 298 | 323 |
-| Owns at the start | jump | jump, double | all verbs | all verbs | all verbs |
-| GET | double jump, sixteenth 120 (bar 8) | cape, sixteenth 4 (bar 1) | — | — | — |
-| Cape rule | (no cape) | breath | landing | landing | landing |
-| Physics (sim) | g 1640, jump 635, double 570, hang ×0.5 below 66, fall ≤ 681 (560 real), tap cap 308 | 1500 / 570 / 525 | same | same, cracks 5/16 | same |
-| Bars / real s | 19 / 51.8 | 19 / 48.5 | 22½ / 50.5 | 23 / 46.8 | 25 / 46.9 |
-| Presses (main) | 23, 1.21 a bar, peak 2 | 25, 1.32 a bar, peak 3 | | | |
-| Narrowest / median required window | 618 / 628 ms | 332 / 626 ms | | | |
-| Beacons | 4 (lookout, first-star, climb, crash) | 5 (gift, void, long, steps, pluto) | 5 | 4 | 6 |
-| Look | home | pluto | jupiter | saturn | moon-earth |
+| | I · Waking | II · The Gift | III · Still Water | IV · The Way Down | V (interim) · Borrowed Wind | VI (interim) · The Breaking Constellation | VII (interim) · The Far Door |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| BPM / clock | 88 / 0.822 | 94 / 0.879 | 100 / 0.935 | 107 / 1 | 107 / 1 | 118 / 1.103 | 128 / 1.196 |
+| Run (real) | 222 px/s | 237 | 252 | 270 | 270 | 298 | 323 |
+| Owns at the start | jump | jump, double | jump, double, cape | jump, double, cape, glide | all verbs | all verbs | all verbs |
+| GET | double jump, sixteenth 120 (bar 8) | cape, sixteenth 4 (bar 1) | glide (the helper), 44 (bar 3) | dive (the necklace), 44 (bar 3) | — | — | — |
+| Cape rule | (no cape) | breath | breath | breath | landing | landing | landing |
+| Physics (sim) | g 1640, jump 635, double 570, hang ×0.5 below 66, fall ≤ 681 (560 real), tap cap 308 | 1500 / 570 / 525 | same (glide 350 px/s², ≤ 140 px/s) | same | same | same, cracks 5/16 | same |
+| Bars / real s | 19 / 51.8 | 19 / 48.5 | 22 / 52.8 | 21 / 47.1 | 22½ / 50.5 | 23 / 46.8 | 25 / 46.9 |
+| Inputs (main; `inputsOf`) | 23, 1.21 a bar, peak 2 | 25, 1.32 a bar, peak 3 | 34 (26 presses, 4 held capes, 4 releases), 1.55 a bar, peak 3 | 36 (33 presses, 3 held capes), 1.71 a bar, peak 4 | | | |
+| Narrowest / median required window | 618 / 628 ms | 332 / 626 ms | 321 / 606 ms | 300 / 583 ms | | | |
+| Diana's own notes (perfect run) / bed onsets | 1.41 / 0.98 per s | 1.92 / 1.83 | 2.23 / 1.74 | 2.61 / 2.23 | | | |
+| Beacons (largest gap, real) | 4 (13.6 s) | 6 (10.7 s) | 6 (11.7 s) | 5 (9.8 s) | 5 | 4 | 6 |
+| Look | home | pluto | neptune | uranus | jupiter | saturn | moon-earth |
+
+**Inputs** (`scripts/movement-audit.mjs` `inputsOf`, used by the level report and the L3 ladder test): every press (jump, tap, cape, dive), every press of the cape that only holds it (a glide that does not start with a flight at the same x) and every release of a held cape in the air (a timed letting-go); a release after a touch-down is not one, like a jump's release, and letting go and jumping in the same instant is one gesture. I and II are unchanged by this rule (they have no glide).
 
 **Authoring.** `scripts/arcs.mjs <level> <move>` flies a move with the real model in free space and prints its height at exactly each sixteenth (PHYS and CLOCK override the physics for a level still being solved). `scripts/level-report.mjs <level> [--windows] [--holds] [--anchors]` prints every route at 30–240 Hz, the main route's grid audit, presses per bar, the longest quiet stretch, beacon gaps, each press window (real ms) with its decision lead, and the holds each press needs. Every main route was then baked (`npm run score:bake`) and tested.
 
@@ -75,23 +78,81 @@ Charge sources (RESEARCH_PROGRESSION 3.4): (a) beacons for the hearth void, its 
 
 Platforms (x from–to, y): crater −700–1101 300; crater-step 1205–1403 274; rim 1508–1744 248; gift-stone 2088–2917 231; hearth-shore 3299–3561 301; hearth-2 3622–4242 221; void-shore-1 4624–4810 291; breath-1 5078–5264 303; long-stone 5533–6778 315; void-shore 7415–8216 330; step-rock 8608–8784 400; pluto-rock 9166–9958 470; heart-plain 10340–10677 540; heart-1 10781–11055 514; heart-2 11159–11434 488; heart-door 11538–13155 462. Safe line: crater-floor 1810–2123 308.
 
-Departures from the brief's II table: 19 bars instead of 20 (48.5 s); beacons at 4½, 6½, 10½, 12½ and 15 so each required flight has its source and the breath lesson stays unrefilled; GS1 sits over the first flight rather than on a Pluto ledge (a ledge there leaves no rejoin under 255 px); the largest beacon gap is 13.3 s (pluto to the door, under the 14 s test, 0.3 s over the brief's ladder).
+Departures from the brief's II table: 19 bars instead of 20 (48.5 s); beacons at 4½, 6½, 10½, 12½ and 15 so each required flight has its source and the breath lesson stays unrefilled; GS1 sits over the first flight rather than on a Pluto ledge (a ledge there leaves no rejoin under 255 px). A sixth beacon, *lock*, stands on the door stone at 280 (18½), over the glide lock, so the largest beacon gap is 10.7 s (it was 13.3 s, pluto to the door, over the ladder's 13).
 
-## Interim levels III–V (revision six's II–IV)
+### III · Still Water (100 BPM): floating, flowing; the glide
 
-### III (interim) · Borrowed Wind (107 BPM, revision six's II): floating with marked beats
+Shared simulation physics, so II's cells hold; the held cape adds its own (scripts/arcs.mjs `g`/`u` on the interim wind level): after a flight or a jump the glide falls at most 140 px/s of simulation (19.6 px a sixteenth), and a release drops 33.6 px in the next sixteenth and 96.6 in two. Cells (dy at k/16 after a grid takeoff, up < 0): walk off holding the cape **8: +122.9**; jump, cape 3, hold **20: +134.8** (a flight alone is down at 10.6); jump, cape 3 **9: −16.8**; jump holding the cape **13: +70.3** (a double alone reaches +70 at 10.5); jump, cape 3, let go at 13 **15: +96.9**, at 14 **15: +51.7**; jump holding, let go at 6 **8: +29.7**; jump, cape 3, the refill, cape 9, hold **17: +47.3** (two flights alone are down by 14.6); jump, cape 3, let go and jump again at 10 **14: −117.4**; jump, jump at 3 **7: −160.2**; jump, jump at 4, hold **12: −84.7**.
+
+| k (bar) | Step | What (y) |
+| --- | --- | --- |
+| 23–33 (2–3) | warm-up | Off Pluto's plain (90): jump 23, cape 26, 70 px down onto the helper's cliff (160) on 33 |
+| 36 / 44 (3) | **GET** | The helper (`moment` *helper-drift* on 36) drifts down the slope of air at the cliff's lip; Diana runs through it on 44 and owns the glide (`moment` *ripple*). No required input within a bar of it |
+| 48–56 (4) | safe first use | The lip at 48 is a walk-off onto the field (283) 123 px below. Holding the cape (the *hold →* glyph, optional) floats her down the *float-song* onto it on 56; without it she lands at about 51.5 |
+| 64 (5) | beacon *float* | |
+| 76–96 (5–7) | need | The still void: jump 76, cape 79 and hold, 135 px down onto the far shore (418) 20/16 later, along the *still-song* (the ↑ · hold → glyph). Without the held cape she is down at 515 px; the shore starts at 615. (Jump and hold alone reaches its very edge: the flight is the comfortable way, holding is the required one) |
+| 104 (7½) | beacon *still* | |
+| 116–142 (8–9) | twist | The cape floats when it cannot fly: jump 116, cape 119 up 17 px onto a short ledge (401; 4/16 of breath); jump 129 holding the cape (the bar empty), 70 px down along the *ledge-song* onto shore A (471) on 142 |
+| 144 (10) | beacon *drift* | |
+| 156–180 (10–12) | twist | Letting go: jump 156, cape 159 and hold over three islets; let go on 169 over the second, 97 px down on 171 (it ends before the held glide comes down to it, so only a release lands there; release window about 3.5/16), then jump 173 and jump again 176, 160 px up onto the next shore (408) on 180. The first islet (a release over it lands short of every shore) and the third (too low to climb out of) are optional (`high`); Great Star 2 is on a tiny high islet for an exact release (163) |
+| 192 (13) | beacon *stair* | |
+| 204–243 (13–16) | develop | The water stair: jump 204, cape 207, hold, let go at 218 (52 px down on 219); twice a jump holding the cape (the bar a quarter and a half full), let go 6/16 later, 30 px down 8/16 after the jump (223/231, 235/243) |
+| 248 (16½) | beacon *wide* | |
+| 260–277 (17–18) | develop | The widest void: jump 260, cape 263, the *refill-song* (one star a sixteenth, complete on 266) gives the cape back, cape 269 and hold along the *deep-song*, 47 px down 17/16 after the takeoff (870 px) onto the wide shore (567). Great Star 3 over it for jump, double, cape, hold |
+| 280 (18) | beacon *rise* | |
+| 292–324 (19–21) | conclude | The rise, twice, no glyph: jump, cape 3/16 later, hold, then let go and jump again 7/16 after the cape: 117 px up 14/16 after the takeoff (292/295/302 onto climb-1, 310/313/320 onto climb-2); the *climb-song* on climb-1 and the second rise charges the second cape; the *neptune-song* along it |
+| 327–352 (21–23) | coda | A held hop 26 px up onto the dive lock (a glinting lid on the main line she runs across and cannot open: no dive yet; its catch is `high`), a hop onto Neptune's shelf (281) and the door on the downbeat of bar 23 |
+
+Charge sources (RESEARCH_PROGRESSION 3.4): (a) beacons for the warm-up (the level starts full), the need, the glide ledge's flight, letting go, the stair's first flight, the widest void's first flight and the rise's first; (b) the *refill-song* (on the widest void's first flight) and the *climb-song* (on the second rise's own line). Every held cape on its own (the field's float, the pure glide off the ledge, the stair's two) starts with the bar short of full, so the same key glides and never flies there (C1 checks it on every route and rate); the loose stars before them are counted (one on the stair). Great Stars: GS1 the longest float (jump at the lip, jump again at 52, hold to 71), GS2 the tiny islet, GS3 the double-cape-hold line.
+
+Platforms (x from–to, y): pluto-edge −700–1101 90; helper-cliff 1483–2156 160; still-field 2244–3220 283; far-shore 3825–4848 418; glide-ledge 5202–5453 401; shore-a 5863–6475 471; islet-2 7128–7230 568; next-shore 7397–8406 408; stair-1 9017–9238 460; stair-2 9476–9693 490; stair-3 9930–10639 520; wide-shore 11449–12077 567; climb-1 12631–12872 450; climb-2 13425–13629 333; lock-lid 13733–13970 307 (lid); neptune-shelf 14074–15085 281. Upper: islet-gs2 6924–6979 491; islet-1 6995–7071 511; islet-3 7308–7378 636; lock-floor 13732–14035 457.
+
+Departures from the brief's III table: 22 bars (52.8 s) instead of 20, because the title card covers sixteenths 5–22 and the GET needs a bar clear of required input on each side, so the warm-up flight (23/26) comes first and the GET is on 44 (bar 3) instead of 2½; beacons at 5, 7½, 10, 13, 16½ and 18 (six, at most 11.7 s apart; the brief's 4½ would put a required input inside the GET's bar); the need's far shore starts 615 px out (the portrait lookahead from the cape press), so holding alone, without the flight, reaches its edge; III's ladder band for Diana's own notes (3.2–4.0/s) is not met: they are 2.23/s, +16% over II, with the bed at 1.74/s under them (the user's restraint: the notes come from the glide lines, never from the bed). The glide whistle (audio.mjs) is not counted in those numbers.
+
+### IV · The Way Down (107 BPM): the song at home; the dive
+
+Clock 1, shared physics. Cells: jump, cape 3, hold **15: +36.7**; a dive on a lid falls 127 px in 1.4/16 (pressed 0.4/16, 56 ms, before the grid its notes snap forward onto it and the landing is on the next one: the score's quantiser only waits forward, at most 70 ms); a dive from the air falls 427 px in 3/16 (through a lid 77 px below the dive's height it breaks it 1.18/16 in, and the shards snap onto the next eighth); jump, cape 3, dive 6 **7: +2.2** (the dive cuts the flight 3/16 in: +94.9 px instead of 113.55, so a grid x is `wk(k, F, C)` with C such cuts); jump holding the cape, dive 8 **9: +84.2**; jump, cape 3, dive 8 **9: +38.4**; jump, cape 3, hold, dive 10 **11: +48.3**; jump, jump 3, cape 6 **11: −160.4**; held hop **4: −79.9**; jump, cape 3 **9: −16.8**; jump, jump 3 **7: −160.2**.
+
+| k (bar) | Step | What (y) |
+| --- | --- | --- |
+| 23–38 (2–3) | warm-up | Flight and held cape (jump 23, cape 26, hold) along the *warm-song*, 37 px down onto the glinting stone (99) on 38 |
+| 44 (3) | **GET** | From 42 the stone is a lid. The necklace wakes on 44 (`moment` *necklace-wake*; `decor` *glint-stone*) |
+| 53.6–55 (4) | safe first use | A dive breaks the lid (the ↓ glyph, optional) into the star row 127 px below (226) on 55. Running on, she crosses the lid and walks off the ledge after it onto the same floor |
+| 64 (5) | beacon *down* | |
+| 76–83 (5–6) | need | The cut: jump 76, cape 79, a dive on 82 cuts the flight over the islet (228) and lands on it on 83 (the ↓ glyph). Without the dive the flight runs on past its end (60 px after the landing) and the fall after it misses everything |
+| 84–105 (6–7) | develop | A held hop up 80 (84) onto the cut shore, then a jump holding the cape (the bar short of full) and a dive that cancels the glide onto the rock (232) (96, 104, 105) |
+| 112 (8) | beacon *glint* | |
+| 124–145 (8–10) | twist | The glint: a held hop onto a lid (152) that holds a run; the *glint-song* on it and the next rise charges the flight off its end (jump 136, cape 139) 17 px up onto the broken gate (135). Great Star 1 is in the star cache under the lid (a dive; out by jump, double and flight) |
+| 152 (10½) | beacon *broken* | |
+| 164–196 (11–13) | twist | The broken well: jump 164, cape 167 over a long lid (212) on a well 276 px deep, deeper than a walk-off survives; the dive at 172 breaks the lid from the air and lands on the well floor (488) on 175 (a flight alone lands on the lid, and a dive there still opens it); out by jump, double and flight (185, 188, 191), charged by the *well-song* on the floor and the rise, 160 px up onto the well shore (328) on 196 |
+| 204–213 (13–14) | | A jump holding the cape and a dive out of it onto the ring gate (412) |
+| 216 (14½) | beacon *rings* | |
+| 228–265 (15–17) | conclude | The way down into Uranus's rings: fly and dive (228/231/236, onto ring-1, 450), hold and dive (241/249, ring-2, 534), fly, hold and dive (254/257/264, ring-3, 582; charged by the *ring-song* on ring-2 and its own rise). Great Star 3 on a tiny islet for an early dive out of the held cape (260.6); Great Star 2 under the ring's lid (optional: a dive, then a jump and an early second jump out) |
+| 280 (18) | beacon *plane* | |
+| 292–311 (19–20) | conclude | A double up 160 px (292/295) onto ring-high, the *plane-song* on it and the next rise, a last fly and dive (302/305/310) onto the ring plane (460) |
+| 336 (22) | door | On the ring plane, the downbeat of bar 22 |
+
+Charge sources: (a) beacons for the cut, the broken well's flight and the first fly-and-dive; (b) the *glint-song*, the *well-song*, the *ring-song* and the *plane-song*, each on its flight's own line (an optional flight spent in an earlier airtime cannot take their charge: C2). The way down's dives are on the beat but optional (without them the held cape or the flight lands later on the same stone); the required dives are the cut and the broken well (and the lid's in the safe use is optional). Every held cape on its own starts with the bar short of full; the loose stars before them are counted.
+
+Platforms (x from–to, y): uranus-gate −700–1101 62; glint-rock 1691–1923 99; glint-lid 1923–2453 99 (lid); glint-floor 1923–3220 226; glint-ledge 2453–2611 99; cut-islet 3490–3630 228; cut-shore 3689–4072 148; glide-rock 4323–5132 232; cache-lid 5203–5586 152 (lid); broken-gate 5940–6759 135; broken-lid 7128–7608 212 (lid); well-floor 7128–7668 488; well-shore 8098–8501 328; ring-gate 8751–9409 412; ring-1 9783–10015 450; ring-2 10275–10507 534; ring-3 10946–11150 582; ring-lid 11150–11453 582 (lid); ring-3b 11453–12058 582; ring-high 12233–12437 422; ring-plane 12801–14347 460. Upper: star-cache 5311–5652 295; ring-islet 10898–10951 550; lid-well 11150–11491 702.
+
+Departures from the brief's IV table: the GET is on 44 (bar 3), as in III; the need is a dive that cuts a flight short (a dive after a flight's end lands only about 25 px earlier than the fall without it, which cannot make the dive required with a runway on the islet); the brief's "today's currents" (interim V) and "broken well" (interim VI) are re-solved here at their own coordinates and stay in the interim levels until V and VI replace them; Movement II's well lid became the ring's lid at the end of the way down (Great Star 2); beacons at 5, 8, 10½, 14½ and 18 (at most 9.8 s apart). IV's own-note band (4.2–5.0/s) is not met: 2.61/s, +17% over III, bed 2.23/s under it.
+
+## Interim levels V–VII (revision six's II–IV)
+
+### V (interim) · Borrowed Wind (107 BPM, revision six's II): floating with marked beats
 
 Added (2026-11-10): **the void again** (cut after the hearth void: it lands on a copy of the wind shore along its star line, a 4/16 hop climbs 80 px onto a second hearth, and the same void follows without stars; two bars); **the glide bridge** (beacon *bridge*; jump at 16th 540 into a column with the cape held, glide past its top across a void: no-glide runs come down about 150 px short, the held cape lands 20/16 after the jump on the grid; four bars); **the currents** (beacon *currents*; jump and flight, the flight ends over a low islet and a dive at 7/16 lands 44 px down 1/16 later; a jump into a column that carries Diana past the island beneath it, a dive at 16th 554 lands on it 1/16 later; jump and flight up 69 px onto the exit shore; three bars and two flights).
 
 Movement III at its own coordinates; Diana wakes on the hearth at chapter sixteenth 360 (a half bar: the score enters on a pickup and the door falls on bar 14). Changes: the split voids are one **long void** (takeoff 16003.45: jump, flight at 3/16, the four-star *void-song* along the flight refills the cape, flight at 9/16, landing 14/16 later 15 px lower on the far rock); a tap from the far rock lands on the wind gate 4/16 later. **GS2** sits above the void for a double jump between the flights. The finale's cracked launch became stable rock (no cracked stone before III). **GS1** is in the star cache under the second lid (the dive); **GS3** at the top of the finale wind, reached only with the cape held in it.
 
-### IV (interim) · The Breaking Constellation (118 BPM, revision six's III): call and response
+### VI (interim) · The Breaking Constellation (118 BPM, revision six's III): call and response
 
 Added (2026-11-10): Movement II's lid is optional again (the main route runs over it; GS2 in its well). **The broken well**, after the crown's late double (beacon *broken*): jump and flight onto a 520 px cracked lid (it never refills the cape); the well under it is 276 px deep, deeper than the 265 px a walk-off survives, so walking, jumping or double jumping off the lid's end dies, while a dive through the lid lowers the allowance by `RULES.smashDrop` (120 px) and lands on the floor (dive half a sixteenth past the grid: the 2.6/16 fall lands on it); the floor refills the cape: jump, second press 3/16 later, flight 3/16 after that, 606 px out onto the far shore 13/16 later; a hop onto a copy of the last crack and the crown's late double. Four bars, two flights; the rest sits 28 px lower. The paragraph below describes the first version.
 
 Movement II plus the hearth void and the split voids, at their own coordinates, from chapter sixteenth 160. Cracks break 5/16 after touch-down; the first crack's floor moved to 129 px below it so the fall lands 3/16 after the break, and a 4/16 hop climbs 80 px to the second crack. The upper path ends at the lid: the main route dives through it on the grid (k 285), lands in the well 95 px down 1/16 later, and leaves with a double jump (second press 4/16 later) straight up 76 px onto the second tile, 9/16 later, the same touch-down as Movement II's bounce; the cascade has five tiles (its first drops when the chapter's second did). **GS1** on the cracked chain, **GS2** for an early (3/16) second press out of the well, **GS3** on a two-step cracked stair above the crown. The split voids' constellation is required (cracks never refill). The door is on wind-gate's rock, bar 20.
 
-### V (interim) · The Far Door (128 BPM, revision six's IV): agitated, precise but fair
+### VII (interim) · The Far Door (128 BPM, revision six's IV): agitated, precise but fair
 
 Added (2026-11-10): **the voids at 128** after the crown (Movement III's hearth void and split voids translated so their first takeoff is the hearth's, at 16th 206; beacon *voids*; the split-song refill is required; the finale follows 159 px lower) and **the rising stair** before the door (beacon *stair*; two double jumps, second press 4/16 after the first, 135 px up each, along the six-star stair-song; the walk-off from the top step lands on the door island as from the finale's high shore).
 
