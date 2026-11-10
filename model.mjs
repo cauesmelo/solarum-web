@@ -123,6 +123,9 @@ export function createGame(seed = 2021, options = {}) {
   const capeRule = options.capeRule ?? def.capeRule ?? RULES.capeRule;
   const verbs = ownedVerbs(def);
   const physics = levelPhysics(def);
+  // Refill stars (RESEARCH_REFILLS 1): cape stars and leaf stars, kept apart
+  // from the stars (they are tools: never counted, never a constellation).
+  const refillStars = (def.refills ?? []).map((q) => ({ id: q.id, kind: q.kind, x: q.x, y: q.y, required: !!q.required, taken: false }));
   return {
     seed,
     level: def.id,
@@ -177,6 +180,10 @@ export function createGame(seed = 2021, options = {}) {
     queuedJump: false,
     queuedJumpReleased: false,
     bufferedDouble: false, // a press waiting for a predicted touch-down (jump())
+    // A cape press that could not fly yet (empty bar, or inside the wind),
+    // kept this long (sim s) for the moment it can (a refill, leaving a column).
+    capeBuffer: 0,
+    refillStars,
     starNetUsed: false,
     assist: {
       endlessCape: !!options.endlessCape,
@@ -233,6 +240,23 @@ export function ownedVerbs(def) {
   return { double: v.double ?? true, cape: !!v.cape, glide: !!v.glide, dive: !!v.dive, super: v.super ?? !!v.cape };
 }
 const maxJumps = (s) => (s.verbs.double ? 2 : 1);
+/** A refill star is lit exactly while its resource is spent (RESEARCH_REFILLS
+ * 1.1): a cape star while the cape is owned and the bar is not full (never
+ * in Endless cape), a leaf star while the double jump is owned and Diana is
+ * in the air with no air jump left. A dormant star is never consumed. */
+export function refillLit(s, q) {
+  if (q.taken || s.status !== "running") return false;
+  if (q.kind === "cape") return !!s.verbs.cape && !s.assist.endlessCape && !capeReady(s);
+  const p = s.player;
+  return !!s.verbs.double && !p.grounded && s.coyote <= 0 && p.jumps >= maxJumps(s);
+}
+/** Where a relic (an ability's GET) is drawn: its own y, or chest height
+ * over the run line's stone at its x. */
+export function relicY(def, g) {
+  if (g.y != null) return g.y;
+  const q = def.main.filter(([, x, , w]) => g.x >= x && g.x <= x + w).sort((a, b) => a[2] - b[2])[0];
+  return (q ? q[2] : def.level.startY) - 40;
+}
 export function capeReady(s) {
   if (s.assist.endlessCape) return true;
   if (s.capeRule === "breath") return s.capeCharge >= 1 - 1e-9;
@@ -310,6 +334,8 @@ function restoreCheckpoint(s) {
     s.distance = (cp.x - s.def.level.startX) / 10;
     for (const q of s.pickups)
       q.collected = cp.collected.includes(q.id) || keep.greatBanked.includes(q.id);
+    // Refill stars before the beacon stay taken; those after it return.
+    for (const q of s.refillStars) q.taken = (cp.refillsTaken ?? []).includes(q.id);
     for (const c of s.chains) {
       const saved = cp.chains[c.id];
       if (saved) Object.assign(c, saved);
@@ -467,11 +493,17 @@ export function releaseJump(s) {
 export function dash(s) {
   // A level that has not given Diana her cape yet ignores the button.
   if (!s.verbs.cape) return false;
-  if (s.status !== "running" || s.player.grounded || !capeReady(s))
-    return false;
+  if (s.status !== "running" || s.player.grounded) return false;
   // Inside solar wind the cape does not dash level (a level flight there can
   // run under the shore it is meant to reach); holding it glides upward.
-  if (updraftAt(s)) return false;
+  // A press that cannot fly yet (an empty bar, or inside a column) waits
+  // jumpBuffer (0.14 s real) for the moment it can: a refill in the air, a
+  // lit cape star, the column's edge (the critic's IV and VI presses).
+  if (!capeReady(s) || updraftAt(s)) {
+    s.capeBuffer = s.physics.jumpBuffer;
+    return false;
+  }
+  s.capeBuffer = 0;
   if (!s.assist.endlessCape) {
     s.capeCharges = 0;
     s.capeCharge = 0;
@@ -586,6 +618,7 @@ function landOn(s, q, wasGrounded, hard) {
   p.jumps = 0;
   p.diving = false;
   p.gliding = false;
+  s.capeBuffer = 0; // a touch-down ends the airtime the press was for
   s.coyote = s.physics.coyote;
   s.anchorY = q.y;
   s.fallTime = 0;
@@ -688,6 +721,7 @@ function catchInStarNet(s) {
     const first = s.platforms.find((q) => q.id === g.tiles[0]);
     if (first.x + first.width > at.x) g.t0 = null;
   }
+  for (const q of s.refillStars) if (q.x > at.x) q.taken = false;
   for (const c of s.chains) {
     const stars = s.pickups.filter((q) => q.chain === c.id);
     if (Math.min(...stars.map((q) => q.x)) <= at.x) continue;
@@ -774,6 +808,7 @@ function tick(s, dt, controls) {
   const flightDt = s.dashRemaining > 1e-9 ? Math.min(dt, s.dashRemaining) : 0;
   s.dashRemaining = s.dashRemaining - dt > 1e-9 ? s.dashRemaining - dt : 0;
   s.jumpBuffer = Math.max(0, s.jumpBuffer - dt);
+  s.capeBuffer = Math.max(0, s.capeBuffer - dt);
   // The predicted touch-down did not come (see jump()): the double jump now.
   if (s.bufferedDouble && s.jumpBuffer <= 0) {
     s.bufferedDouble = false;
@@ -892,6 +927,23 @@ function tick(s, dt, controls) {
     if (Math.abs(q.x - p.x) < rx && Math.abs(q.y - (p.y - 36)) < ry)
       collectStar(s, q);
   }
+  // Refill stars: a box of +-44 x +-50 px around the body centre. Lit, one
+  // acts and is taken; dormant, it is left in place (a later touch in the
+  // same airtime still works once it is lit).
+  for (const q of s.refillStars) {
+    if (q.taken || Math.abs(q.x - p.x) >= 44 || Math.abs(q.y - (p.y - 36)) >= 50 || !refillLit(s, q)) continue;
+    q.taken = true;
+    event(s, "refill-star", { type: "refill-star", id: q.id, kind: q.kind, x: q.x, y: q.y });
+    if (q.kind === "cape") refillCape(s, "cape-star");
+    else {
+      // One air jump back; a jump pressed within the buffer before the
+      // contact (with none in hand) is the double on this tick.
+      p.jumps = maxJumps(s) - 1;
+      if (s.jumpBuffer > 0 && !s.bufferedDouble) leap(s, false, s.jumpBufferReleased);
+    }
+  }
+  // A waiting cape press flies the moment it can (RESEARCH_REFILLS C12).
+  if (s.capeBuffer > 0 && !p.grounded && capeReady(s) && !updraftAt(s)) dash(s);
   for (const c of s.chains) {
     if (c.complete || c.broken) continue;
     // Missing a star (passing it) or pausing too long fades the chain.
@@ -923,6 +975,8 @@ function tick(s, dt, controls) {
     // The cape's bar appears empty and breathes in over the next bar.
     if (g.verb === "cape" && s.capeRule === "breath") ((s.capeCharge = 0), (s.capeCharges = 0));
     event(s, "get", { id: g.id, verb: g.verb });
+    // The relic (RESEARCH_REFILLS 2): the renderer's banner and pickup.
+    event(s, "relic", { type: "relic", id: g.id, verb: g.verb, x: g.x, y: relicY(s.def, g) });
   }
   // Breath: one bar (capeBreathBeats beats of simulation time) of running on
   // stable stone fills the cape; cracks, the air and wind add nothing.
@@ -946,6 +1000,7 @@ function tick(s, dt, controls) {
       highStars: s.highStars,
       time: s.time,
       collected: s.pickups.filter((q) => q.collected).map((q) => q.id),
+      refillsTaken: s.refillStars.filter((q) => q.taken).map((q) => q.id),
       chains: Object.fromEntries(
         s.chains.map((c) => [c.id, { ...c, links: [...c.links] }]),
       ),
@@ -1007,6 +1062,10 @@ export function snapshot(s) {
     capeFull: ready,
     verbs: { ...s.verbs },
     gets: (s.def.gets ?? []).map((g) => ({ ...g, taken: s.gotten.includes(g.id) })),
+    // RESEARCH_REFILLS: the relics (each ability's GET as a pickup on the run
+    // line) and the refill stars, pure data for the renderer.
+    relics: (s.def.gets ?? []).map((g) => ({ id: g.id, verb: g.verb, x: g.x, y: relicY(s.def, g), taken: s.gotten.includes(g.id) })),
+    refills: s.refillStars.map((q) => ({ id: q.id, kind: q.kind, x: q.x, y: q.y, required: q.required, lit: refillLit(s, q), taken: q.taken })),
     capeReady: ready,
     capeSpent: !ready,
     dashCooldown: s.dashCooldown,
@@ -1026,7 +1085,8 @@ export function snapshot(s) {
     greatStars: s.greatBanked.length,
     greatBanked: [...s.greatBanked],
     greatPending: [...s.greatPending],
-    refills: s.refills,
+    // (The count of breath refills; `refills` is now the refill stars.)
+    refillCount: s.refills,
     smashes: s.smashes,
     lipCatches: s.lipCatches,
     stepUps: s.stepUps ?? 0,

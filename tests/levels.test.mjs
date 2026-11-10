@@ -168,6 +168,20 @@ test("GETs (RESEARCH_PROGRESSION 7): no required input within a bar of one; the 
 });
 
 /* ---------- the cape's breath on real routes ---------- */
+/** A flight press on an empty bar is "empty" unless it flies within the
+ * cape's press buffer (0.14 s real: RESEARCH_REFILLS C12 and the critic's
+ * cape buffer), as a press just before a refill or a column's edge does. */
+function pressWait(empty) {
+  let pend = null;
+  return {
+    dash: (g, ready) => !ready && (pend = { x: Math.round(g.player.x), t: g.time, flights: g.flights }),
+    step: (g) => {
+      if (!pend) return;
+      if (g.flights > pend.flights) pend = null;
+      else if (g.time - pend.t > g.physics.jumpBuffer + 1e-9 || g.status !== "running") ((empty.push(pend.x)), (pend = null));
+    },
+  };
+}
 /** C1 for one stage: every flight press on every route and rate finds the
  * bar full, and every held-cape onset that is a press of its own (no flight
  * in that airtime: the same key) finds it short of full, so it glides and
@@ -179,9 +193,11 @@ function c1(d) {
         flew = [];
       let air = 0,
         gliding = false;
+      const wait = pressWait(empty);
       const { s } = run(d, route, 1 / hz, {
-        dash: (g, ready) => !ready && empty.push(Math.round(g.player.x)),
+        dash: wait.dash,
         step: (g) => {
+          wait.step(g);
           if (g.player.grounded) air = g.time;
           if (g.player.gliding && !gliding && g.lastDashAt < air && capeReady(g) && !g.player.inWind) flew.push(Math.round(g.player.x));
           gliding = g.player.gliding;
@@ -225,7 +241,8 @@ function c1(d) {
       const empty = [];
       const s = game({ ...d, routes: { ...d.routes, main: plan } });
       const m = createRouteMemory("main");
-      const a = api(s, { dash: (g, ready) => !ready && empty.push(Math.round(g.player.x)) });
+      const wait = pressWait(empty);
+      const a = api(s, wait);
       for (let t = 0; s.status === "running" && t < 120 * 120; t++) {
         // A person who touches down before an airborne press of the shifted
         // airtime (a late flight's held cape lands before its dive) simply
@@ -234,6 +251,7 @@ function c1(d) {
         const act = chooseAction(snapshot(s), m);
         if (act) a[act]();
         update(s, TICK, { glide: m.glide });
+        wait.step(s);
       }
       assert.equal(s.status, "won", `${d.numeral} step ${i} shifted ${dt} ticks`);
       assert.deepEqual(empty, [], `${d.numeral} step ${i} shifted ${dt} ticks: a flight press on an empty bar`);
@@ -268,7 +286,12 @@ test("C2: no doomed approach: an optional flight spent in any airtime with a ful
         if (a) api(s)[a]();
         update(s, TICK, { glide: m.glide });
         const kk = Math.floor(s.time / SIX + 1e-9);
-        if (kk !== k && !s.player.grounded && capeReady(s) && s.verbs.cape && nom.plan[m.i]?.[1] !== "dash" && s.dashRemaining <= 0) candidates.push(t);
+        // (The press is injected before the next tick: t + 1. A press in an
+        // airtime whose own flight is still to come is an early press of
+        // that flight: its window, C1's sweep.)
+        const next = nom.plan.findIndex((q, j) => j >= m.i && q[1] === "dash");
+        const ownFlight = next >= 0 && !nom.plan.slice(m.i, next).some((q) => q[2] === "g");
+        if (kk !== k && !s.player.grounded && capeReady(s) && s.verbs.cape && !ownFlight && s.dashRemaining <= 0) candidates.push(t + 1);
         k = kk;
       }
     }
