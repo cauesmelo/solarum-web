@@ -11,6 +11,14 @@ export const RULES = Object.freeze({
   // 'landing' (default): one flight per airtime; refilled by stable ground, a
   // beacon or a completed constellation. 'cooldown': the archived 6 s timer.
   capeRule: "landing",
+  // 'breath' (RESEARCH_PROGRESSION 3): the cape holds one flight and breathes
+  // it back over capeBreathBeats of running on stable stone (one bar, 605.6
+  // px, in every level); a loose star adds starCharge; a constellation, a
+  // beacon, a Great Star and a respawn fill it at once. A flight that the
+  // wind cuts short within windRefund s (real; x clock) gets its charge back.
+  capeBreathBeats: 4,
+  starCharge: 1 / 8,
+  windRefund: 0.15,
   dashCooldown: 6,
   dashDuration: 0.5,
   // Added to the 270 px/s run while the cape is open. 227.1 px/s x 0.5 s =
@@ -66,6 +74,8 @@ export const RULES = Object.freeze({
   respawnPop: 0.4,
 });
 const CRACKED = new Set(["crumble", "lid", "cascade"]);
+/** One beat of simulation time (the simulation always runs at 107 BPM). */
+const BEAT_SIM = 60 / 107;
 const DURATIONS = {
   start: 1 / 3,
   jump: 5 / 12,
@@ -96,6 +106,7 @@ export function levelPhysics(def) {
     respawnIris: RULES.respawnIris * c,
     respawnPop: RULES.respawnPop * c,
     cascadeShake: RULES.cascadeShake * c,
+    windRefund: RULES.windRefund * c,
     ...def.physics,
   });
 }
@@ -104,7 +115,8 @@ export function createGame(seed = 2021, options = {}) {
   const def = options.def ?? levelDef(options.level);
   const LEVEL = def.level;
   const world = createLevel(def);
-  const capeRule = options.capeRule ?? RULES.capeRule;
+  const capeRule = options.capeRule ?? def.capeRule ?? RULES.capeRule;
+  const verbs = ownedVerbs(def);
   const physics = levelPhysics(def);
   return {
     seed,
@@ -121,6 +133,14 @@ export function createGame(seed = 2021, options = {}) {
     score: 0,
     speed: LEVEL.speed,
     capeCharges: 1,
+    // Breath charge, 0-1 (capeRule 'breath'); full whenever the cape is owned
+    // at the start (a cape GET empties it, then she breathes it in).
+    capeCharge: 1,
+    // The verbs owned right now: the level's own, plus any GET passed.
+    verbs,
+    gotten: [],
+    ground: null, // the platform Diana stands on (breath needs stable stone)
+    lastDashAt: -9,
     dashCooldown: 0,
     dashRemaining: 0,
     superUsed: false,
@@ -200,13 +220,33 @@ function markPrompts(s, action) {
     )
       q.done = true;
 }
+/** The verbs a level starts with (RESEARCH_PROGRESSION 2.5). Older level
+ * definitions name only cape, dive and glide: the double jump is then owned,
+ * and the super jump comes with the cape, as before. */
+export function ownedVerbs(def) {
+  const v = def.verbs ?? {};
+  return { double: v.double ?? true, cape: !!v.cape, glide: !!v.glide, dive: !!v.dive, super: v.super ?? !!v.cape };
+}
+const maxJumps = (s) => (s.verbs.double ? 2 : 1);
 export function capeReady(s) {
   if (s.assist.endlessCape) return true;
+  if (s.capeRule === "breath") return s.capeCharge >= 1 - 1e-9;
   return s.capeRule === "cooldown" ? s.dashCooldown <= 0 : s.capeCharges > 0;
+}
+/** Add breath (0-1) to the cape; a refill event only when it becomes full. */
+function breathe(s, amount, source) {
+  if (s.capeRule !== "breath" || !s.verbs.cape || s.capeCharge >= 1) return;
+  s.capeCharge = Math.min(1, s.capeCharge + amount);
+  if (s.capeCharge >= 1 - 1e-9) {
+    s.capeCharge = 1;
+    s.refills++;
+    event(s, "refill", { source });
+  }
 }
 function refillCape(s, source) {
   const was = capeReady(s);
   s.capeCharges = 1;
+  s.capeCharge = 1;
   s.dashCooldown = 0;
   if (!was) {
     s.refills++;
@@ -249,6 +289,8 @@ function restoreCheckpoint(s) {
   Object.assign(s, keep);
   s.status = "running";
   const cp = s.checkpoint;
+  // A respawn owns what the beacon had: a GET passed after it is taken again.
+  if (cp?.verbs) ((s.verbs = { ...cp.verbs }), (s.gotten = [...cp.gotten]));
   if (cp) {
     s.checkpointsReached = [...cp.reached];
     s.ringsCrossed = cp.ringsCrossed;
@@ -305,7 +347,9 @@ export function jump(s) {
   }
   if (s.status !== "running") return false;
   const p = s.player;
-  if (s.dashRemaining > 0 && !s.superUsed && !p.grounded) {
+  // Before the super jump is owned, a jump during a flight ends the flight and
+  // is the double jump (if one is left): leap() closes the cape.
+  if (s.verbs.super && s.dashRemaining > 0 && !s.superUsed && !p.grounded) {
     // M6: flight + jump = super jump, once per flight, whatever jumps remain.
     s.superUsed = true;
     s.dashRemaining = 0;
@@ -321,7 +365,9 @@ export function jump(s) {
     event(s, "super-jump");
     return true;
   }
-  if (p.jumps >= 2 && s.coyote <= 0) {
+  // (Without the double jump there is no air jump: a press after coyote only
+  // waits in the buffer for the next touch-down.)
+  if (p.jumps >= maxJumps(s) && s.coyote <= 0) {
     s.jumpBuffer = s.physics.jumpBuffer;
     s.jumpBufferReleased = false;
     return false;
@@ -415,7 +461,7 @@ export function releaseJump(s) {
 }
 export function dash(s) {
   // A level that has not given Diana her cape yet ignores the button.
-  if (!s.def.verbs.cape) return false;
+  if (!s.verbs.cape) return false;
   if (s.status !== "running" || s.player.grounded || !capeReady(s))
     return false;
   // Inside solar wind the cape does not dash level (a level flight there can
@@ -423,8 +469,10 @@ export function dash(s) {
   if (updraftAt(s)) return false;
   if (!s.assist.endlessCape) {
     s.capeCharges = 0;
+    s.capeCharge = 0;
     if (s.capeRule === "cooldown") s.dashCooldown = s.physics.dashCooldown;
   }
+  s.lastDashAt = s.time;
   // The cape is a new decision: a jump pressed just before it was waiting for
   // a touch-down the flight now postpones, so it is dropped (not fired midair).
   if (s.bufferedDouble) ((s.bufferedDouble = false), (s.jumpBuffer = 0));
@@ -441,7 +489,7 @@ export function dash(s) {
   return true;
 }
 export function dive(s) {
-  if (!s.def.verbs.dive || s.status !== "running") return false;
+  if (!s.verbs.dive || s.status !== "running") return false;
   const p = s.player;
   if (p.grounded) {
     // Only drawn cracks are smashable. Ordinary ground ignores a grounded dive.
@@ -520,6 +568,7 @@ function windAt(s, x, y) {
 }
 function landOn(s, q, wasGrounded, hard) {
   const p = s.player;
+  s.ground = q;
   if (q.type === "crumble" && q.triggeredAt === null) q.triggeredAt = s.time;
   if (q.cascade) {
     const g = s.cascades.find((c) => c.id === q.cascade);
@@ -562,9 +611,11 @@ function collectStar(s, q) {
   if (q.great) {
     s.greatPending.push(q.id);
     event(s, "great-star", { id: q.id });
+    if (s.capeRule === "breath" && s.verbs.cape) breathe(s, 1, "great");
     return;
   }
   s.stars++;
+  if (!q.chain) breathe(s, s.physics.starCharge, "star");
   if (q.route === "high") s.highStars++;
   const c = q.chain ? s.chains.find((k) => k.id === q.chain) : null;
   if (c && !c.complete && !c.broken) {
@@ -716,7 +767,7 @@ function tick(s, dt, controls) {
   // The predicted touch-down did not come (see jump()): the double jump now.
   if (s.bufferedDouble && s.jumpBuffer <= 0) {
     s.bufferedDouble = false;
-    if (!p.grounded && p.jumps < 2) leap(s, false, s.jumpBufferReleased);
+    if (!p.grounded && p.jumps < maxJumps(s)) leap(s, false, s.jumpBufferReleased);
   }
   const previousY = p.y,
     wasGrounded = p.grounded;
@@ -727,10 +778,17 @@ function tick(s, dt, controls) {
   if (s.dashRemaining > 0 && !p.grounded && !p.diving && updraftAt(s)) {
     s.dashRemaining = 0;
     event(s, "wind-catch");
+    // The refund: D pressed just before the column (within windRefund) did
+    // not mean to spend the flight the wind has now cancelled.
+    if (s.capeRule === "breath" && s.time - s.lastDashAt <= s.physics.windRefund + 1e-9 && !s.assist.endlessCape) {
+      s.capeCharge = 1;
+      s.capeCharges = 1;
+      event(s, "wind-refund");
+    }
   }
   const wind = !p.grounded && !p.diving && s.dashRemaining <= 0 && updraftAt(s);
   p.inWind = !!wind;
-  p.gliding = !!controls.glide && s.def.verbs.glide && !p.diving && !p.grounded && s.dashRemaining <= 0;
+  p.gliding = !!controls.glide && s.verbs.glide && !p.diving && !p.grounded && s.dashRemaining <= 0;
   if (p.gliding && wind) markPrompts(s, "glide");
   if (flightDt > 0) p.vy = 0;
   else if (wind) {
@@ -840,6 +898,18 @@ function tick(s, dt, controls) {
     s.movement = movement;
     event(s, "movement", { id: movement.id });
   }
+  // GETs (RESEARCH_PROGRESSION 2.2): running through one owns its verb.
+  for (const g of s.def.gets ?? []) {
+    if (s.gotten.includes(g.id) || p.x < g.x) continue;
+    s.gotten.push(g.id);
+    s.verbs[g.verb] = true;
+    // The cape's bar appears empty and breathes in over the next bar.
+    if (g.verb === "cape" && s.capeRule === "breath") ((s.capeCharge = 0), (s.capeCharges = 0));
+    event(s, "get", { id: g.id, verb: g.verb });
+  }
+  // Breath: one bar (capeBreathBeats beats of simulation time) of running on
+  // stable stone fills the cape; cracks, the air and wind add nothing.
+  if (p.grounded && s.ground && !isCracked(s.ground) && !s.ground.collapsed) breathe(s, dt / (s.physics.capeBreathBeats * BEAT_SIM), "ground");
   for (const mark of s.def.checkpoints) {
     if (
       s.checkpointsReached.includes(mark.id) ||
@@ -864,6 +934,8 @@ function tick(s, dt, controls) {
       ),
       ringsCrossed: s.ringsCrossed,
       reached: [...s.checkpointsReached],
+      verbs: { ...s.verbs },
+      gotten: [...s.gotten],
     };
     s.fallsHere = 0;
     s.starNetUsed = false;
@@ -912,7 +984,12 @@ export function snapshot(s) {
     highStars: s.highStars,
     speed: s.speed,
     capeRule: s.capeRule,
-    capeCharges: s.assist.endlessCape ? 1 : s.capeCharges,
+    // Legacy QA field: 1 when a flight is ready (breath: a full bar).
+    capeCharges: s.assist.endlessCape ? 1 : s.capeRule === "breath" ? (ready ? 1 : 0) : s.capeCharges,
+    capeCharge: s.assist.endlessCape ? 1 : s.capeRule === "breath" ? s.capeCharge : ready ? 1 : 0,
+    capeFull: ready,
+    verbs: { ...s.verbs },
+    gets: (s.def.gets ?? []).map((g) => ({ ...g, taken: s.gotten.includes(g.id) })),
     capeReady: ready,
     capeSpent: !ready,
     dashCooldown: s.dashCooldown,
