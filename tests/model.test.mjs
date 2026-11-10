@@ -127,11 +127,11 @@ test("ability route smashes the lid, glides in the wind and keeps two refills fo
 test("removing one taught action fails exactly at the challenge that teaches it", () => {
   const noDouble = traverse("main", 1 / 120, "double").s;
   assert.equal(noDouble.status, "dead");
-  assert.ok(noDouble.player.x > 3330 && noDouble.player.x < 3600);
+  assert.ok(noDouble.player.x > 3350 && noDouble.player.x < 3650, `no double: ${noDouble.player.x}`);
   assert.equal(noDouble.checkpoint.id, "leap");
   const noCape = traverse("main", 1 / 120, "dash").s;
   assert.equal(noCape.status, "dead");
-  assert.ok(noCape.player.x > 15100 && noCape.player.x < 15490);
+  assert.ok(noCape.player.x > 15060 && noCape.player.x < 15460, `no cape: ${noCape.player.x}`);
   assert.equal(noCape.checkpoint.id, "hearth");
 });
 test("missing the required midair constellation leaves the cape spent over the second void", () => {
@@ -316,35 +316,46 @@ test("no required crossing depends on a chain unless a beacon sits right before 
 });
 
 /* ---------- M4 beat cascade ---------- */
-test("the beat cascade drops a tile per beat and catches up with Diana", () => {
+test("the beat cascade drops a tile on every 107 BPM beat and closes in on the bouncing line", () => {
   const s = start(createGame());
   const tiles = s.platforms.filter((q) => q.cascade).sort((a, b) => a.x - b.x);
   assert.ok(tiles.length >= 5 && tiles.length <= 7);
+  assert.ok(Math.abs(BEAT - 60 / 107) < 1e-12, "the soundtrack's tempo, not the GDD's 88");
   for (let i = 0; i < tiles.length; i++) {
-    assert.ok(tiles[i].width >= 160 && tiles[i].width <= 180);
+    assert.ok(tiles[i].width >= 140 && tiles[i].width <= 160, tiles[i].id);
     if (i) {
+      // One tile per beat at a 207 px pitch: the wave travels 369 px/s and
+      // gains 55.6 px of run on Diana every beat (RESEARCH_MUSIC 5.3).
+      assert.ok(Math.abs(tiles[i].x - tiles[i - 1].x - 207) < 1, `${tiles[i].id} pitch`);
       const gap = tiles[i].x - tiles[i - 1].x - tiles[i - 1].width;
-      assert.ok(gap >= 60 && gap <= 90);
+      assert.ok(gap >= 50 && gap <= 70, `${tiles[i].id} gap ${gap}`);
     }
   }
   const wave = s.cascades[0];
   assert.equal(wave.interval, BEAT);
-  Object.assign(s.player, { x: tiles[0].x + 40, y: tiles[0].y - 20, vy: 0, grounded: false, jumps: 1 });
-  s.anchorY = tiles[0].y;
-  update(s, 0.25);
-  assert.ok(s.events.some((e) => e.name === "cascade"));
-  const t0 = s.time - (s.player.x - tiles[0].x) / LEVEL.speed + wave.lead / LEVEL.speed;
-  tiles.forEach((q, i) => assert.ok(Math.abs(q.collapseAt - (t0 + i * BEAT)) < 0.02, q.id));
-  // Where is Diana (nominally) inside each tile when it drops? The wave gains
-  // on her every beat until the last tile drops under her feet.
-  const into = tiles.map((q) => tiles[0].x + (q.collapseAt - (t0 - wave.lead / LEVEL.speed)) * LEVEL.speed - q.x);
-  for (let i = 1; i < into.length; i++) assert.ok(into[i] < into[i - 1]);
-  assert.ok(into[0] > tiles[0].width + 200, "it starts well behind");
-  const last = into.at(-1);
-  assert.ok(last > 120 && last < tiles.at(-1).width, `last tile drops ${last} px in`);
-  // A hop at each edge always lands before the next tile drops (edge jump
-  // lands about 205 - 70 = 135 px into the next tile).
-  assert.ok(205 - 70 + 16 < last + 16);
+  // The main route bounces across; record when it leaves each tile.
+  const log = [];
+  let seen = 0;
+  const api = adapter(s);
+  const step = api.step;
+  api.step = (dt, c) => {
+    const r = step(dt, c);
+    for (const e of s.events) if (e.serial > seen) (seen = e.serial), log.push({ ...e });
+    return r;
+  };
+  playRoute(api, { route: "main" });
+  const drops = log.filter((e) => e.name === "tile-drop");
+  assert.equal(drops.length, tiles.length);
+  for (const d of drops) {
+    const beats = d.time / BEAT;
+    assert.ok(Math.abs(beats - Math.round(beats)) * BEAT < 0.02, `${d.platform} drops ${((beats - Math.round(beats)) * BEAT * 1000).toFixed(1)} ms off the beat`);
+  }
+  // Each touch-down on a tile is also the takeoff from it (a bounce), so the
+  // slack is the time from that landing until the tile falls.
+  const left = tiles.map((q) => log.find((e) => e.name === "land" && e.platform === q.id).time);
+  const slack = tiles.map((q, i) => drops[i].time - left[i]);
+  for (let i = 1; i < slack.length; i++) assert.ok(slack[i] < slack[i - 1], `the wave gains on tile ${i}`);
+  assert.ok(slack.at(-1) > 0.35 && slack.at(-1) < 0.75, `last tile falls ${slack.at(-1).toFixed(3)} s after Diana leaves it`);
 });
 test("hopping at each tile edge survives the wave; late coyote hops are caught", () => {
   assert.equal(traverse("main").s.status, "won");
@@ -495,12 +506,12 @@ test("beacons are at most 14 s of run apart and leave 400 px before the next req
 });
 test("a beacon sits right before the first required use of each mechanic", () => {
   const firstUse = {
-    "double-jump": 3330,
+    "double-jump": 3324,
     fragile: 7900,
-    cascade: 11820,
-    flight: 15100,
-    constellation: 16200,
-    updraft: 18070,
+    cascade: createLevel().platforms.find((q) => q.id === "tile-0").x,
+    flight: 14982,
+    constellation: 16147,
+    updraft: 18047,
   };
   for (const [mechanic, x] of Object.entries(firstUse)) {
     const before = CHECKPOINTS.filter((c) => c.x < x).at(-1);
@@ -810,11 +821,12 @@ test("cracked shelves collapse while Diana is still on them and keep coyote grac
   assert.equal(jump(s), true);
   const fall = start(createGame());
   const f = fall.platforms.find((p) => p.id === "first-crack");
+  const floor = fall.platforms.find((p) => p.id === "crack-floor");
   Object.assign(fall.player, { x: f.x + 20, y: f.y, grounded: true });
   fall.anchorY = f.y;
   update(fall, 1.2);
   assert.equal(fall.status, "running");
-  assert.equal(fall.player.y, 560, "the floor beneath catches the first break");
+  assert.equal(fall.player.y, floor.y, "the floor beneath catches the first break");
 });
 
 /* ---------- forgiveness, glyphs, stars ---------- */
