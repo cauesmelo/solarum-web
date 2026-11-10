@@ -8,6 +8,7 @@
  *   hold →   press and hold the cape until the prompt's window ends
  *   ↑ · hold →  jump, then hold the cape until the window ends
  *   ↓        dive
+ *   tap ↑    jump and release at once
  * Options: { at: 'from' | 'inputX', start: x, tap: true } (tap releases a
  * jump at once; `start` probes an arbitrary first input x).
  */
@@ -17,6 +18,7 @@ export function followGlyph(api, prompt, { route = "main", at = "from", start: f
   // The route pilot hands over at the glyph's own window (or earlier when
   // probing an earlier start), so it never takes the jump the glyph covers.
   const handover = Math.min(start, prompt.from) - 1;
+  // "tap-up" is a jump released at once (L1's stepping stones).
   const g = prompt.glyph.filter((k) => k !== "then");
   const m = createRouteMemory(route);
   let s = api.getState(),
@@ -41,7 +43,9 @@ export function followGlyph(api, prompt, { route = "main", at = "from", start: f
         prev = g[step - 1];
       since += dt;
       let done = false;
-      if (k === "up") {
+      if (k === "tap-up") {
+        if (p.grounded || s.coyote > 0) (api.jump(), api.releaseJump(), (done = true));
+      } else if (k === "up") {
         if (step === 0) {
           if (p.grounded || s.coyote > 0) (act("jump"), (done = true));
         } else if (prev === "right") {

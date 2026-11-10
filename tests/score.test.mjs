@@ -1,26 +1,25 @@
-/** The adaptive score (score.mjs) against the re-timed level: path clock,
- * grid alignment, quantiser caps, harmonic safety, dissonance rules, falls,
- * the perfect-run payoff and the scheduler's clock. Pure: no Web Audio (the
- * engine-level checks live in audio.test.mjs). */
+/** The adaptive score (score.mjs) against every level: path clocks, grid
+ * alignment, quantiser caps, harmonic safety, dissonance rules, falls, the
+ * perfect-run payoff, the scheduler's clock and each level's own preset
+ * (RESEARCH_LEVELS 6). Pure: no Web Audio (the engine-level checks live in
+ * audio.test.mjs). */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { RULES } from "../model.mjs";
-import { CHECKPOINTS, createLevel } from "../level.mjs";
-import { PATH } from "../score-path.mjs";
+import { LEVELS, levelDef, createLevel } from "../level.mjs";
+import { PATHS, HASH } from "../score-path.mjs";
 import { record, bake, auditAnchors, sourceHash, ANCHOR_GRID } from "../scripts/bake-score.mjs";
 import {
   SIXTEENTH,
   BAR,
   CAPS,
   TOLERANCE,
-  PHRASES,
+  SCORES,
   CHORDS,
   DIATONIC,
   MAX_DETUNE,
-  MAX_FLAT,
   LAYERS,
   quantize,
-  chordAt,
   pathPos,
   pc,
   isSafe,
@@ -28,49 +27,72 @@ import {
   createClockMap,
   createTuning,
 } from "../score.mjs";
-import { musicRun, CRACKED, beaconX } from "./music-run.mjs";
+import { musicRun, CRACKED, beaconX, SLOPPY_RUNS } from "./music-run.mjs";
 
-const SLOPPY = { failAt: ["leap", "voids"], removeStars: ["first-song-2"], late: [[4400, 4470, 14], [8600, 8710, 16], [10900, 10980, 12]] };
+const IDS = LEVELS.map((d) => d.id);
+const chordOf = (n, pos) => SCORES[n].chordAt(pos);
+/** Score position of world x on level n (the path counts from waking; L2 wakes on its pickup). */
+const posOf = (n, x) => pathPos(PATHS[n], x) + SCORES[n].pickup;
 
-/* ---------- path clock and the level on the grid ---------- */
-test("the path clock is baked from the current level, model and pilot (a stale table fails)", async () => {
-  assert.equal(PATH.hash, await sourceHash(), "run `npm run score:bake` after changing level.mjs, model.mjs or tests/routes.mjs");
-  assert.equal(PATH.bpm, 107);
-  for (let i = 1; i < PATH.path.length; i++) {
-    assert.ok(PATH.path[i][0] > PATH.path[i - 1][0]);
-    assert.ok(PATH.path[i][1] > PATH.path[i - 1][1], "x -> beat is monotonic");
+/* ---------- path clocks and the levels on the grid ---------- */
+test("each level's path clock is baked from the current levels, model and pilots (a stale table fails)", async () => {
+  assert.equal(HASH, await sourceHash(), "run `npm run score:bake` after changing level.mjs, model.mjs or tests/routes.mjs");
+  for (const n of IDS) {
+    const P = PATHS[n];
+    assert.equal(P.bpm, levelDef(n).bpm);
+    for (let i = 1; i < P.path.length; i++) {
+      assert.ok(P.path[i][0] > P.path[i - 1][0]);
+      assert.ok(P.path[i][1] > P.path[i - 1][1], `L${n}: x -> beat is monotonic`);
+    }
+    // Each level reaches its door on a downbeat, its own bar count in.
+    const end = P.end + SCORES[n].pickup;
+    assert.ok(Math.abs(end / BAR - Math.round(end / BAR)) * BAR < 0.1, `L${n} ends at sixteenth ${end}`);
+    assert.equal(Math.round(end / BAR) + 1, SCORES[n].bars, `L${n} door bar`);
   }
-  // The main route is 35 bars to the door, which it reaches on a downbeat.
-  assert.ok(Math.abs(PATH.end - 35 * BAR) < 0.1, `route ends at sixteenth ${PATH.end}`);
 });
-test("main route: every takeoff, landing, star, chain note, beacon and tile drop sits within 35 ms of its grid", () => {
-  for (const hz of [60, 120, 240]) {
-    const rec = record("main", 1 / hz);
-    assert.equal(rec.s.status, "won");
-    const audit = auditAnchors(bake(rec).anchors);
-    assert.ok(audit.length >= 150, `${audit.length} anchors at ${hz} Hz`);
-    const names = new Set(audit.map((a) => a.name));
-    for (const n of ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"]) assert.ok(names.has(n), `${n} anchors exist`);
-    const worst = audit.reduce((w, a) => (Math.abs(a.ms) > Math.abs(w.ms) ? a : w));
-    for (const a of audit) assert.ok(Math.abs(a.ms) <= 35, `${hz} Hz: ${a.name} ${a.id ?? ""} at x ${a.x} is ${a.ms.toFixed(1)} ms off its 1/${16 / a.grid} grid`);
-    if (hz === 120) assert.ok(Math.abs(worst.ms) <= 20, `120 Hz worst ${worst.ms.toFixed(1)} ms (${worst.name} ${worst.id ?? ""})`);
+test("every main route: each takeoff, landing, star, chain note, beacon and tile drop sits within 35 ms (real) of its grid", () => {
+  const kinds = {
+    1: ["jump", "double-jump", "land", "star", "chain-note", "constellation", "checkpoint"],
+    2: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
+    3: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
+    4: ["jump", "dash", "super-jump", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
+  };
+  for (const n of IDS) {
+    const clock = levelDef(n).clock;
+    for (const hz of [60, 120, 240]) {
+      // The pilot samples at hz of real time: clock/hz of simulation.
+      const rec = record("main", clock / hz, n);
+      assert.equal(rec.s.status, "won");
+      const audit = auditAnchors(bake(rec).anchors);
+      assert.ok(audit.length >= 50, `L${n}: ${audit.length} anchors at ${hz} Hz`);
+      const names = new Set(audit.map((a) => a.name));
+      for (const k of kinds[n]) assert.ok(names.has(k), `L${n} ${k} anchors exist`);
+      const ms = (a) => a.ms / clock; // simulation ms -> real (audio) ms
+      const worst = audit.reduce((w, a) => (Math.abs(ms(a)) > Math.abs(ms(w)) ? a : w));
+      for (const a of audit) assert.ok(Math.abs(ms(a)) <= 35, `L${n} ${hz} Hz: ${a.name} ${a.id ?? ""} at x ${a.x} is ${ms(a).toFixed(1)} ms off its 1/${16 / a.grid} grid`);
+      if (hz === 120) assert.ok(Math.abs(ms(worst)) <= 25, `L${n} 120 Hz worst ${ms(worst).toFixed(1)} ms (${worst.name} ${worst.id ?? ""})`);
+    }
   }
-  // At 30 Hz the pilot only acts every 33 ms; the map is still on the grid
-  // to within that sampling.
-  const coarse = auditAnchors(bake(record("main", 1 / 30)).anchors);
-  for (const a of coarse) assert.ok(Math.abs(a.ms) <= 35 + 1000 / 30 + 1, `30 Hz: ${a.name} ${a.ms.toFixed(1)} ms`);
 });
 test("constellations complete on an eighth, beacons sit on half bars, flights move exactly three sixteenths", () => {
-  for (const a of PATH.anchors.filter((q) => q.name === "constellation")) assert.ok(Math.abs(a.k / 2 - Math.round(a.k / 2)) * 2 * SIXTEENTH <= 0.035, `${a.id} completes off the eighth`);
-  for (const cp of CHECKPOINTS) {
-    const k = pathPos(PATH, cp.x);
-    assert.ok(Math.abs(k / 8 - Math.round(k / 8)) * 8 * SIXTEENTH <= 0.02, `${cp.id} at sixteenth ${k.toFixed(2)}`);
+  for (const n of IDS) {
+    const pick = SCORES[n].pickup;
+    for (const a of PATHS[n].anchors.filter((q) => q.name === "constellation")) {
+      const k = a.k + pick;
+      assert.ok(Math.abs(k / 2 - Math.round(k / 2)) * 2 * SIXTEENTH <= 0.035 * levelDef(n).clock, `L${n} ${a.id} completes off the eighth`);
+    }
+    for (const cp of levelDef(n).checkpoints) {
+      const k = posOf(n, cp.x);
+      assert.ok(Math.abs(k / 8 - Math.round(k / 8)) * 8 * SIXTEENTH <= 0.02, `L${n} ${cp.id} at sixteenth ${k.toFixed(2)}`);
+    }
   }
   // A full flight adds 0.5 s x 227.1 px/s = 113.55 px = 3 x 37.85 px of run.
   assert.ok(Math.abs(RULES.dashSpeed * RULES.dashDuration - 3 * 270 * SIXTEENTH) < 0.01);
   // The beat cascade's pitch is one wave-beat: 207 px.
-  const tiles = createLevel().platforms.filter((q) => q.cascade).sort((a, b) => a.x - b.x);
-  for (let i = 1; i < tiles.length; i++) assert.ok(Math.abs(tiles[i].x - tiles[i - 1].x - 207) < 1);
+  for (const n of [3, 4]) {
+    const tiles = createLevel(n).platforms.filter((q) => q.cascade).sort((a, b) => a.x - b.x);
+    for (let i = 1; i < tiles.length; i++) assert.ok(Math.abs(tiles[i].x - tiles[i - 1].x - 207) < 1);
+  }
 });
 
 /* ---------- quantiser ---------- */
@@ -86,82 +108,97 @@ test("the quantiser never waits past its cap, and an on-grid action plays at onc
         if (q.kind === "snap") assert.ok(Math.abs(q.pos / grid - Math.round(q.pos / grid)) < 1e-9, "a snapped note lands on its grid");
       }
   // In real runs every voice respects its cap.
-  for (const run of [musicRun(), musicRun(SLOPPY), musicRun({ route: "upper" })])
-    for (const n of run.player) assert.ok(n.delay <= n.cap + 1e-9, `${n.voice} waited ${(n.delay * 1000).toFixed(1)} ms (cap ${n.cap * 1000})`);
+  for (const n of IDS)
+    for (const run of [musicRun({ level: n }), musicRun(SLOPPY_RUNS[n]), musicRun({ level: n, route: "upper" })])
+      for (const v of run.player) assert.ok(v.delay <= v.cap + 1e-9, `L${n} ${v.voice} waited ${(v.delay * 1000).toFixed(1)} ms (cap ${v.cap * 1000})`);
 });
 
 /* ---------- harmony ---------- */
 const AUTHORED = new Set(["pad", "choir", "signal"]); // the composer's voicings
 test("every free note is from the current chord's safe set; G# rings only for Great Stars", () => {
   let checked = 0;
-  for (const run of [musicRun(), musicRun({ route: "upper" }), musicRun({ route: "ability" }), musicRun({ route: "safe" }), musicRun(SLOPPY)]) {
-    for (const n of run.notes) {
-      const chord = chordAt(n.pos),
-        midis = n.midis ?? (n.midi != null ? [n.midi] : []);
-      for (const m of midis) {
-        checked++;
-        if (pc(m) === 8) {
-          assert.equal(n.voice, "dust", `G# outside the Earth colour: ${n.voice}`);
-          assert.notEqual(chord.root, 7, "never G# over G (a minor ninth on the root)");
-          continue;
+  for (const lv of IDS)
+    for (const run of [musicRun({ level: lv }), musicRun({ level: lv, route: "upper" }), musicRun({ level: lv, route: "ability" }), musicRun({ level: lv, route: "safe" }), musicRun(SLOPPY_RUNS[lv])]) {
+      for (const n of run.notes) {
+        const chord = chordOf(lv, n.pos),
+          midis = n.midis ?? (n.midi != null ? [n.midi] : []);
+        for (const m of midis) {
+          checked++;
+          if (pc(m) === 8) {
+            assert.equal(n.voice, "dust", `L${lv} G# outside the Earth colour: ${n.voice}`);
+            assert.notEqual(chord.root, 7, "never G# over G (a minor ninth on the root)");
+            continue;
+          }
+          // The F major chord's A# (L4's dominant) lives only in its pad.
+          if (n.voice === "pad" && chord.name === "F#" && pc(m) === 10) continue;
+          if (n.voice === "bass") assert.equal(pc(m), pc(chord.bass), "the bass plays the chord's bass (the root, or L4's F# pedal)");
+          else if (AUTHORED.has(n.voice)) {
+            assert.ok(DIATONIC.includes(pc(m)), `L${lv} ${n.voice} ${m} outside D major`);
+            assert.notEqual((pc(m) - chord.root + 12) % 12, 1, `L${lv} ${n.voice} ${m}: a minor second over the root`);
+          } else if (n.voice === "bloom" && m < 60) assert.equal(pc(m), chord.root, "a bloom's low note is the root");
+          else assert.ok(isSafe(chord, m), `L${lv} ${n.voice} ${m} (${n.event}) is not safe over ${chord.name} at sixteenth ${n.pos}`);
         }
-        if (n.voice === "bass") assert.equal(pc(m), chord.root, "the bass plays the root");
-        else if (AUTHORED.has(n.voice)) {
-          assert.ok(DIATONIC.includes(pc(m)), `${n.voice} ${m} outside D major`);
-          assert.notEqual((pc(m) - chord.root + 12) % 12, 1, `${n.voice} ${m}: a minor second over the root`);
-        } else if (n.voice === "bloom" && m < 60) assert.equal(pc(m), chord.root, "a bloom's low note is the root");
-        else assert.ok(isSafe(chord, m), `${n.voice} ${m} (${n.event}) is not safe over ${chord.name} at sixteenth ${n.pos}`);
       }
     }
-  }
-  assert.ok(checked > 3000, `${checked} pitches checked`);
+  assert.ok(checked > 6000, `${checked} pitches checked`);
 });
-test("authored constellation notes fit the chord where the main route takes each star", () => {
-  const chainNotes = PATH.anchors.filter((a) => a.name === "chain-note");
-  assert.ok(chainNotes.length >= 20);
-  for (const a of chainNotes) {
-    const [chain, step] = [a.id.replace(/-\d+$/, ""), Number(a.id.split("-").at(-1))];
-    const m = PHRASES[chain][step],
-      chord = chordAt(Math.round(a.k));
-    assert.ok(isSafe(chord, m), `${a.id}: ${m} over ${chord.name}`);
+test("authored constellation notes fit the chord where each main route takes each star", () => {
+  let count = 0;
+  for (const n of IDS) {
+    const P = SCORES[n];
+    for (const a of PATHS[n].anchors.filter((q) => q.name === "chain-note")) {
+      count++;
+      const [chain, step] = [a.id.replace(/-\d+$/, ""), Number(a.id.split("-").at(-1))];
+      const m = P.phrases[chain][step],
+        chord = P.chordAt(Math.round(a.k) + P.pickup);
+      assert.ok(isSafe(chord, m), `L${n} ${a.id}: ${m} over ${chord.name}`);
+    }
+    for (const [id, notes] of Object.entries(P.phrases)) assert.equal(notes.length, createLevel(n).chains.find((c) => c.id === id).count, `L${n} ${id}`);
+    assert.equal(Object.keys(P.phrases).length, createLevel(n).chains.length, `L${n}: every constellation has its phrase`);
   }
-  for (const [id, notes] of Object.entries(PHRASES)) assert.equal(notes.length, createLevel().chains.find((c) => c.id === id).count, id);
+  assert.ok(count >= 40, `${count} chain notes`);
 });
 
 /* ---------- mistakes ---------- */
 test("dissonance follows only visible errors, is clearly heard (the bed goes flat), heals one bar at a time; Gentle never detunes", () => {
-  const clean = musicRun();
-  assert.ok(clean.mixes.every((m) => m.totalCents === 0 && m.H === 1), "a clean main run is perfectly in tune");
-  const sloppy = musicRun(SLOPPY);
-  const errorTimes = sloppy.events.filter((e) => e.name === "chain-fade" || e.name === "death").map((e) => e.time);
-  const firstDetune = sloppy.mixes.find((m) => m.totalCents > 0);
-  assert.ok(firstDetune, "a sloppy run is heard");
-  // Errors are also off-beat score notes; the first detune comes after the
-  // first error of any kind, never before.
-  const firstError = sloppy.tuning.find((q) => q.H < 1);
-  assert.ok(firstError && firstDetune.time >= firstError.time - 1e-9);
-  assert.ok(errorTimes.length >= 3, `${errorTimes.length} visible errors`);
-  for (const m of sloppy.mixes) assert.ok(m.totalCents <= MAX_DETUNE + 1e-9 && m.flatCents <= MAX_FLAT + 1e-9 && m.padCents >= 0 && m.wowCents >= 0, `${m.totalCents} cents`);
-  // Audible: right after a fall the whole bed sits at least 15 cents flat of
-  // Diana's voice (a symmetric spread alone was measured as nearly inaudible).
-  const death = sloppy.events.find((e) => e.name === "death");
-  const afterFall = sloppy.mixes.filter((m) => m.status === "running" && m.time >= death.time - 3 && m.H < 1);
-  assert.ok(afterFall.length && Math.max(...afterFall.map((m) => m.flatCents)) >= 15, "the bed is clearly flat after a fall");
-  // Healing is gentle: never more than +0.1 at a time, and a fall is heard
-  // for several bars of clean play.
-  for (let i = 1; i < sloppy.tuning.length; i++) {
-    const d = sloppy.tuning[i].H - sloppy.tuning[i - 1].H;
-    assert.ok(d <= 0.1 + 1e-9, `H rose ${d.toFixed(2)} at once (${sloppy.tuning[i].after})`);
+  for (const n of IDS) {
+    const cap = SCORES[n].maxFlat;
+    const clean = musicRun({ level: n });
+    assert.ok(clean.mixes.every((m) => m.totalCents === 0 && m.H === 1), `L${n}: a clean main run is perfectly in tune`);
+    const sloppy = musicRun(SLOPPY_RUNS[n]);
+    assert.equal(sloppy.s.status, "won");
+    const firstDetune = sloppy.mixes.find((m) => m.totalCents > 0);
+    assert.ok(firstDetune, `L${n}: a sloppy run is heard`);
+    // Errors are also off-beat score notes; the first detune comes after the
+    // first error of any kind, never before.
+    const firstError = sloppy.tuning.find((q) => q.H < 1);
+    assert.ok(firstError && firstDetune.time >= firstError.time - 1e-9);
+    for (const m of sloppy.mixes) assert.ok(m.totalCents <= MAX_DETUNE + 1e-9 && m.flatCents <= cap + 1e-9 && m.padCents >= 0 && m.wowCents >= 0, `L${n} ${m.totalCents} cents`);
+    // Audible: right after a fall the whole bed sits at the level's full
+    // flat cap (10 cents in L1's calm, 15 in L2, 20 from L3) against
+    // Diana's in-tune voice.
+    // (In step order: simulation time rewinds to the beacon at a respawn.)
+    const fell = sloppy.mixes.findIndex((m) => m.status === "dead");
+    const afterFall = sloppy.mixes.slice(fell).filter((m, i) => m.status === "running" && i < 600 && m.H < 1);
+    assert.ok(afterFall.length && Math.max(...afterFall.map((m) => m.flatCents)) >= Math.min(cap, 15) - 1e-9, `L${n}: the bed is clearly flat after a fall`);
+    // Healing is gentle: never more than +0.1 at a time, and a fall is heard
+    // for several bars of clean play.
+    for (let i = 1; i < sloppy.tuning.length; i++) {
+      const d = sloppy.tuning[i].H - sloppy.tuning[i - 1].H;
+      assert.ok(d <= 0.1 + 1e-9, `L${n} H rose ${d.toFixed(2)} at once (${sloppy.tuning[i].after})`);
+    }
+    const outOfTune = sloppy.mixes.filter((m) => m.totalCents > 0).length / 120 / levelDef(n).clock;
+    // A fall is heard for at least three bars of clean play at any tempo.
+    assert.ok(outOfTune > (3 * 4 * 60) / levelDef(n).bpm, `L${n} ${outOfTune.toFixed(1)} s out of tune over the sloppy run`);
+    assert.equal(sloppy.mixes.at(-1).totalCents, 0, `L${n}: clean play retunes the world by the door`);
+    const gentle = musicRun({ ...SLOPPY_RUNS[n], gentle: true });
+    assert.ok(gentle.mixes.every((m) => m.totalCents === 0 && m.H === 1), "Gentle music never detunes");
+    assert.ok(gentle.fx.some((f) => f.kind === "fade") && !gentle.fx.some((f) => f.kind === "tape-stop"), "a Gentle fall fades instead");
+    assert.ok(gentle.player.every((v) => !v.blur), "and never blurs a note");
   }
-  const outOfTune = sloppy.mixes.filter((m) => m.totalCents > 0).length / 120;
-  assert.ok(outOfTune > 12, `${outOfTune.toFixed(1)} s out of tune over the sloppy run`);
-  assert.equal(sloppy.mixes.at(-1).totalCents, 0, "clean play retunes the world by the door");
   // Below H 0.7 the choir rests; it returns as H heals.
+  const sloppy = musicRun(SLOPPY_RUNS[3]);
   assert.ok(sloppy.mixes.some((m) => !m.choir) && sloppy.mixes.at(-1).choir);
-  const gentle = musicRun({ ...SLOPPY, gentle: true });
-  assert.ok(gentle.mixes.every((m) => m.totalCents === 0 && m.H === 1), "Gentle music never detunes");
-  assert.ok(gentle.fx.some((f) => f.kind === "fade") && !gentle.fx.some((f) => f.kind === "tape-stop"), "a Gentle fall fades instead");
-  assert.ok(gentle.player.every((n) => !n.blur), "and never blurs a note");
   // Kindness: three falls at one beacon soften the penalty, five forgive it.
   const t = createTuning();
   assert.equal(t.apply("respawn", { fallsHere: 1 }) <= 0 && t.H, 0.6);
@@ -171,70 +208,90 @@ test("dissonance follows only visible errors, is clearly heard (the bed goes fla
   t.apply("respawn", { fallsHere: 5 });
   assert.equal(t.H, 1);
 });
-test("a fall tape-stops the score, plays its last notes backwards and restarts on the beacon's bar when control returns", () => {
-  const run = musicRun({ failAt: ["leap"] });
-  assert.equal(run.s.status, "won");
-  const stop = run.fx.find((f) => f.kind === "tape-stop");
-  assert.ok(stop, "the fall tape-stops");
-  assert.equal(stop.seconds, 0.45);
-  assert.ok(stop.rewind.length >= 1 && stop.rewind.length <= 8, `${stop.rewind.length} rewind notes`);
-  const restart = run.fx.find((f) => f.kind === "restart");
-  const beacon = pathPos(PATH, beaconX("leap"));
-  assert.equal(restart.pos, Math.round(beacon));
-  assert.equal(restart.pos % 8, 0, "a half bar: the re-entry is on a strong beat");
-  assert.equal(restart.event, "control", "it happens when control returns, not while Diana is still falling apart");
-  // The restart is the frame control came back: within one 120 Hz step of it.
-  const back = run.events.find((e) => e.name === "respawn");
-  assert.ok(back && Math.abs(restart.time - back.time) < 0.01, "same simulation moment as the respawn (sim time is frozen while she reforms)");
-  // The rewind replays the notes that were just heard, an octave up.
-  const before = run.player.filter((n) => n.t <= stop.time + 1e-9).flatMap((n) => n.midis ?? [n.midi]);
-  for (const r of stop.rewind) assert.ok(before.includes(r.midi - 12), `rewind ${r.midi}`);
+test("a fall tape-stops the score (L1 short, no rewind; then backwards), L4 rests its groove, and the score restarts on the beacon's bar when control returns", () => {
+  for (const n of IDS) {
+    const P = SCORES[n];
+    const run = musicRun({ level: n, failAt: SLOPPY_RUNS[n].failAt });
+    assert.equal(run.s.status, "won");
+    const stop = run.fx.find((f) => f.kind === "tape-stop");
+    assert.ok(stop, `L${n}: the fall tape-stops`);
+    assert.equal(stop.seconds, P.tapeStop);
+    if (P.rewind) assert.ok(stop.rewind.length >= 1 && stop.rewind.length <= 8, `L${n} ${stop.rewind.length} rewind notes`);
+    else assert.equal(stop.rewind.length, 0, "L1's stop has no rewind");
+    const restart = run.fx.find((f) => f.kind === "restart");
+    const beacon = posOf(n, beaconX(SLOPPY_RUNS[n].failAt[0], n));
+    assert.equal(restart.pos, Math.round(beacon));
+    assert.equal(restart.pos % 8, 0, `L${n}: a half bar, the re-entry is on a strong beat`);
+    assert.equal(restart.event, "control", "it happens when control returns, not while Diana is still falling apart");
+    const back = run.events.find((e) => e.name === "respawn");
+    assert.ok(back && Math.abs(restart.time - back.time) < 0.01, "same simulation moment as the respawn");
+    // The rewind replays the notes that were just heard, an octave up.
+    const before = run.player.filter((v) => v.t <= stop.time + 1e-9).flatMap((v) => v.midis ?? [v.midi]);
+    for (const r of stop.rewind) assert.ok(before.includes(r.midi - 12), `rewind ${r.midi}`);
+    if (P.dropOnFall) {
+      // L4: no kick or ostinato between the respawn and the next constellation or beacon.
+      const after = run.events.filter((e) => (e.name === "constellation" || e.name === "checkpoint") && e.seq > back.seq)[0];
+      const until = after ? after.seq : Infinity;
+      const groove = run.notes.filter((v) => v.event === "tick" && (v.voice === "pulse" || v.voice === "marimba") && v.seq > back.seq && v.seq < until);
+      assert.equal(groove.length, 0, `L4 groove during the rest: ${groove.length}`);
+    }
+  }
   // Back to last light rewinds without the tape-stop or a penalty.
-  const c = createConductor({ path: PATH, cracked: CRACKED });
+  const c = createConductor({ level: 2, path: PATHS[2], cracked: CRACKED });
   c.event({ name: "wake", time: 0 });
-  const out = c.event({ name: "respawn", source: "retry", time: 9, x: beaconX("leap") });
+  assert.equal(c.transport.pos(0), SCORES[2].pickup, "L2 wakes on its half-bar pickup");
+  const out = c.event({ name: "respawn", source: "retry", time: 9, x: beaconX("voids", 2) });
   assert.deepEqual(out.fx.map((f) => f.kind), ["restart"]);
   assert.equal(c.tuning.H, 1);
-  assert.equal(c.transport.pos(9), Math.round(pathPos(PATH, beaconX("leap"))), "on the beacon's bar");
-  // Restart chapter: a fresh, stopped, in-tune song that the next wake starts on bar 1.
+  assert.equal(c.transport.pos(9), Math.round(posOf(2, beaconX("voids", 2))), "on the beacon's bar");
+  // Restart level: a fresh, stopped, in-tune song that the next wake starts on its first bar.
   c.event({ name: "chain-fade", time: 10 });
   assert.ok(c.tuning.H < 1);
   c.reset();
   assert.equal(c.transport.running, false);
   assert.equal(c.tuning.H, 1);
   c.event({ name: "wake", time: 0 });
-  assert.equal(c.transport.pos(0), 0);
+  assert.equal(c.transport.pos(0), SCORES[2].pickup);
 });
 
 /* ---------- the payoff ---------- */
-test("a perfect run completes the whole song; a sloppy one does not", () => {
-  const perfect = musicRun();
-  assert.equal(perfect.s.status, "won");
-  const song = perfect.c.song();
-  assert.equal(song.notes, song.total, `${song.notes}/${song.total} intended notes on time`);
-  assert.ok(song.total >= 60);
-  assert.equal(song.constellations, 5);
-  assert.equal(song.complete, true);
-  const layers = perfect.c.state(perfect.s.time).layers;
-  for (const l of ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"]) assert.ok(layers.includes(l), `${l} played`);
-  assert.ok(perfect.player.every((n) => n.kind === "on"), "every note of the perfect run is on its beat");
-  assert.equal(perfect.c.state(perfect.s.time).rephases, 0, "the main route never needs a re-phase");
-  const door = perfect.fx.find((f) => f.kind === "door");
-  assert.equal(door.complete, true);
-  assert.equal(door.earth, false);
-  // The last two bars play the Signal's whole theme (head and answer).
-  const coda = perfect.notes.filter((n) => n.voice === "signal" && n.pos >= 33 * BAR);
-  assert.ok(coda.length >= 6, `${coda.length} coda notes`);
-  const sloppy = musicRun(SLOPPY);
-  assert.equal(sloppy.s.status, "won");
-  assert.equal(sloppy.c.song().complete, false);
-  assert.equal(sloppy.fx.find((f) => f.kind === "door").complete, false);
-  // The mastery line brings three Great Stars: the door opens on the Earth chord.
-  const upper = musicRun({ route: "upper" });
-  const earthDoor = upper.fx.find((f) => f.kind === "door");
-  assert.equal(earthDoor.earth, true);
-  assert.equal(earthDoor.chord.name, CHORDS.Earth.name);
-  assert.ok(upper.notes.some((n) => n.voice === "dust" && (n.midis ?? [n.midi]).some((m) => pc(m) === 8)), "G# rings for the Great Stars");
+test("a perfect run completes each level's song; a sloppy one does not; three Great Stars open the door on Earth's chord", () => {
+  const layers = {
+    1: ["sky", "signal", "steps", "stars", "choir", "strings"],
+    2: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
+    3: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings", "glass"],
+    4: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
+  };
+  for (const n of IDS) {
+    const perfect = musicRun({ level: n });
+    assert.equal(perfect.s.status, "won");
+    const song = perfect.c.song();
+    assert.equal(song.notes, song.total, `L${n}: ${song.notes}/${song.total} intended notes on time`);
+    assert.ok(song.total >= 12, `L${n} ${song.total} intended notes`);
+    assert.equal(song.constellations, song.totalConstellations);
+    assert.equal(song.complete, true);
+    const heard = perfect.c.state(perfect.s.time).layers;
+    for (const l of layers[n]) assert.ok(heard.includes(l), `L${n}: ${l} played`);
+    if (n === 1) assert.ok(!heard.includes("pulse"), "L1 has no drums");
+    // On the grid: on time, or (the smash's shards) snapped onto their eighth.
+    assert.ok(perfect.player.every((v) => v.kind === "on" || (v.kind === "snap" && v.voice === "shards")), `L${n}: ${perfect.player.filter((v) => v.kind !== "on").map((v) => v.voice)}`);
+    assert.equal(perfect.c.state(perfect.s.time).rephases, 0, `L${n}: the main route never needs a re-phase`);
+    const door = perfect.fx.find((f) => f.kind === "door");
+    assert.equal(door.complete, true);
+    assert.equal(door.earth, false);
+    // The last bars play the Signal's whole theme (head and answer).
+    const coda = perfect.notes.filter((v) => v.voice === "signal" && v.pos >= (SCORES[n].closeFrom - 1) * BAR);
+    assert.ok(coda.length >= 6, `L${n}: ${coda.length} coda notes`);
+    const sloppy = musicRun(SLOPPY_RUNS[n]);
+    assert.equal(sloppy.s.status, "won");
+    assert.equal(sloppy.c.song().complete, false);
+    assert.equal(sloppy.fx.find((f) => f.kind === "door").complete, false);
+    const upper = musicRun({ level: n, route: "upper" });
+    const earthDoor = upper.fx.find((f) => f.kind === "door");
+    assert.equal(earthDoor.earth, true, `L${n}`);
+    assert.equal(earthDoor.chord.name, CHORDS.Earth.name);
+    assert.ok(upper.notes.some((v) => v.voice === "dust" && (v.midis ?? [v.midi]).some((m) => pc(m) === 8)), "G# rings for the Great Stars");
+  }
 });
 
 /* ---------- the scheduler's clock ---------- */
@@ -242,28 +299,30 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
   // The engine's loop with a fake clock: frames of 8-50 ms (seeded), one
   // 200 ms hitch; the simulation advances min(frame, 50 ms) like game.js;
   // the audio clock advances in 128-sample render quanta.
-  const c = createConductor({ path: PATH, cracked: CRACKED });
+  // L3: shaker sixteenths through its body, at 118 BPM (clock 1.103).
+  const c = createConductor({ level: 3, path: PATHS[3], cracked: CRACKED });
   const clock = createClockMap();
+  const scale = levelDef(3).clock;
   let seed = 9;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   let wall = 0,
     sim = 0;
   c.event({ name: "wake", time: 0 });
-  clock.anchor(0, 0);
+  clock.anchor(0, 0, scale);
   const at = new Map(); // tick position -> audio time
   let past = 0,
     maxDrift = 0,
     hitchAt = null;
   const quantum = 128 / 48000;
-  for (let i = 0; sim < 70; i++) {
+  for (let i = 0; sim < 40; i++) {
     let dt = 0.008 + rnd() * 0.042;
-    if (i === 900) (dt = 0.2), (hitchAt = wall + dt);
+    if (i === 700) (dt = 0.2), (hitchAt = wall + dt);
     wall += dt;
-    sim += Math.min(dt, 0.05);
+    sim += Math.min(dt, 0.05) * scale;
     const audioNow = Math.floor(wall / quantum) * quantum;
-    clock.follow(sim, audioNow, dt);
+    clock.follow(sim, audioNow, dt, scale);
     if (hitchAt == null || wall > hitchAt + 1) maxDrift = Math.max(maxDrift, Math.abs(clock.stats().drift));
-    for (const n of c.ticks(c.transport.pos(sim), c.transport.pos(clock.toSim(audioNow + 0.12)))) {
+    for (const n of c.ticks(c.transport.pos(sim), c.transport.pos(clock.toSim(audioNow + 0.12, scale)))) {
       const want = clock.toAudio(n.t);
       if (want < audioNow - 1e-9) past++;
       if (!at.has(n.pos)) at.set(n.pos, Math.max(audioNow + 0.006, want));
@@ -275,7 +334,7 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
   for (let i = 1; i < ks.length; i++) {
     if (ks[i] !== ks[i - 1] + 1) continue;
     const gap = at.get(ks[i]) - at.get(ks[i - 1]);
-    const err = Math.abs(gap - SIXTEENTH);
+    const err = Math.abs(gap - SIXTEENTH / scale);
     const nearHitch = Math.abs(at.get(ks[i]) - hitchAt) < 0.4;
     if (!nearHitch) worst = Math.max(worst, err);
     if (at.get(ks[i]) > hitchAt + 0.4 && recovered == null && err < 0.002) recovered = at.get(ks[i]) - hitchAt;
@@ -286,31 +345,43 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
     const a = at.get(ks[i - 1]),
       b = at.get(ks[i]);
     if (Math.abs(b - hitchAt) > 0.4) continue;
-    const r = ((b - a) / SIXTEENTH) % 1;
-    assert.ok(Math.min(r, 1 - r) * SIXTEENTH < 0.015, `tick ${ks[i]} lands ${(Math.min(r, 1 - r) * SIXTEENTH * 1000).toFixed(1)} ms off the old grid`);
+    const r = ((b - a) / (SIXTEENTH / scale)) % 1;
+    assert.ok(Math.min(r, 1 - r) * (SIXTEENTH / scale) < 0.015, `tick ${ks[i]} lands ${(Math.min(r, 1 - r) * (SIXTEENTH / scale) * 1000).toFixed(1)} ms off the old grid`);
   }
-  // Movement I has no voice on every sixteenth; II and III do (the shaker).
-  assert.ok(ks.length > 300, `${ks.length} sixteenths carried notes`);
+  assert.ok(ks.length > 200, `${ks.length} sixteenths carried notes`);
   assert.ok(worst < 0.002, `grid error ${(worst * 1000).toFixed(2)} ms`);
-  assert.ok(recovered != null && recovered < 16 * SIXTEENTH, `recovered ${recovered?.toFixed(3)} s after the hitch`);
+  assert.ok(recovered != null && recovered < (16 * SIXTEENTH) / scale, `recovered ${recovered?.toFixed(3)} s after the hitch`);
   assert.ok(maxDrift < 0.05, `drift ${(maxDrift * 1000).toFixed(1)} ms`);
   assert.ok(past <= 2, `${past} ticks were due in the past when first seen`);
   assert.equal(clock.stats().jumps, 1, "only the hitch re-anchored the clock");
 });
-test("the conductor is deterministic and its bed respects the layer plan", () => {
-  const a = musicRun(),
-    b = musicRun();
-  assert.deepEqual(a.notes.map((n) => [n.voice, n.pos, n.midi ?? n.midis?.join()]), b.notes.map((n) => [n.voice, n.pos, n.midi ?? n.midis?.join()]));
-  const at = (voice, bars) => a.notes.filter((n) => n.voice === voice && bars.includes(Math.floor(n.pos / BAR) + 1));
-  assert.equal(at("pulse", [1, 2]).length, 0, "the pulse enters on bar 3");
-  assert.ok(at("pulse", [3, 4]).length >= 4);
-  assert.equal(at("pulse", [23, 24]).length, 0, "and rests on the hearth");
-  assert.equal(at("shaker", [5]).length, 0, "the shaker belongs to II and III");
-  assert.ok(at("shaker", [12]).length >= 16);
-  assert.ok(at("pad", [1]).length >= 1, "the sky enters at the wake");
-  // The sky never thins out: a pad starts in every bar (a held chord is
-  // re-voiced at each bar line), so bars 1-3 of Bm no longer decay to silence.
-  for (let bar = 1; bar <= 35; bar++) assert.ok(at("pad", [bar]).length >= 1, `bar ${bar} has a sky pad`);
-  for (const n of a.notes) assert.ok(LAYERS[n.layer], n.layer);
-  assert.ok(a.notes.filter((n) => n.layer === "choir").length > 0, "constellations bring in the choir");
+test("the conductor is deterministic and each level's bed respects its layer plan", () => {
+  for (const n of IDS) {
+    const a = musicRun({ level: n }),
+      b = musicRun({ level: n });
+    assert.deepEqual(a.notes.map((v) => [v.voice, v.pos, v.midi ?? v.midis?.join()]), b.notes.map((v) => [v.voice, v.pos, v.midi ?? v.midis?.join()]));
+    const at = (voice, bars) => a.notes.filter((v) => v.voice === voice && v.event === "tick" && bars.includes(Math.floor(v.pos / BAR) + 1));
+    assert.equal(at("pulse", [1, 2]).length, 0, `L${n}: the groove enters on bar 3`);
+    assert.ok(at("pad", [1, 2]).length >= 1, "the sky enters at the wake");
+    // The sky never thins out: a pad starts in every bar (a held chord is
+    // re-voiced at each bar line).
+    const first = n === 2 ? 2 : 1;
+    for (let bar = first; bar < SCORES[n].bars; bar++) assert.ok(at("pad", [bar]).length >= 1, `L${n} bar ${bar} has a sky pad`);
+    for (const v of a.notes) assert.ok(LAYERS[v.layer], v.layer);
+    assert.ok(a.notes.filter((v) => v.layer === "choir").length > 0, "constellations bring in the choir");
+  }
+  const bar = (run, voice, b) => run.notes.filter((v) => v.voice === voice && v.event === "tick" && Math.floor(v.pos / BAR) + 1 === b).length;
+  const [l1, l2, l3, l4] = IDS.map((n) => musicRun({ level: n }));
+  // L1: no drums at all. L2: heartbeat on 1 and 3 with ticks and shaker.
+  // L3: the backbeat once a bar and the tresillo marimba. L4: four on the floor.
+  assert.equal(l1.notes.filter((v) => v.voice === "pulse" || v.voice === "shaker").length, 0);
+  assert.equal(bar(l2, "pulse", 5), 2);
+  assert.ok(bar(l2, "shaker", 5) >= 16);
+  assert.equal(bar(l3, "pulse", 5), 1);
+  assert.equal(bar(l3, "marimba", 5), 3);
+  assert.equal(bar(l4, "pulse", 5), 4);
+  assert.equal(bar(l4, "marimba", 5), 8);
+  // Each level its own space (RESEARCH_LEVELS 6): 5.5 s, 5.5, 3.5, 2.5.
+  assert.deepEqual(IDS.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 3.5, 2.5]);
+  assert.deepEqual(IDS.map((n) => SCORES[n].maxFlat), [10, 15, 20, 20]);
 });

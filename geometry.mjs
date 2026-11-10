@@ -59,10 +59,16 @@ export function viewGeometry(width) {
 }
 /** Fit the logical view into a CSS box. Wide boxes show more world; boxes
  * narrower than minWidth:height letterbox (the sky keeps its full width and
- * the leftover height becomes the control deck). */
-export function fitStage(boxWidth, boxHeight, hudBar = 0) {
+ * the leftover height becomes the control deck). `view` raises the minimum
+ * widths for a faster level (RESEARCH_LEVELS 7: 2.5 s of landscape and
+ * 2.0 s of portrait lookahead at L3's 298 and L4's 323 px/s real need 970 /
+ * 775 and 1050 / 840 logical px). A landscape box between the two minimums
+ * letterboxes thinly above and below instead of turning into a deck. */
+export function fitStage(boxWidth, boxHeight, hudBar = 0, view = null) {
+  const minWidth = Math.max(VIEW.minWidth, view?.minWidth ?? 0),
+    portraitMin = Math.max(VIEW.portraitMinWidth, view?.portraitMinWidth ?? 0);
   const aspect = boxWidth / Math.max(1, boxHeight);
-  const minAspect = VIEW.minWidth / VIEW.height;
+  const minAspect = minWidth / VIEW.height;
   if (aspect >= minAspect) {
     return {
       layout: "landscape",
@@ -73,10 +79,21 @@ export function fitStage(boxWidth, boxHeight, hudBar = 0) {
       scale: boxHeight / VIEW.height,
     };
   }
+  if (aspect >= VIEW.minWidth / VIEW.height) {
+    const cssHeight = (boxWidth * VIEW.height) / minWidth;
+    return {
+      layout: "landscape",
+      top: (boxHeight - cssHeight) / 2,
+      cssWidth: boxWidth,
+      cssHeight,
+      logicalWidth: minWidth,
+      scale: boxWidth / minWidth,
+    };
+  }
   // As tall a sky as the box allows, but never narrower than portraitMinWidth
   // and always leaving room for the HUD bar and a usable control deck.
   const room = Math.max(1, boxHeight - hudBar - VIEW.deckMin);
-  const logicalWidth = Math.max(VIEW.portraitMinWidth, (VIEW.height * boxWidth) / room);
+  const logicalWidth = Math.max(portraitMin, (VIEW.height * boxWidth) / room);
   const cssHeight = (boxWidth * VIEW.height) / logicalWidth;
   return {
     layout: "portrait",

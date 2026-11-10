@@ -40,6 +40,8 @@
             <span id="start-label">Gathering the stars…</span>
           </button>
           <p class="keys" id="title-keys" aria-hidden="true">↑ jump · → cape · ↓ dive</p>
+          <!-- The orbit map: four levels, opened in order (progress is saved). -->
+          <nav class="level-map" id="level-map" aria-label="Levels"></nav>
           <p class="load-error" id="load-error" hidden>
             The stars could not be gathered.
             <button id="reload" class="ink-btn small" type="button">Try again</button>
@@ -90,7 +92,7 @@
             <div class="stack">
               <button id="resume" class="ink-btn primary" type="button">Continue</button>
               <button id="back-to-light" class="ink-btn" type="button">Back to last light</button>
-              <button id="restart-chapter" class="ink-btn" type="button">Restart chapter</button>
+              <button id="restart-chapter" class="ink-btn" type="button">Restart level</button>
             </div>
             <div class="row">
               <button id="pause-sound" class="ink-btn small" type="button" aria-pressed="true">♫ Sound</button>
@@ -120,16 +122,19 @@
       </div>
 
       <!-- Victory: slides up beside the portal, never over it. -->
-      <div class="card victory-card" id="victory-card" role="dialog" aria-labelledby="victory-line" hidden>
+      <div class="card victory-card" id="victory-card" role="dialog" aria-labelledby="victory-title" hidden>
+        <p class="victory-title" id="victory-title">I · Waking</p>
         <p class="victory-line" id="victory-line"><i class="earth" aria-hidden="true"></i>The signal is stronger now.</p>
         <dl class="results">
           <div><dt><i class="star-icon" aria-hidden="true"></i><span class="sr-only">Stars</span></dt><dd id="result-stars">0 / 0</dd></div>
           <div><dt class="great-slots" id="result-great"><i class="slot"></i><i class="slot"></i><i class="slot"></i><span class="sr-only">Great Fallen Stars</span></dt><dd id="result-great-count">0 / 3</dd></div>
           <div><dt>Time</dt><dd id="result-time">0:00</dd></div>
           <div><dt>Falls</dt><dd id="result-falls">0</dd></div>
+          <div><dt>Song</dt><dd id="result-song">—</dd></div>
         </dl>
         <div class="row">
-          <button id="again" class="ink-btn primary" type="button">Run again</button>
+          <button id="continue" class="ink-btn primary" type="button">Continue</button>
+          <button id="again" class="ink-btn" type="button">Retry</button>
           <button id="to-title" class="ink-btn" type="button">Title</button>
         </div>
       </div>

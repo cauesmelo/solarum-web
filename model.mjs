@@ -96,9 +96,10 @@ export function levelPhysics(def) {
   });
 }
 export function createGame(seed = 2021, options = {}) {
-  const def = levelDef(options.level);
+  // options.def: a level definition object (tests and authoring tools).
+  const def = options.def ?? levelDef(options.level);
   const LEVEL = def.level;
-  const world = createLevel(def.id);
+  const world = createLevel(def);
   const capeRule = options.capeRule ?? RULES.capeRule;
   const physics = levelPhysics(def);
   return {
@@ -217,7 +218,7 @@ export function start(s) {
 export function restart(s) {
   const assist = { ...s.assist },
     serial = s.eventSerial;
-  Object.assign(s, createGame(s.seed, { capeRule: s.capeRule, level: s.level, ...assist }));
+  Object.assign(s, createGame(s.seed, { capeRule: s.capeRule, def: s.def, ...assist }));
   // Event serials stay monotonic so a renderer never mistakes new events for old.
   s.eventSerial = serial;
   return start(s);
@@ -237,7 +238,7 @@ function restoreCheckpoint(s) {
   };
   Object.assign(
     s,
-    createGame(s.seed, { capeRule: s.capeRule, level: s.level, ...keep.assist }),
+    createGame(s.seed, { capeRule: s.capeRule, def: s.def, ...keep.assist }),
   );
   Object.assign(s, keep);
   s.status = "running";
@@ -332,7 +333,8 @@ export function jump(s) {
   s.jumpBufferReleased = false;
   s.dashRemaining = 0;
   animate(s, "jump");
-  s.jumpHeld = true;
+  // Apex hang only while the button is still down (a buffered tap is not).
+  s.jumpHeld = !bufferedTap;
   markPrompts(s, first ? "jump" : "double-jump");
   event(s, first ? "jump" : "double-jump");
   return true;
@@ -543,7 +545,7 @@ function die(s) {
 function catchInStarNet(s) {
   const at = s.lastStable;
   s.starNetUsed = true;
-  const fresh = createLevel(s.level);
+  const fresh = createLevel(s.def);
   const freshById = new Map(fresh.platforms.map((q) => [q.id, q]));
   for (const q of s.platforms)
     if (q.x + q.width > at.x) Object.assign(q, freshById.get(q.id));
@@ -867,5 +869,7 @@ export function snapshot(s) {
     eventSerial: s.eventSerial,
     level: s.level,
     world: { ...s.def.level },
+    // The level's authored pilots (frozen data, shared, not copied).
+    routes: s.def.routes,
   };
 }

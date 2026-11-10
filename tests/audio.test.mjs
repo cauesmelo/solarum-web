@@ -310,7 +310,7 @@ test("every event name model.mjs emits maps to at least one cue", async () => {
   assert.deepEqual(cuesForEvent({ name: "refill", source: "constellation" }), []);
   assert.equal(cuesForEvent({ name: "tile-drop", platform: "tile-4" })[0].params.index, 4);
   const js = await read("game.js");
-  assert.match(js, /audio\.event\(e, \{ render: loud, timeScale \}\);/, "processEvents voices every event (and quiet steps still tell the score)");
+  assert.match(js, /audio\.event\(e, \{ render: loud, timeScale: simScale\(\) \}\);/, "processEvents voices every event (and quiet steps still tell the score)");
   assert.doesNotMatch(js, /\bsfx\(/, "no pitch-shifted WAV calls remain");
   // Presentation-only cues the renderer triggers directly.
   for (const cue of ["crumble-shake", "crumble-fall", "ui-hover", "ui-select", "ui-resume"]) assert.match(js, new RegExp(`audio\\.play\\("${cue}"`), cue);
@@ -596,31 +596,35 @@ test("the itch ZIP ships audio.js but not the soundboard, WAV renders or the arc
 /* ---------- the adaptive score through the engine ---------- */
 /** Play a route through the real engine at 60 frames per second on a fake
  * audio clock, the way game.js drives it (events, then one scoreFrame). */
-function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true } = {}) {
+// L3 by default: every layer of the bed (backbeat, tresillo marimba, the
+// smash's celesta) at 118 BPM, so the audio clock runs at 1/clock of the
+// simulation's, as in the game.
+function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true, level = 3 } = {}) {
   let now = 0;
-  const r = rig({ gentle, enabled, clock: () => now });
+  const r = rig({ gentle, enabled, level, clock: () => now });
   const music = mockMusic();
   r.engine.attachMusic(music);
-  const s = createGame();
+  const s = createGame(2021, { level });
   let seen = s.eventSerial;
   const flush = () => {
-    for (const e of s.events) if (e.serial > seen) (seen = e.serial), r.engine.event(e);
+    for (const e of s.events) if (e.serial > seen) (seen = e.serial), r.engine.event(e, { timeScale: s.clock });
   };
   r.engine.unlock();
   if (r.ctx()) r.ctx().clock = () => now;
   startGame(s);
   flush();
   const m = createRouteMemory(route);
-  const dt = 1 / 60;
+  const clock = s.clock;
+  const dt = clock / 60; // simulation seconds per 60 Hz frame
   const pauses = [];
   for (let i = 0; i < 100 / dt && s.status !== "won"; i++) {
-    if (pauseAt != null && Math.abs(s.time - pauseAt) < dt / 2) {
+    if (pauseAt != null && s.time >= pauseAt && !pauses.length) {
       // Pause: the context suspends; the game keeps calling scoreFrame with a
       // frozen simulation while (in this fake) wall time moves on.
       r.engine.setPaused(true);
       const before = { nodes: r.engine.stats().nodes, scheduled: r.engine.stats().score.scheduled, pos: r.engine.conductor.transport.pos(s.time) };
       for (let k = 0; k < 60; k++) {
-        r.engine.scoreFrame({ simTime: s.time, x: s.player.x, y: s.player.y, status: "paused", timeScale: 1 });
+        r.engine.scoreFrame({ simTime: s.time, x: s.player.x, y: s.player.y, status: "paused", timeScale: clock });
         r.engine.event({ name: "star", time: s.time, id: "x" });
       }
       const after = { nodes: r.engine.stats().nodes, scheduled: r.engine.stats().score.scheduled, pos: r.engine.conductor.transport.pos(s.time) };
@@ -628,12 +632,12 @@ function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = tr
       r.engine.setPaused(false);
     }
     const a = chooseAction(s, m);
-    if (a) ({ jump, releaseJump, dash, dive })[a](s), flush();
+    if (a) ({ jump, releaseJump, dash, dive, tap: (g) => (jump(g), releaseJump(g)) })[a](s), flush();
     update(s, dt, { glide: m.glide });
-    now += dt;
+    now += 1 / 60;
     if (r.ctx()) r.ctx().currentTime = now;
     flush();
-    r.engine.scoreFrame({ simTime: s.time, x: s.player.x, y: s.player.y, status: s.status, timeScale: 1, inWind: s.player.inWind, gliding: s.player.gliding, fallsHere: s.fallsHere });
+    r.engine.scoreFrame({ simTime: s.time, x: s.player.x, y: s.player.y, status: s.status, timeScale: clock, inWind: s.player.inWind, gliding: s.player.gliding, fallsHere: s.fallsHere });
   }
   return { ...r, s, pauses, stats: r.engine.stats() };
 }

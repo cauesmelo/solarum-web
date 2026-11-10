@@ -55,31 +55,35 @@ export const CHORDS = Object.freeze({
   G: { name: "G", root: 7, bass: 43, tones: [7, 11, 2], safe: [7, 9, 11, 2, 4], pad: [55, 59, 62, 66] },
   Dadd9: { name: "Dadd9", root: 2, bass: 38, tones: [2, 6, 9, 4], safe: [2, 4, 6, 9, 11], pad: [57, 62, 64, 66] },
   "Gmaj7#11": { name: "Gmaj7#11", root: 7, bass: 43, tones: [7, 11, 2, 6], safe: [7, 9, 11, 2, 4], pad: [59, 62, 66, 73] },
+  // Per-level colours (RESEARCH_LEVELS 6). L1: the cycle in maj7 / add9
+  // voicings. L3: E Dorian (D major's notes, so G# stays reserved). L4: B
+  // Aeolian over an F# pedal; its A# lives only in the F# pad.
+  "Bm(add9)": { name: "Bm(add9)", root: 11, bass: 47, tones: [11, 2, 6], safe: [11, 1, 2, 4, 6, 9], pad: [59, 61, 62, 66] },
+  "F#m7": { name: "F#m7", root: 6, bass: 42, tones: [6, 9, 1], safe: [6, 9, 11, 1, 4], pad: [57, 61, 64, 66] },
+  Dmaj7: { name: "Dmaj7", root: 2, bass: 38, tones: [2, 6, 9], safe: [2, 4, 6, 9, 11], pad: [57, 61, 62, 66] },
+  Gmaj7: { name: "Gmaj7", root: 7, bass: 43, tones: [7, 11, 2], safe: [7, 9, 11, 2, 4], pad: [55, 59, 62, 66] },
+  Em9: { name: "Em9", root: 4, bass: 40, tones: [4, 7, 11], safe: [4, 7, 9, 11, 2], pad: [55, 59, 62, 66] },
+  A7sus4: { name: "A7sus4", root: 9, bass: 45, tones: [9, 2, 4], safe: [9, 11, 2, 4], pad: [55, 57, 62, 64] },
+  "Dmaj9/F#": { name: "Dmaj9/F#", root: 2, bass: 42, tones: [2, 6, 9], safe: [2, 4, 6, 9, 11], pad: [57, 61, 64, 66] },
+  "Bm/F#": { name: "Bm/F#", root: 11, bass: 42, tones: [11, 2, 6], safe: [11, 2, 4, 6, 9], pad: [59, 62, 66, 71] },
+  // Over the pedal the F# itself is always safe (the ostinato plays it).
+  "G/F#": { name: "G/F#", root: 7, bass: 42, tones: [7, 11, 2], safe: [7, 9, 11, 2, 4, 6], pad: [55, 59, 62, 67] },
+  "Em/F#": { name: "Em/F#", root: 4, bass: 42, tones: [4, 7, 11], safe: [4, 7, 11, 2, 9, 6], pad: [55, 59, 64, 67] },
+  "F#sus4": { name: "F#sus4", root: 6, bass: 42, tones: [6, 11, 1], safe: [6, 11, 1, 4], pad: [54, 59, 61, 66] },
+  "F#": { name: "F#", root: 6, bass: 42, tones: [6, 1, 11], safe: [6, 11, 1, 4], pad: [54, 58, 61, 66] },
   // D Lydian: the chapter's only sustained G#, at the door with three Great Stars.
   Earth: { name: "Dmaj7#11", root: 2, bass: 38, tones: [2, 6, 9, 1, 8], safe: [2, 4, 6, 8, 9, 11, 1], pad: [62, 66, 68, 73] },
 });
 const C = CHORDS;
-/** The score map in bars (1-based) and the chord of each half bar (brief
- * 5.4). The main route is 35 bars to the door (score-path.mjs). */
+/** The chapter's score map in bars (1-based) and the chord of each half bar
+ * (brief 5.4): the source of L2's map (its bars are the chapter's minus 22). */
 const CYCLE = [[C.Bm, C.Bm], [C["F#m"], C.D], [C["F#m"], C.D], [C.G, C.G]];
 const CYCLE_III = [[C.Bm, C.Bm], [C["F#m"], C.Dadd9], [C["F#m"], C.Dadd9], [C["Gmaj7#11"], C["Gmaj7#11"]]];
-export const SECTIONS = Object.freeze([
-  { id: "wake", from: 1, to: 2 }, // Bm pedal: Sky, Signal
-  { id: "I", from: 3, to: 10 }, // the cycle twice; Pulse enters
-  { id: "II", from: 11, to: 22 }, // three cycles; shaker; earned Glass
-  { id: "hearth", from: 23, to: 24 }, // G -> D, the pulse rests
-  { id: "III", from: 25, to: 34 }, // the cycle with Gmaj7#11 and Dadd9
-  { id: "coda", from: 35, to: Infinity }, // D: every earned layer plays the theme
-]);
 export const barOf = (pos) => Math.floor(pos / BAR) + 1;
-export function sectionOf(pos) {
-  const bar = barOf(pos);
-  return SECTIONS.find((q) => bar >= q.from && bar <= q.to) ?? SECTIONS[0];
-}
-/** The chord at score position `pos` (sixteenths). */
-export function chordAt(pos) {
+const halfOf = (pos) => Math.floor((((Math.max(0, pos) % BAR) + BAR) % BAR) / 8);
+function chapterChordAt(pos) {
   const bar = barOf(Math.max(0, pos)),
-    half = Math.floor((((Math.max(0, pos) % BAR) + BAR) % BAR) / 8);
+    half = halfOf(pos);
   if (bar <= 2) return C.Bm;
   if (bar <= 10) return CYCLE[(bar - 3) % 4][half];
   if (bar <= 22) return CYCLE[(bar - 11) % 4][half];
@@ -89,6 +93,125 @@ export function chordAt(pos) {
   if (bar === 33) return C.Bm;
   if (bar === 34) return C["Gmaj7#11"];
   return C.Dadd9;
+}
+const L1_CYCLE = [C["Bm(add9)"], C["Bm(add9)"], C["F#m7"], C.Dmaj7, C["F#m7"], C.Dmaj7, C.Gmaj7, C.Gmaj7];
+const L3_CYCLE = [C.Em9, C.A7sus4, C["Dmaj9/F#"], C["Gmaj7#11"]];
+const L4_CYCLE = [C["Bm/F#"], C["G/F#"], C["Em/F#"], C["F#sus4"]];
+/**
+ * One conductor preset per level (RESEARCH_LEVELS 6): its map (sections in
+ * bars, a chord per position), the Signal's bars and the bar its closing
+ * theme starts, the groove, the bed's detune cap, the space, the fall and
+ * the payoff. Section flags: pulse (the groove plays), shaker, glass (the
+ * earned celesta). Positions are simulation sixteenths from the level's bar
+ * 1; the transport plays them at the level's own BPM (clock = BPM / 107).
+ * L2 starts on a half bar (pickup 8), like the chapter's hearth it was.
+ */
+export const SCORES = Object.freeze({
+  1: {
+    level: 1, bpm: 96, bars: 27, pickup: 0,
+    // floaty, calm: half the harmonic rhythm (a chord a bar), no drums; the
+    // pad re-voicing on every bar line is the breath.
+    groove: "breath", maxFlat: 10, space: { seconds: 5.5, shimmer: 0.45 }, tapeStop: 0.35, rewind: false, dropOnFall: false,
+    sections: [{ id: "wake", from: 1, to: 2 }, { id: "drift", from: 3, to: 24, shaker: false }, { id: "coda", from: 25, to: Infinity }],
+    chordAt(pos) {
+      const bar = barOf(Math.max(0, pos));
+      if (bar <= 2) return C["Bm(add9)"];
+      if (bar <= 24) return L1_CYCLE[(bar - 3) % 8];
+      if (bar === 25) return C.Gmaj7;
+      if (bar === 26) return C.Dmaj7;
+      return C.Dadd9;
+    },
+    signalBars: [1, 3, 11, 19], closeFrom: 25,
+    phrases: {
+      // bars 2-5, one note per hop apex: the motif's head, slowed: D5 C#5 B4 | A4.
+      "first-song": [74, 73, 71, 69],
+      // the climb (bar 8, D): A4 B4 D5 | E5.
+      "climb-song": [69, 71, 74, 76],
+      // home (bar 25-26): the answer falling home, F#5 E5 D5 A4.
+      "home-song": [78, 76, 74, 69],
+    },
+  },
+  2: {
+    level: 2, bpm: 107, bars: 14, pickup: 8,
+    // floaty with marked beats: heartbeat on 1 and 3, a tick on 2 and 4,
+    // shaker sixteenths at about -30 dB (the chapter's Movement III).
+    groove: "heartbeat", maxFlat: 15, space: { seconds: 5.5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
+    sections: [{ id: "hearth", from: 1, to: 2, pulse: false }, { id: "wind", from: 3, to: 12, shaker: true }, { id: "coda", from: 13, to: Infinity }],
+    chordAt: (pos) => chapterChordAt(pos + 22 * BAR),
+    signalBars: [3, 7, 11], closeFrom: 12,
+    phrases: {
+      // bar 3 (Bm): the cape opens on a falling Bm line, F#5 E5 D5 B4.
+      "flight-line": [78, 76, 74, 71],
+      // the long void (bar 5, F#m | Dadd9): C#5 E5 F#5 | A5, rising to the refill.
+      "void-song": [73, 76, 78, 81],
+      // the star cache (about bar 9, F#m | Dadd9): E5 F#5 A5 B5.
+      "cache-song": [76, 78, 81, 83],
+      // bar 11 (Bm): the last phrase climbs to the high B, B4 D5 F#5 B5.
+      "finale-song": [71, 74, 78, 83],
+    },
+  },
+  3: {
+    level: 3, bpm: 118, bars: 20, pickup: 0,
+    // call and response: half-time backbeat (beat 3), a 3+3+2 tresillo on
+    // the rim and the marimba's low root, the world calling on the grid.
+    groove: "clave", maxFlat: 20, space: { seconds: 3.5, shimmer: 0.3 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
+    sections: [{ id: "wake", from: 1, to: 2 }, { id: "cracks", from: 3, to: 17, shaker: true, glass: true }, { id: "coda", from: 18, to: Infinity }],
+    chordAt(pos) {
+      const bar = barOf(Math.max(0, pos));
+      if (bar <= 2) return C.Em9;
+      if (bar <= 17) return L3_CYCLE[(bar - 3) % 4];
+      if (bar === 18) return C["Gmaj7#11"];
+      return C.Em9;
+    },
+    signalBars: [3, 7, 11, 15], closeFrom: 18,
+    phrases: {
+      // out of the well (bar 9, A7sus4 | Dmaj9/F#): A4 B4 D5 | E5 F#5, climbing.
+      "well-song": [69, 71, 74, 76, 79],
+      // the hearth void (about bar 15): B4 D5 E5 | A5.
+      "flight-line": [71, 74, 76, 81],
+      // the split voids: the answer, E5 D5 B4 | A4 E4.
+      "split-song": [76, 74, 71, 69, 64],
+    },
+  },
+  4: {
+    level: 4, bpm: 128, bars: 18, pickup: 0,
+    // agitated, tense: a felt kick on every beat, sixteenth ticks and an
+    // eighth-note F# ostinato; after a fall the ostinato rests until the
+    // next constellation or beacon.
+    groove: "four", maxFlat: 20, space: { seconds: 2.5, shimmer: 0.25 }, tapeStop: 0.45, rewind: true, dropOnFall: true,
+    sections: [{ id: "wake", from: 1, to: 2 }, { id: "storm", from: 3, to: 15, shaker: true }, { id: "coda", from: 16, to: Infinity }],
+    chordAt(pos) {
+      const bar = barOf(Math.max(0, pos)),
+        half = halfOf(pos);
+      if (bar <= 2) return C["Bm/F#"];
+      if (bar <= 15) {
+        const c = L4_CYCLE[(bar - 3) % 4];
+        return c === C["F#sus4"] && half ? C["F#"] : c;
+      }
+      if (bar === 16) return half ? C["F#"] : C["F#sus4"];
+      if (bar === 17) return C["Bm/F#"];
+      return C.Dadd9;
+    },
+    signalBars: [1, 3, 7, 11, 15], closeFrom: 16,
+    phrases: {
+      // the well (bar 6, G/F#): D5 B4 A4 G4 B4.
+      "well-song": [74, 71, 69, 67, 71],
+      // the finale (bar 15, Bm/F#): F#5 E5 D5 B4.
+      "finale-song": [78, 76, 74, 71],
+    },
+  },
+});
+export const scoreOf = (level = 1) => SCORES[level] ?? SCORES[1];
+/** Level n's sections (kept as `SECTIONS` for level 1). */
+export const SECTIONS = SCORES[1].sections;
+export function sectionOf(pos, level = 1) {
+  const P = scoreOf(level),
+    bar = barOf(pos);
+  return P.sections.find((q) => bar >= q.from && bar <= q.to) ?? P.sections[0];
+}
+/** The chord at score position `pos` (sixteenths) of level n. */
+export function chordAt(pos, level = 1) {
+  return scoreOf(level).chordAt(pos);
 }
 export const isSafe = (chord, m) => chord.safe.includes(pc(m));
 /** The safe pitch nearest to `target` (ties go up). */
@@ -120,30 +243,16 @@ export function chordTones(chord, lo, hi) {
  * Every constellation star has a composed note, checked by a test against
  * the chord at the star's baked sixteenth (score-path.mjs). The phrases quote
  * the soundtrack's top line (D5 C#5 B4 | A4 ...) and answer it. */
-export const PHRASES = Object.freeze({
-  // bars 3-4 (Bm | F#m D): the motif's head, as in the brief: D5 | C#5 B4 A4.
-  "first-song": [74, 73, 71, 69],
-  // bar 8 (F#m | D): climbing with the double jump, A4 B4 C#5 | E5.
-  "climb-song": [69, 71, 73, 76],
-  // the star well (upper line, about bars 18-19, G | Bm): E5 | D5 B4 A4 F#4.
-  "well-song": [76, 74, 71, 69, 66],
-  // bar 25 (Bm): the cape opens on a falling Bm line, F#5 E5 D5 B4.
-  "flight-line": [78, 76, 74, 71],
-  // bar 27 (F#m | Dadd9): the answer, falling home, F#5 E5 C#5 | B4 A4.
-  "split-song": [78, 76, 73, 71, 69],
-  // the star cache (ability line, about bar 31, F#m | Dadd9): E5 F#5 A5 B5.
-  "cache-song": [76, 78, 81, 83],
-  // bar 33 (Bm): the last phrase climbs to the high B, B4 D5 F#5 B5.
-  "finale-song": [71, 74, 78, 83],
-});
+/** Every level's authored constellation notes, by chain id. */
+export const PHRASES = Object.freeze({ ...SCORES[1].phrases });
 /** The Signal: the motif's head (3 + 3 + 2 eighths) and its answer. Offsets
  * in sixteenths from the bar line; the answer bar is F#m | D. */
 export const MOTIF = Object.freeze({
   head: [[0, 74], [6, 73], [12, 71]], // D5 . . C#5 . . B4 .
   answer: [[0, 69], [2, 78], [8, 69]], // A4 F#5 . . A4 . . .
 });
-/** Bars on which the Signal calls (the Bm bar of each cycle). */
-export const SIGNAL_BARS = Object.freeze([1, 3, 7, 11, 15, 19, 25, 29, 33]);
+/** Bars on which level 1's Signal calls (each level: SCORES[n].signalBars). */
+export const SIGNAL_BARS = Object.freeze(SCORES[1].signalBars);
 
 /* ---------- path clock ---------- */
 /** Score position (sixteenths) of world x on the baked main route. */
@@ -298,7 +407,7 @@ export const MAX_DETUNE = 25; // cents: flat + spread + wow at H_MIN
  * voice: (1 - H) x 40 cents, at most 20, plus a small spread and tape wow,
  * at most 25 cents in all. Its lowpass closes and below H 0.7 the choir
  * rests. */
-export function createTuning({ gentle = false } = {}) {
+export function createTuning({ gentle = false, maxFlat = MAX_FLAT } = {}) {
   let H = 1,
     gentleMode = !!gentle,
     errors = 0;
@@ -358,7 +467,8 @@ export function createTuning({ gentle = false } = {}) {
     },
     mix() {
       const out = 1 - H;
-      const flat = Math.min(MAX_FLAT, out * 40),
+      // Each level caps the flat drift (10/15/20/20 cents, RESEARCH_LEVELS 6).
+      const flat = Math.min(maxFlat, out * 40),
         pad = Math.min(3, out * 7.5),
         wow = Math.min(2, out * 5);
       return {
@@ -404,19 +514,27 @@ const SIGH_BEND = -50; // cents: a broken constellation's last note sighs down
 const REWIND_NOTES = 8;
 
 /**
- * options: path (score-path.mjs PATH), cracked (Set of platform ids that
- * give no bass), chains (id -> star count), gentle, seed.
+ * options: level (its SCORES preset), path (that level's score-path entry),
+ * cracked (Set of platform ids that give no bass), gentle, seed.
  * The engine calls wake / frame / event / ticks and renders the returned
  * notes: { layer, voice, midi | midis, pos, t, kind, delay, cap, dur, gain,
  * pan, glideTo, bend, blur }. `t` is the onset in simulation seconds.
  */
 export function createConductor(options = {}) {
+  // The level's preset shadows the module's level-1 map inside the conductor.
+  const P = scoreOf(options.level ?? 1);
+  const chordAt = (pos) => P.chordAt(pos);
+  const sectionOf = (pos) => P.sections.find((q) => barOf(pos) >= q.from && barOf(pos) <= q.to) ?? P.sections[0];
+  const PHRASES = P.phrases;
   const path = options.path;
   const cracked = options.cracked ?? new Set();
   const transport = createTransport();
-  const tuning = createTuning({ gentle: options.gentle });
+  const tuning = createTuning({ gentle: options.gentle, maxFlat: P.maxFlat });
   const intended = new Map(); // star id -> baked sixteenth
-  for (const a of path?.anchors ?? []) if (a.name === "star" || a.name === "chain-note") intended.set(a.id, a.k);
+  // The path counts from waking; a level that starts on a half bar (L2)
+  // wakes at its pickup position.
+  const pickup = P.pickup ?? 0;
+  for (const a of path?.anchors ?? []) if (a.name === "star" || a.name === "chain-note") intended.set(a.id, a.k + pickup);
   const mainChains = new Set((path?.anchors ?? []).filter((a) => a.name === "constellation").map((a) => a.id));
   let rng = mulberry(options.seed ?? 7);
   let st;
@@ -452,11 +570,12 @@ export function createConductor(options = {}) {
       tapeStops: 0,
       rephases: [],
       door: null,
+      dropped: false, // L4: the groove rests after a fall
     };
   }
   reset();
   const pos = (t) => transport.pos(t);
-  const placePos = (x) => (path ? pathPos(path, x) : null);
+  const placePos = (x) => (path ? pathPos(path, x) + pickup : null);
   function note(n) {
     st.played[n.voice] = (st.played[n.voice] ?? 0) + 1;
     st.layersHeard.add(n.layer);
@@ -527,32 +646,51 @@ export function createConductor(options = {}) {
       st.lastChord = chord;
     }
     if (st.sus && k >= st.sus.until) st.sus = null;
-    // Pulse: a felt heartbeat on beats 1 and 3 (the half-time feel), from bar
-    // 3; it rests on the hearth and breathes out in the coda.
-    if (bar >= 3 && sec !== "hearth" && (inBar === 0 || inBar === 8))
-      bed({ layer: "pulse", voice: "pulse", dur: 0.4, gain: (inBar === 0 ? 1 : 0.7) * (sec === "coda" ? 0.6 : 1) });
-    // Shaker, 1/16 at about -30 dB, in II and III; accents on beats.
-    if (sec === "II" || sec === "III") bed({ layer: "pulse", voice: "shaker", dur: 0.06, gain: inBar % 4 === 0 ? 0.5 : inBar % 2 === 0 ? 0.32 : 0.22 });
+    // The groove (RESEARCH_LEVELS 6), from bar 3, resting where a section
+    // says so and, in L4, after a fall until the next constellation or beacon.
+    const S = sectionOf(k);
+    const grooveOn = bar >= 3 && S.pulse !== false && !st.dropped;
+    const coda = sec === "coda" ? 0.6 : 1;
+    if (grooveOn && P.groove === "heartbeat") {
+      // A felt heartbeat on beats 1 and 3 (the half-time feel), a tick on 2 and 4.
+      if (inBar === 0 || inBar === 8) bed({ layer: "pulse", voice: "pulse", dur: 0.4, gain: (inBar === 0 ? 1 : 0.7) * coda });
+      if ((inBar === 4 || inBar === 12) && S.shaker) bed({ layer: "pulse", voice: "shaker", dur: 0.06, gain: 0.62 });
+    } else if (grooveOn && P.groove === "clave") {
+      // Half-time backbeat on beat 3; the tresillo (3+3+2) on the rim and a
+      // low marimba root under it.
+      if (inBar === 8) bed({ layer: "pulse", voice: "pulse", dur: 0.4, gain: 0.85 * coda });
+      if (inBar === 0 || inBar === 6 || inBar === 12)
+        bed({ layer: "pulse", voice: "marimba", midi: rootIn(chord, 45), dur: 0.5, gain: (inBar === 0 ? 0.62 : 0.48) * coda, pan: 0.15 });
+    } else if (grooveOn && P.groove === "four") {
+      // A felt kick on every beat and an eighth-note ostinato on the F# pedal.
+      if (inBar % 4 === 0) bed({ layer: "pulse", voice: "pulse", dur: 0.3, gain: (inBar === 0 ? 1 : 0.78) * coda });
+      if (inBar % 2 === 0) bed({ layer: "pulse", voice: "marimba", midi: inBar % 4 === 0 ? 54 : 66, dur: 0.22, gain: 0.34 * coda, pan: 0.2 });
+    }
+    // Shaker sixteenths at about -30 dB where the section has them; accents
+    // follow the groove (beats, or the tresillo in L3).
+    if (S.shaker && grooveOn) {
+      const accent = P.groove === "clave" ? [0, 6, 12].includes(inBar) : inBar % 4 === 0;
+      bed({ layer: "pulse", voice: "shaker", dur: 0.06, gain: accent ? 0.5 : inBar % 2 === 0 ? 0.32 : 0.22 });
+    }
     // The Signal: the motif's head on each cycle's Bm bar, far right at first
     // and nearer and drier with progress; the full theme leads the coda.
     const rel = inBar;
-    const near = Math.min(1, bar / 36);
+    const near = Math.min(1, bar / P.bars);
     const signalNote = (midi, len) =>
       bed({ layer: "signal", voice: "signal", midi, dur: len * SIXTEENTH * 1.6, gain: 0.45 + 0.55 * near, pan: 0.75 - 0.45 * near, send: 0.5 - 0.25 * near });
-    if (SIGNAL_BARS.includes(bar) && bar < 34) {
+    if (P.signalBars.includes(bar) && bar < P.closeFrom) {
       // Re-entries after falls rotate the phrase (seeded by the fall count).
       const head = st.variation % 2 ? [[0, 74], [6, 76], [12, 71]] : MOTIF.head;
       for (const [at, m] of head) if (rel === at) signalNote(m, at === 12 ? 4 : 6);
     }
-    // The theme closes the chapter: its head over bar 34's Gmaj7#11 (C# is
-    // the Lydian #11 there), its answer over the coda's Dadd9, into the door.
-    if (bar >= 34) {
-      const phrase = (bar - 34) % 2 === 0 ? MOTIF.head : MOTIF.answer;
+    // The theme closes the level: its head, then its answer, into the door.
+    if (bar >= P.closeFrom) {
+      const phrase = (bar - P.closeFrom) % 2 === 0 ? MOTIF.head : MOTIF.answer;
       for (const [at, m] of phrase) if (rel === at) signalNote(m, 6);
     }
-    // Glass: a quiet celesta arpeggio through II, earned by the lid smash or
-    // Great Star 2.
-    if (sec === "II" && st.glassEarned) {
+    // Glass: a quiet celesta arpeggio where the section allows it, earned by
+    // a lid smash or Great Star 2.
+    if (S.glass && st.glassEarned) {
       const tones = chordTones(chord, 74, 90);
       const order = [0, 1, 2, 3, 2, 1];
       const m = tones[order[(inBar + st.variation) % order.length] % tones.length];
@@ -582,7 +720,7 @@ export function createConductor(options = {}) {
       out = { notes: [], fx: [] };
     const push = (n) => n && out.notes.push(n);
     if (e.name === "wake") {
-      transport.start(t, 0);
+      transport.start(t, pickup);
       st.started = true;
       st.status = "running";
       tuning.apply("restart");
@@ -698,6 +836,7 @@ export function createConductor(options = {}) {
       }
       case "constellation": {
         st.constellations.add(e.chain);
+        st.dropped = false;
         tuning.apply("constellation");
         const q = quantize(pos(t), { grid: 2, cap: CAPS.bloom, timeScale: st.timeScale });
         const c2 = chordAt(q.pos);
@@ -713,7 +852,9 @@ export function createConductor(options = {}) {
         st.barErrors++;
         // A sigh: the last note bends down 50 cents; the pad holds a sus4
         // until the next strong beat.
-        const m = st.lastChainNote ?? rootIn(chord, 74);
+        // (Over the chord sounding now, which may have changed since.)
+        const last = st.lastChainNote ?? rootIn(chord, 74);
+        const m = isSafe(chord, last) ? last : nearestSafe(chord, last);
         push(note({ layer: "stars", voice: "kalimba", midi: m, bend: SIGH_BEND, bendTime: 0.4, pos: pos(t), t, kind: "loose", delay: 0, cap: 0, dur: 1, gain: 0.5 }));
         const p = pos(t);
         st.sus = { until: Math.ceil((p + 1) / 8) * 8 };
@@ -734,6 +875,7 @@ export function createConductor(options = {}) {
       case "checkpoint": {
         // Sync anchor first, then the cadence chime on the half bar.
         anchor(t, e.x, "beacon");
+        st.dropped = false;
         tuning.apply("beacon");
         st.barErrors = 0;
         const q = quantize(pos(t), { grid: 8, cap: CAPS.bloom, timeScale: st.timeScale });
@@ -762,7 +904,10 @@ export function createConductor(options = {}) {
         st.falls++;
         transport.stop();
         st.status = "dead";
-        out.fx.push(tuning.gentle ? { kind: "fade", seconds: 0.45 } : { kind: "tape-stop", seconds: 0.45, rewind: st.recent.slice().reverse().map((r) => ({ ...r, midi: r.midi + 12 })) });
+        // Per level: L1's is a short one-octave stop; from L2 on the last
+        // notes play backwards; in L4 the groove also rests (dropOnFall).
+        out.fx.push(tuning.gentle ? { kind: "fade", seconds: 0.45 } : { kind: "tape-stop", seconds: P.tapeStop, rewind: P.rewind ? st.recent.slice().reverse().map((r) => ({ ...r, midi: r.midi + 12 })) : [] });
+        if (P.dropOnFall) st.dropped = true;
         st.tapeStops++;
         st.recent = [];
         break;
@@ -876,6 +1021,10 @@ export function createConductor(options = {}) {
       return tones[Math.min(tones.length - 1, Math.floor(lift * tones.length))];
     },
     windChord: (t) => chordAtT(t),
+    /** The level's chord at a score position, and a world x's position. */
+    chordAt,
+    placePos,
+    preset: P,
     /** After the engine silenced the bed (a reset), voice it again next tick. */
     revoice() {
       st.lastChord = null;

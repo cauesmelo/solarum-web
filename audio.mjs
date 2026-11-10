@@ -31,9 +31,9 @@
  *   rewind notes -> rewind bus -> master (they sound while the score is stopped)
  *   soundtrack element -> music gain (ducking) -> music tone -> master (title, door)
  */
-import { createConductor, createClockMap, chordAt, pathPos, chordTones, rootIn, safeAtOrAbove, CHORDS, SIXTEENTH, BEAT, BAR, LAYERS } from "./score.mjs";
-import { PATH } from "./score-path.mjs";
-import { createLevel } from "./level.mjs";
+import { createConductor, createClockMap, chordTones, rootIn, safeAtOrAbove, scoreOf, CHORDS, SIXTEENTH, BEAT, BAR, LAYERS } from "./score.mjs";
+import { PATHS } from "./score-path.mjs";
+import { createLevel, LEVELS } from "./level.mjs";
 
 /* ---------- settings ---------- */
 export const SETTING_KEY = "solarum.sound";
@@ -1401,7 +1401,9 @@ const DOOR_BOOST = 1.4; // +3 dB: the full section then matches the door's bloom
  * the beat instead of trailing it (audio critic, finding 7). */
 const BED_DELAY = 0.015;
 const wallNow = () => globalThis.performance?.now?.() ?? Date.now();
-const CRACKED = new Set(createLevel().platforms.filter((q) => q.type).map((q) => q.id));
+// Cracked stone of every level (ids are unique within a level, and no id is
+// cracked in one level and stable in another).
+const CRACKED = new Set(LEVELS.flatMap((d) => createLevel(d).platforms.filter((q) => q.type).map((q) => q.id)));
 /** Pitched cues follow the score's chord at the moment they sound. */
 const CHORDED = new Set(["cascade", "wind-catch", "great-banked", "movement", "respawn"]);
 
@@ -1411,7 +1413,8 @@ const CHORDED = new Set(["cascade", "wind-catch", "great-banked", "movement", "r
  * gentle (Gentle music), clock (a function returning the audio time to use
  * instead of context.currentTime: offline renders of a whole run schedule
  * everything up front), spaceSeconds (space reverb length; 4 s on phones),
- * only (an iterable of score layer ids: render just those, for stems).
+ * only (an iterable of score layer ids: render just those, for stems),
+ * level (1-4: whose score preset and path to conduct; setLevel changes it).
  */
 export function createAudioEngine(options = {}) {
   const seed = options.seed ?? 1987,
@@ -1446,7 +1449,9 @@ export function createAudioEngine(options = {}) {
     chainSize = {},
     buffers = {},
     plucks = new Map();
-  const conductor = createConductor({ path: PATH, cracked: CRACKED, seed: seed ^ 0x51, gentle: !!options.gentle });
+  let level = options.level ?? 1;
+  const makeConductor = (n, gentle) => createConductor({ level: n, path: PATHS[n], cracked: CRACKED, seed: seed ^ 0x51, gentle });
+  let conductor = makeConductor(level, !!options.gentle);
   const clock = createClockMap();
   const only = options.only ? new Set(options.only) : null;
   const sc = { lastAudio: null, scale: 1, sim: 0, status: "ready", scheduled: 0, late: 0, maxLate: 0, lateCount: 0, maxQuant: 0, tapeStops: 0, fades: 0, restarts: 0, frames: 0, mix: null, whistle: null };
@@ -1635,7 +1640,9 @@ export function createAudioEngine(options = {}) {
     const spaceIn = node("Gain");
     const space = node("Convolver");
     space.normalize = false;
-    space.buffer = makeBuffer(reverbImpulse(sr, options.spaceSeconds ?? 5.5, r, { predelay: 0.03, fadeIn: 0.12 }));
+    // Each level has its own space (5.5 s floating to 2.5 s close, RESEARCH_LEVELS 6).
+    const spaceSeconds = (n) => Math.min(options.spaceSeconds ?? 9, scoreOf(n).space.seconds);
+    space.buffer = makeBuffer(reverbImpulse(sr, spaceSeconds(level), r, { predelay: 0.03, fadeIn: 0.12 }));
     buffers.space = true;
     const spaceOut = node("Gain");
     spaceOut.gain.value = 1.1; // +5 dB on the first mix: more space, more float
@@ -1656,7 +1663,7 @@ export function createAudioEngine(options = {}) {
     lp.connect(fb);
     fb.connect(spaceIn);
     const shimmerOut = node("Gain");
-    shimmerOut.gain.value = 0.22;
+    shimmerOut.gain.value = 0.22 * (scoreOf(level).space.shimmer / 0.4);
     lp.connect(shimmerOut);
     shimmerOut.connect(scoreIn);
     // The detune bus: pad and choir oscillators add +-padCents from here.
@@ -1676,7 +1683,7 @@ export function createAudioEngine(options = {}) {
     // Rewind notes sound while the score bus is stopped, so they bypass it.
     const rewind = node("Gain");
     rewind.connect(graph.master);
-    score = { scoreOut, tapeGain, tapeTone, tape, scoreIn, playerIn, bedIn, wowDepth, bedTone, spaceIn, fb, det, detDown, flat, rewind };
+    score = { scoreOut, tapeGain, tapeTone, tape, scoreIn, playerIn, bedIn, wowDepth, bedTone, spaceIn, fb, det, detDown, flat, rewind, space, shimmerOut, spaceSeconds, rng: r };
   }
   function routeMusic() {
     if (!musicEl || musicRouted || !graph || offline) return;
@@ -2282,7 +2289,7 @@ export function createAudioEngine(options = {}) {
       else if (fx.kind === "door") door(fx);
     }
   }
-  /** The far door: the score's sustain blooms out while, one bar later and
+  /** The far door: the score's sustain blooms out while (in L4), one bar later and
    * on a downbeat, the original recording fades in at its full section
    * (bar 26 of the file, where it is as loud as the score; its intro sat
    * 9 dB under and left a hole): the title song, finished by the player. */
@@ -2293,7 +2300,9 @@ export function createAudioEngine(options = {}) {
     } catch {
       /* ignore */
     }
-    if (offline || !musicEl) return;
+    // Only the last level's door opens onto Earth and the original recording;
+    // the others close on the score's own cadence (RESEARCH_LEVELS 4).
+    if (offline || !musicEl || !LEVELS.find((d) => d.id === level)?.level.earth) return;
     clearTimeout(doorTimer);
     const wait = (BAR * SIXTEENTH) / sc.scale;
     doorTimer = setTimeout(() => {
@@ -2676,7 +2685,7 @@ export function createAudioEngine(options = {}) {
           }
           if (c.cue === "chain-note" && params.chain) chainSize[params.chain] = params.count;
           if (c.cue === "constellation") params.count = chainSize[params.chain] ?? 5;
-          if (CHORDED.has(c.cue)) params.chord = c.cue === "respawn" ? chordAt(Math.max(0, Math.round(pathPos(PATH, e.x ?? 0)))) : chordAt(Math.max(0, conductor.transport.pos(e.time ?? 0)));
+          if (CHORDED.has(c.cue)) params.chord = c.cue === "respawn" ? conductor.chordAt(Math.max(0, Math.round(conductor.placePos(e.x ?? 0)))) : conductor.chordAt(Math.max(0, conductor.transport.pos(e.time ?? 0)));
           if (c.cue === "win") Object.assign(params, { complete: !!conductor.state().door?.complete, chord: e.earth ? CHORDS.Earth : CHORDS.Dadd9 });
           if (c.music === "darken" && canPlay()) tint(true);
           if (c.music === "brighten") tint(false);
@@ -2691,6 +2700,25 @@ export function createAudioEngine(options = {}) {
       return out;
     },
     scoreFrame,
+    /** Conduct level n (its preset, path and space). The score starts fresh. */
+    setLevel(n) {
+      const next = LEVELS.some((d) => d.id === n) ? n : 1;
+      if (next === level) return level;
+      level = next;
+      conductor = makeConductor(level, conductor.gentle);
+      if (score) {
+        try {
+          score.space.buffer = makeBuffer(reverbImpulse(ctx.sampleRate, score.spaceSeconds(level), score.rng, { predelay: 0.03, fadeIn: 0.12 }));
+          score.shimmerOut.gain.value = 0.22 * (scoreOf(level).space.shimmer / 0.4);
+        } catch {
+          /* a context mid-close keeps its old space */
+        }
+      }
+      return level;
+    },
+    get level() {
+      return level;
+    },
     /** A fresh score (restart chapter, title): bar 1, H = 1, silence. */
     scoreReset() {
       conductor.reset();
@@ -2826,7 +2854,10 @@ export function createAudioEngine(options = {}) {
       if (ctx && score) applyTuning(t());
       return conductor.tuning.mix();
     },
-    conductor,
+    // The level's conductor (setLevel replaces it).
+    get conductor() {
+      return conductor;
+    },
     get context() {
       return ctx;
     },
@@ -2912,10 +2943,10 @@ export async function renderCueOffline(name, { OfflineContext = globalThis.Offli
  * before `from` keep the conductor in step without sound; the render covers
  * [from, from + seconds). `only` limits the output to some score layers
  * (stems): the others are rendered silent. */
-export async function renderRunOffline({ frames, from = 0, seconds = 20, OfflineContext = globalThis.OfflineAudioContext, sampleRate = 48000, seed = 1, gentle = false, cues = true, only = null, safety = true } = {}) {
+export async function renderRunOffline({ frames, from = 0, seconds = 20, OfflineContext = globalThis.OfflineAudioContext, sampleRate = 48000, seed = 1, gentle = false, cues = true, only = null, safety = true, level = 1 } = {}) {
   const ctx = new OfflineContext(2, Math.ceil((seconds + 3) * sampleRate), sampleRate);
   let now = 0;
-  const engine = createAudioEngine({ context: ctx, seed, safety, gentle, only, clock: () => now });
+  const engine = createAudioEngine({ context: ctx, seed, safety, gentle, only, level, clock: () => now });
   engine.unlock();
   for (const f of frames) {
     if (f.wall >= from + seconds) break;

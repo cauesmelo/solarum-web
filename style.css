@@ -280,6 +280,65 @@ button:disabled {
   font-size: 18px;
   text-shadow: 0 0 4px var(--ink);
 }
+/* The orbit map on the title: four ink stations on one line, each with its
+ * numeral, name and three Great Star slots. Locked stations are faint. */
+.level-map {
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 10px;
+  margin-top: 6px;
+  max-width: min(92vw, 760px);
+}
+.station {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  min-width: 120px;
+  min-height: 48px;
+  padding: 4px 10px 2px;
+  border: 2px solid rgba(251, 251, 234, 0.45);
+  border-radius: 14px;
+  background: rgba(12, 12, 15, 0.55);
+  color: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+.station .numeral {
+  font-size: 20px;
+  line-height: 1;
+}
+.station .name {
+  font-size: 16px;
+  color: var(--mute);
+}
+.station .slot {
+  width: 22px;
+  height: 22px;
+  margin: -2px;
+  background-size: 88px 44px;
+}
+.station .slot.filled {
+  background-position: -44px 0;
+}
+.station[aria-pressed="true"] {
+  border-color: var(--paper);
+  background: rgba(251, 251, 234, 0.12);
+}
+.station:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.station:focus-visible {
+  outline: 3px solid var(--paper);
+  outline-offset: 2px;
+}
+.victory-title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ink-soft);
+}
 .load-error {
   pointer-events: auto;
   margin: 6px 0 0;
@@ -911,7 +970,7 @@ button:disabled {
 .results {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(4, auto);
+  grid-template-columns: repeat(5, auto);
   gap: 6px 18px;
   align-items: center;
 }
@@ -930,6 +989,7 @@ button:disabled {
 .results dd {
   margin: 0;
   font-size: 22px;
+  white-space: nowrap;
 }
 /* The slots sit in the icon row (like the star icon above its count) so all
  * four columns share one baseline. */

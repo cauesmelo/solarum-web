@@ -14,15 +14,7 @@ import {
   capeReady,
   RULES,
 } from "./model.mjs";
-import {
-  LEVEL,
-  CHECKPOINTS,
-  MOVEMENTS,
-  START_TIP,
-  CARD,
-  checkpointIndex,
-  shownPrompts,
-} from "./level.mjs";
+import { LEVELS, CARD, checkpointIndex, shownPrompts } from "./level.mjs";
 import { characterLayers, frameForClip } from "./animation.mjs";
 import {
   VIEW,
@@ -50,7 +42,29 @@ const INK = "#0c0c0f",
   MUTE = "#aeaea3",
   DIM = "#777771",
   EARTH = "#6fa8dc";
-const state = createGame();
+/* Levels (RESEARCH_LEVELS): the state carries its level definition. Progress
+ * (which levels are open, the best Great Stars of each) is kept in guarded
+ * storage; without storage every session starts with level I open. */
+const PROGRESS_KEY = "solarum.levels";
+function readProgress() {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(PROGRESS_KEY) || "null");
+    if (v && Number.isInteger(v.unlocked)) return { unlocked: Math.max(1, Math.min(LEVELS.length, v.unlocked)), great: v.great ?? {}, done: v.done ?? {} };
+  } catch {
+    /* storage blocked or corrupt: start fresh */
+  }
+  return { unlocked: 1, great: {}, done: {} };
+}
+function writeProgress() {
+  try {
+    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+  } catch {
+    /* storage blocked: progress lasts for this session */
+  }
+}
+const progress = readProgress();
+const state = createGame(2021, { level: 1 });
+const WORLD = () => state.def.level;
 const images = {};
 let manifest = null,
   ready = false,
@@ -63,7 +77,7 @@ let manifest = null,
   lastSerial = 0,
   wakeAt = -99,
   wonAt = -99,
-  timeScale = 1,
+  pace = 1, // Gentle pace multiplies every level's own clock (0.8)
   shake = 0,
   turnHintShown = false;
 const held = { glide: false };
@@ -93,8 +107,11 @@ const sound = {
   gentle: readGentleSetting(() => window.localStorage),
   music: new Audio(),
 };
-// Phones get a shorter space reverb (4 s instead of 5.5 s) to save CPU.
-const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, spaceSeconds: coarse ? 4 : 5.5 });
+// Phones get a shorter space reverb (at most 4 s) to save CPU.
+const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, spaceSeconds: coarse ? 4 : 5.5, level: state.level });
+/** Simulation seconds per real second: the level's clock (BPM / 107) times
+ * Gentle pace, so the arcs stay identical and only time is scaled. */
+const simScale = () => pace * (state.clock ?? 1);
 sound.music.preload = "none";
 sound.music.loop = true;
 audio.attachMusic(sound.music); // level: MUSIC_LEVEL, matched to the score
@@ -149,7 +166,7 @@ function syncAudio() {
     live = state.status === "running";
   audio.setAir({ wind: live && p.inWind, glide: live && p.gliding && !p.inWind });
   // The score follows the simulation clock (never the other way round).
-  audio.scoreFrame({ simTime: state.time, x: p.x, y: p.y, status: state.status, timeScale, inWind: p.inWind, gliding: p.gliding, fallsHere: state.fallsHere });
+  audio.scoreFrame({ simTime: state.time, x: p.x, y: p.y, status: state.status, timeScale: simScale(), inWind: p.inWind, gliding: p.gliding, fallsHere: state.fallsHere });
 }
 function setGentleMusic(on) {
   sound.gentle = !!on;
@@ -162,7 +179,8 @@ function setGentleMusic(on) {
 function resize() {
   const box = root.getBoundingClientRect();
   if (!box.width || !box.height) return;
-  const fit = fitStage(box.width, box.height, 60);
+  // Faster levels keep 2.5 s of lookahead with a wider minimum view.
+  const fit = fitStage(box.width, box.height, 60, state.def.view);
   layout = fit.layout;
   root.dataset.layout = layout;
   root.style.setProperty("--stage-top", `${fit.top}px`);
@@ -599,7 +617,7 @@ function drawUpdrafts() {
   }
 }
 function drawBeacons() {
-  for (const mark of CHECKPOINTS) {
+  for (const mark of state.def.checkpoints) {
     if (mark.x < camera.x - 80 || mark.x > camera.x + W + 80) continue;
     const lit = state.checkpointsReached.includes(mark.id),
       x = mark.x + 18,
@@ -742,32 +760,57 @@ function drawGreatStar(star) {
   sprite("star", 2, star.x, y, 0.42, 1, reduced ? 0 : Math.sin(clock * 0.8) * 0.12);
   ctx.restore();
 }
+/** L2-L4 open with Diana stepping out of the door she entered last level. */
+function drawEntryDoor() {
+  if (state.level <= 1 || !images.portal) return;
+  const x = WORLD().startX - 90,
+    y = WORLD().startY;
+  if (x < camera.x - 160 || x > camera.x + W + 200) return;
+  const placement = portalPlacement(x, y, manifest.portal.visibleBounds);
+  const b = placement.source;
+  ctx.save();
+  ctx.globalAlpha = 0.75;
+  ctx.drawImage(images.portal, b.x, b.y, b.w, b.h, placement.x, placement.y, placement.width, placement.height);
+  ctx.restore();
+}
 function drawPortal() {
-  const x = LEVEL.finishX;
+  drawEntryDoor();
+  const x = WORLD().finishX;
   if (!images.portal || x < camera.x - 160 || x > camera.x + W + 200) return;
-  const placement = portalPlacement(x, LEVEL.finishY, manifest.portal.visibleBounds);
-  const memory = state.greatBanked.length === 3;
+  const placement = portalPlacement(x, WORLD().finishY, manifest.portal.visibleBounds);
+  // Earth: each Great Star of the campaign paints a twelfth of it into the
+  // arch; it is seen whole only at the last level's door (RESEARCH_LEVELS 4).
+  const earthDoor = !!WORLD().earth;
+  const painted = Math.min(12, paintedStars() + (earthDoor ? 12 : 0));
+  const memory = state.greatBanked.length === 3 || painted > 0;
   const won = state.status === "won";
   ctx.save();
   if (memory || won) {
-    const glow = ctx.createRadialGradient(x, LEVEL.finishY - 95, 8, x, LEVEL.finishY - 95, 120);
+    const glow = ctx.createRadialGradient(x, WORLD().finishY - 95, 8, x, WORLD().finishY - 95, 120);
     glow.addColorStop(0, memory ? "rgba(111,168,220,.28)" : "rgba(251,251,234,.18)");
     glow.addColorStop(1, "rgba(12,12,15,0)");
     ctx.fillStyle = glow;
-    ctx.fillRect(x - 130, LEVEL.finishY - 230, 260, 240);
+    ctx.fillRect(x - 130, WORLD().finishY - 230, 260, 240);
   }
   if (memory) {
-    // The colour memory: all three Great Stars show Earth inside the arch.
+    // The colour memory: Earth inside the arch, painted up from below by the
+    // Great Stars banked so far.
+    const cy = WORLD().finishY - 92;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, cy, 32, 0, Math.PI * 2);
+    ctx.clip();
     ctx.fillStyle = EARTH;
+    ctx.fillRect(x - 33, cy + 33 - (66 * painted) / 12, 66, (66 * painted) / 12);
+    ctx.restore();
     ctx.strokeStyle = PAPER;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(x, LEVEL.finishY - 92, 32, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(x, cy, 32, 0, Math.PI * 2);
     ctx.stroke();
     ctx.fillStyle = "rgba(251,251,234,.85)";
     ctx.beginPath();
-    ctx.ellipse(x - 11, LEVEL.finishY - 104, 9, 5, -0.5, 0, Math.PI * 2);
+    ctx.ellipse(x - 11, WORLD().finishY - 104, 9, 5, -0.5, 0, Math.PI * 2);
     ctx.fill();
   }
   // Draw the original visible art, not its transparent padding, and bury its
@@ -778,13 +821,13 @@ function drawPortal() {
   ctx.strokeStyle = INK;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.rect(x - 63, LEVEL.finishY - 1, 126, 9);
+  ctx.rect(x - 63, WORLD().finishY - 1, 126, 9);
   ctx.fill();
   ctx.stroke();
-  if (won) {
-    // The first colour seen: a small blue Earth rises out of the door.
+  if (won && earthDoor) {
+    // The first colour seen whole: a small blue Earth rises out of the door.
     const age = Math.min(1, (clock - wonAt) / 1.2),
-      ey = LEVEL.finishY - 150 - age * 40;
+      ey = WORLD().finishY - 150 - age * 40;
     ctx.globalAlpha = age;
     ctx.fillStyle = EARTH;
     ctx.strokeStyle = PAPER;
@@ -846,7 +889,7 @@ function drawPrompts() {
   const p = state.player;
   for (const q of shownPrompts(state.prompts, p.x)) {
     if (q.x < camera.x - 60 || q.x > camera.x + W + 60) continue;
-    const lead = (q.inputX - p.x) / LEVEL.speed;
+    const lead = (q.inputX - p.x) / WORLD().speed;
     const alpha = Math.max(0, Math.min(1, (2.6 - lead) / 0.4)) * (q.optional ? 0.75 : 1);
     if (alpha <= 0) continue;
     // Glyphs keep at least ~20 css px of radius on small (portrait) skies.
@@ -1016,7 +1059,7 @@ function titleGround(alpha) {
     c.fillRect(0, 0, img.width, img.height);
   }
   const s = W / img.width,
-    groundScreen = LEVEL.startY - camera.y,
+    groundScreen = WORLD().startY - camera.y,
     top = groundScreen - 175 * s; // flat top of the art sits at 175/313
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -1123,7 +1166,7 @@ function el(name, attrs, parent) {
   parent?.append(e);
   return e;
 }
-const progressOf = (x) => Math.max(0, Math.min(1, (x - LEVEL.startX) / (LEVEL.finishX - LEVEL.startX)));
+const progressOf = (x) => Math.max(0, Math.min(1, (x - WORLD().startX) / (WORLD().finishX - WORLD().startX)));
 function buildOrbit(svg, w, h, big) {
   svg.innerHTML = "";
   const [x0, y0] = bezier(0, w, h),
@@ -1132,7 +1175,7 @@ function buildOrbit(svg, w, h, big) {
   el("path", { d, class: "arc" }, svg);
   const travelled = el("path", { d, class: "travelled" }, svg);
   el("circle", { cx: x0, cy: y0, r: big ? 5 : 4, class: "home" }, svg);
-  const ticks = CHECKPOINTS.map((c) => {
+  const ticks = state.def.checkpoints.map((c) => {
     const [x, y] = bezier(progressOf(c.x), w, h);
     return el("circle", { cx: x, cy: y, r: big ? 4.5 : 3.5, class: "tick", "data-id": c.id }, svg);
   });
@@ -1141,11 +1184,10 @@ function buildOrbit(svg, w, h, big) {
   // Two leaves: Diana's own sprout, the same mark as the title.
   el("path", { d: "M0 0 C-7 -2 -9 -9 -6 -13 C-1 -11 1 -5 0 0Z", class: "leaf" }, leaf);
   el("path", { d: "M0 0 C5 -1 9 -6 9 -11 C4 -11 0 -6 0 0Z", class: "leaf" }, leaf);
-  if (big)
-    for (const m of MOVEMENTS.slice(0, 3)) {
-      const [x, y] = bezier(progressOf(Math.max(LEVEL.startX, m.x) + 300), w, h);
-      el("text", { x, y: y - 12, "text-anchor": "middle", class: "label" }, svg).textContent = m.numeral;
-    }
+  if (big) {
+    const [x, y] = bezier(0.08, w, h);
+    el("text", { x, y: y - 12, "text-anchor": "middle", class: "label" }, svg).textContent = state.def.numeral;
+  }
   return { travelled, ticks, earth, leaf, w, h, length: null };
 }
 let hudOrbit, pauseOrbit;
@@ -1218,7 +1260,7 @@ function showTip(text) {
   ui.tip = { at: state.time };
 }
 function showMovement(id, at = state.time) {
-  const m = MOVEMENTS.find((q) => q.id === id);
+  const m = state.def.movements.find((q) => q.id === id);
   if (!m || !m.numeral) return;
   $("movement-numeral").textContent = m.numeral;
   $("movement-name").textContent = m.name;
@@ -1239,17 +1281,35 @@ function formatTime(t) {
 }
 function showVictory() {
   ui.victoryShown = true;
+  // Progress: the next level opens; the best Great Stars of this one stay.
+  const n = state.level,
+    last = n >= LEVELS.length;
+  progress.unlocked = Math.max(progress.unlocked, Math.min(LEVELS.length, n + 1));
+  progress.great[n] = Math.max(progress.great[n] ?? 0, state.greatBanked.length);
+  progress.done[n] = true;
+  writeProgress();
+  syncLevelMap();
+  $("victory-title").textContent = `${state.def.numeral} · ${state.def.title}`;
+  $("continue").hidden = last;
+  const song = audio.stats().score?.song;
+  $("result-song").textContent = song && song.total ? `${song.notes} / ${song.total}` : "—";
   const total = state.pickups.filter((q) => !q.great).length;
   $("result-stars").textContent = `${state.stars} / ${total}`;
-  $("result-time").textContent = formatTime(state.time);
+  // Real seconds at the level's tempo (the simulation runs BPM / 107 faster).
+  $("result-time").textContent = formatTime(state.time / (state.clock ?? 1));
   $("result-falls").textContent = String(state.deaths);
   setSlots($("result-great"));
   $("result-great-count").textContent = `${state.greatBanked.length} / 3`;
-  $("victory-line").lastChild.textContent =
-    state.greatBanked.length === 3 ? "Earth remembered you. The signal is stronger now." : "The signal is stronger now.";
+  const lines = {
+    1: "She was awake now, and the signal was close.",
+    2: "The wind had carried her this far.",
+    3: "The broken stars still sang, if she was quick.",
+    4: paintedStars() >= 12 ? "Earth, whole and blue, remembered every star." : "Earth. Small, blue, and listening. She was home.",
+  };
+  $("victory-line").lastChild.textContent = lines[n] ?? "The signal is stronger now.";
   $("victory-card").hidden = false;
-  $("again").focus({ preventScroll: true });
-  announce(`Chapter complete. ${state.stars} of ${total} stars, ${state.greatBanked.length} of 3 Great Fallen Stars, ${state.deaths} falls.`);
+  (last ? $("again") : $("continue")).focus({ preventScroll: true });
+  announce(`${state.def.title} complete. ${state.stars} of ${total} stars, ${state.greatBanked.length} of 3 Great Fallen Stars, ${state.deaths} falls.`);
 }
 
 /* ---------- simulation events → feedback ---------- */
@@ -1261,7 +1321,7 @@ function processEvents(quiet = false) {
     // Every event is voiced by audio.mjs (cuesForEvent and the score); a quiet
     // QA step still tells the score, so it keeps its place in the song. The
     // switch below is visual feedback only.
-    audio.event(e, { render: loud, timeScale });
+    audio.event(e, { render: loud, timeScale: simScale() });
     switch (e.name) {
       case "jump":
         if (loud) {
@@ -1333,7 +1393,7 @@ function processEvents(quiet = false) {
         }
         break;
       case "checkpoint": {
-        const mark = CHECKPOINTS[e.index];
+        const mark = state.def.checkpoints[e.index];
         ui.orbitBrightUntil = clock + 1.5;
         ui.orbitDirty = true;
         if (loud) {
@@ -1354,8 +1414,8 @@ function processEvents(quiet = false) {
         clearWords();
         if (loud && state.fallsHere >= 5) showTip("Need a hand? Assists are in the pause menu.");
         else if (loud && state.fallsHere >= 3) {
-          const cp = state.checkpoint ? CHECKPOINTS[checkpointIndex(state.checkpoint.id)] : null;
-          showTip(cp ? cp.tip : START_TIP);
+          const cp = state.checkpoint ? state.def.checkpoints[checkpointIndex(state.checkpoint.id, state.def)] : null;
+          showTip(cp ? cp.tip : state.def.startTip);
         }
         break;
       case "win":
@@ -1376,7 +1436,7 @@ function wake() {
   wakeAt = clock;
   root.classList.add("waking");
   setTimeout(() => root.classList.remove("waking"), 700);
-  showMovement("I", state.time + CARD.wakeDelay);
+  showMovement(state.def.movements[0].id, state.time + (state.def.cardDelay ?? CARD.wakeDelay));
   canvas.focus({ preventScroll: true });
   processEvents();
   sync();
@@ -1444,7 +1504,7 @@ function restartChapter() {
   wakeAt = clock - 1;
   afterReset();
   audio.play("ui-select");
-  showMovement("I", state.time + CARD.wakeDelay);
+  showMovement(state.def.movements[0].id, state.time + (state.def.cardDelay ?? CARD.wakeDelay));
 }
 function afterReset() {
   hideCards();
@@ -1457,7 +1517,7 @@ function afterReset() {
   // and the new sky must not be hushed with the old one.
   audio.hush(0.12);
   audio.clearMoments();
-  for (const e of state.events) if (e.serial > lastSerial) audio.event(e, { cues: false, timeScale });
+  for (const e of state.events) if (e.serial > lastSerial) audio.event(e, { cues: false, timeScale: simScale() });
   lastSerial = state.eventSerial;
   syncAudio();
   resetShelfWatch();
@@ -1468,9 +1528,91 @@ function afterReset() {
   sync();
   draw();
 }
+/** Load level n at its title (ready) state: world, orbit, view and score. */
+function loadLevel(n) {
+  const assist = { ...state.assist };
+  Object.assign(state, createGame(state.seed, { level: n, ...assist }));
+  audio.setLevel(state.level);
+  hudOrbit = buildOrbit($("orbit"), 264, 44, false);
+  pauseOrbit = buildOrbit($("pause-orbit"), 360, 80, true);
+  root.dataset.level = String(state.level);
+  syncLevelMap();
+  resize();
+}
+/** QA and Continue: open level n (when it is unlocked, or always for QA
+ * with { force: true }) and, by default, wake it at once. */
+function startLevel(n, { wake: wakeNow = true, force = true } = {}) {
+  if (!ready) return null;
+  const level = Math.max(1, Math.min(LEVELS.length, Math.round(n) || 1));
+  if (!force && level > progress.unlocked) return null;
+  hideCards();
+  clearWords();
+  audio.scoreReset();
+  audio.hush(0.12);
+  audio.clearMoments();
+  audio.fadeOutMusic(0.6);
+  loadLevel(level);
+  lastSerial = state.eventSerial;
+  fx.length = 0;
+  camera.snap = true;
+  ui.great = "";
+  ui.orbitDirty = true;
+  resetShelfWatch();
+  if (wakeNow) wake();
+  else {
+    syncAudio();
+    sync();
+    draw();
+  }
+  return snapshot(state);
+}
+/** The title's orbit map: four stations, open ones selectable. */
+function syncLevelMap() {
+  const map = $("level-map");
+  if (!map) return;
+  for (const b of map.querySelectorAll(".station")) {
+    const n = Number(b.dataset.level),
+      open = n <= progress.unlocked;
+    b.disabled = !open;
+    b.setAttribute("aria-pressed", String(n === state.level));
+    b.classList.toggle("done", !!progress.done[n]);
+    const got = progress.great[n] ?? 0;
+    b.querySelectorAll(".slot").forEach((sl, i) => sl.classList.toggle("filled", i < got));
+    b.setAttribute("aria-label", `${LEVELS[n - 1].numeral}. ${LEVELS[n - 1].title}${open ? `, ${got} of 3 Great Fallen Stars` : ", locked"}`);
+  }
+}
+function buildLevelMap() {
+  const map = $("level-map");
+  if (!map) return;
+  map.innerHTML = "";
+  for (const d of LEVELS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "station";
+    b.dataset.level = String(d.id);
+    b.innerHTML = `<span class="numeral">${d.numeral}</span><span class="name">${d.title}</span><span class="great-slots"><i class="slot"></i><i class="slot"></i><i class="slot"></i></span>`;
+    b.addEventListener("click", () => {
+      if (state.status !== "ready" || d.id > progress.unlocked) return;
+      audio.play("ui-select");
+      loadLevel(d.id);
+      sync();
+      draw();
+      $("start").focus({ preventScroll: true });
+    });
+    map.append(b);
+  }
+  syncLevelMap();
+}
+/** Great Stars banked across the campaign (best per level, this run's level live). */
+function paintedStars() {
+  let n = 0;
+  for (const d of LEVELS) n += d.id === state.level ? Math.max(progress.great[d.id] ?? 0, state.greatBanked.length) : progress.great[d.id] ?? 0;
+  return n;
+}
 function toTitle() {
   const assist = { ...state.assist };
-  Object.assign(state, createGame(state.seed, assist));
+  Object.assign(state, createGame(state.seed, { level: state.level, ...assist }));
+  syncLevelMap();
   hideCards();
   clearWords();
   lastSerial = state.eventSerial;
@@ -1524,6 +1666,17 @@ window.addEventListener("keydown", (e) => {
   if (state.status === "ready" && ["Space", "Enter", "ArrowUp", "KeyW"].includes(e.code)) return wake();
   if (state.status === "won") {
     if (e.code === "KeyR") restartChapter();
+    return;
+  }
+  // On the title, ←/→ choose among the open levels of the orbit map.
+  if (state.status === "ready" && ["ArrowLeft", "ArrowRight"].includes(e.code) && ready) {
+    const n = state.level + (e.code === "ArrowRight" ? 1 : -1);
+    if (n >= 1 && n <= progress.unlocked) {
+      loadLevel(n);
+      audio.play("ui-select");
+      sync();
+      draw();
+    }
     return;
   }
   if (["Space", "ArrowUp", "KeyW"].includes(e.code)) doJump();
@@ -1633,6 +1786,7 @@ $("resume").addEventListener("click", closePause);
 $("back-to-light").addEventListener("click", backToLight);
 $("restart-chapter").addEventListener("click", restartChapter);
 $("again").addEventListener("click", restartChapter);
+$("continue").addEventListener("click", () => startLevel(state.level + 1));
 $("to-title").addEventListener("click", toTitle);
 $("reload").addEventListener("click", () => location.reload());
 $("sound").addEventListener("click", () => setSound(!sound.on));
@@ -1649,7 +1803,7 @@ for (const b of document.querySelectorAll("[data-assist]")) {
     const name = b.dataset.assist,
       on = b.getAttribute("aria-pressed") !== "true";
     b.setAttribute("aria-pressed", String(on));
-    if (name === "gentle") timeScale = on ? 0.8 : 1;
+    if (name === "gentle") pace = on ? 0.8 : 1;
     else if (name === "gentleMusic") setGentleMusic(on);
     else setAssist(state, name, on);
   });
@@ -1668,8 +1822,9 @@ function frame(now) {
   lastNow = now;
   clock += state.status === "paused" ? 0 : real;
   if (ready) {
-    // Gentle pace slows the whole clock, so every arc and gap stays identical.
-    update(state, real * timeScale, held);
+    // The level's clock (BPM / 107) and Gentle pace scale time only, so
+    // every arc and gap stays identical (RESEARCH_LEVELS 3).
+    update(state, real * simScale(), held);
     processEvents();
     syncAudio();
     if (state.status === "won" && !ui.victoryShown && clock - wonAt > 1.5) showVictory();
@@ -1692,11 +1847,17 @@ window.__game = {
   toTitle,
   jump: () => jump(state),
   releaseJump: () => releaseJump(state),
+  // A tap: pressed and released in the same tick (the pilots' shortest hop).
+  tap: () => (jump(state), releaseJump(state)),
   dash: () => dash(state),
   dive: () => dive(state),
   pause,
   setAssist: (name, on) =>
-    name === "gentle" ? ((timeScale = on ? 0.8 : 1), true) : name === "gentleMusic" ? (setGentleMusic(on), true) : setAssist(state, name, on),
+    name === "gentle" ? ((pace = on ? 0.8 : 1), true) : name === "gentleMusic" ? (setGentleMusic(on), true) : setAssist(state, name, on),
+  // Levels: startLevel(n) opens level n (1-4) and wakes it; levels() lists
+  // them with their tempo and whether they are open in this browser.
+  startLevel: (n, options) => startLevel(n, options),
+  levels: () => LEVELS.map((d) => ({ id: d.id, title: d.title, bpm: d.bpm, clock: d.clock, verbs: { ...d.verbs }, unlocked: d.id <= progress.unlocked, great: progress.great[d.id] ?? 0 })),
   // Harmony feedback: { gentle: true } removes every dissonance (no detune,
   // a fade instead of the tape-stop). Persisted like the sound setting.
   setMusic: ({ gentle } = {}) => (gentle != null && setGentleMusic(gentle), { gentle: sound.gentle }),
@@ -1708,7 +1869,7 @@ window.__game = {
   getRenderGeometry: () => {
     const view = viewGeometry(W);
     return {
-      portal: manifest && portalPlacement(LEVEL.finishX, LEVEL.finishY, manifest.portal.visibleBounds),
+      portal: manifest && portalPlacement(WORLD().finishX, WORLD().finishY, manifest.portal.visibleBounds),
       visibleWorldWidth: W,
       lookahead: view.lookahead,
       lookaheadSeconds: view.lookaheadSeconds,
@@ -1760,6 +1921,9 @@ async function load() {
     sound.music.preload = "auto";
     hudOrbit = buildOrbit($("orbit"), 264, 44, false);
     pauseOrbit = buildOrbit($("pause-orbit"), 360, 80, true);
+    buildLevelMap();
+    // The title opens on the furthest open level.
+    if (progress.unlocked > 1) loadLevel(progress.unlocked);
     ready = true;
     window.__game.ready = true;
     $("start").disabled = false;
