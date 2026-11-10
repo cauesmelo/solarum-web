@@ -726,33 +726,45 @@ const WAKING = {
 };
 
 /* ---- II · The Gift (94 BPM): calm, with marked beats; the cape and its breath ----
- * RESEARCH_PROGRESSION 4.5 and 3. II opens in the crater where I's door
- * left Diana: she runs through the asteroid's gift (the GET: the cape, the
- * bar appears empty and fills over the next bar of running), uses the cape
- * once over a short gap with a floor under it (safe), needs it over the
- * hearth void and the same void again (charged by the gift and void
- * beacons), learns that the bar breathes (after a flight two hop gaps look
- * flight-sized but are double-jump-sized while the bar is not full, then a
- * long stone fills it tick by tick), crosses the long void on a flight, the
- * void-song (which refills the cape in midair) and a second flight, and
- * descends Pluto's steps: three flights in four bars, charged by a long
- * stone with its beacon, by the steps-song after a short rock, and by the
- * Pluto beacon. 19 bars, the door on the downbeat of bar 20 (48.5 s real).
+ * RESEARCH_PROGRESSION 4.5 and 3, re-solved for the owner (2026-11-10:
+ * "the cape is just handed over in level II with no merit ... it should come
+ * at least around the middle of the map"). II now earns its gift:
+ *   - first half (bars 1-10): Pluto's frost with only the jump and the double
+ *     jump, a little harder than I (two doubles up, a long double leap, a
+ *     land-and-go double, a climb that wants the second press early, two
+ *     doubles down into the asteroid's crater);
+ *   - the middle (bar 11): the asteroid's gift on the crater floor (the
+ *     relic, the eye, the banner) gives the cape with a FULL bar (`full`);
+ *   - second half: out of the crater, the safe first flight over a floor,
+ *     the hearth void (the need; a habitual "double, then cape" from I also
+ *     lands), the breath lesson (the bar is spent and the shore is short, so
+ *     a required leaf star at the double's top carries her up and across),
+ *     the long void (two flights around the void-song: the twist) and
+ *     Pluto's steps (the finish), then the heart plain and the door.
+ * 25 bars, the door on the downbeat of bar 26 (63.8 s real).
  *
  * Physics: II-VIII share the chapter's simulation physics (gravity 1500,
  * jump 570, double 525, no hang, no fall cap), so every cell is the one in
  * px and sixteenths that LEVEL_DESIGN lists; only the clock (94 / 107) and
- * so the real windows change. Cells used here (scripts/arcs.mjs 2):
- *   hold 4: -80 (80 up)  5: -26          double at 4: 10: +12 (12 lower)
+ * so the real windows change. Cells used here (scripts/arcs.mjs 2; dy at
+ * k/16 after a grid takeoff, up < 0):
+ *   hold 4: -80  5: -26 (26 up)  6: +57  7: +170
+ *   double, second press at d/16, onto level stone: d 1.25 lands 7.1/16
+ *   (269 px), d 2 8.0, d 3 9.1, d 4 9.9 (373 px), d 5 10.25; up 70 at d 4:
+ *   9.07; up 94 at d 3: 8.08 (d 1-5 climb it); down 67 at d 5: 11.0
  *   flight at 3/16 (the apex): level at -105 for 0.5 s, then 9: -17 (17 up),
- *   10: +70 (70 lower); two flights at 3 and 9 around a refill: 14: +15
+ *   10: +70 (70 lower); two flights at 3 and 9 around a refill: 14: +15;
+ *   jump, double at 4, cape at 7 (I's habit): 14.5: +70
+ *   jump, double at 4, a leaf star at 7 (the apex, -167), jump at 9:
+ *   15.0: +14 (568 px; the double alone lands +14 at most 10.4/16, 394 px)
  * A full flight adds exactly 113.55 px (three sixteenths) to the run, so a
  * grid x after F flights is 220 + 37.85 k + 113.55 F (gk below).
  * Every required flight has a charge source (RESEARCH_PROGRESSION 3.4): the
- * gift and void beacons for the hearth void and its repeat, the long stone's
- * breath and beacon for the long void's first flight and Pluto's first step,
- * the void-song and the steps-song (both completed before the press) for the
- * second flights, and the Pluto beacon for the last. */
+ * relic itself (full) for the optional first flight, the gift beacon for the
+ * hearth void, the long stone's breath and beacon for the long void's first
+ * flight and Pluto's first step, the void-song and the steps-song (both
+ * completed before the press) for the second flights, and the Pluto beacon
+ * for the last. */
 const G_CLOCK = 94 / 107;
 const gk = (k, F = 0) => 220 + 37.85 * k + 113.55 * F;
 const gIsle = (id, landK, F, takeoffK, y, lead = 100) => [id, gk(landK, F) - lead, y, gk(takeoffK, F) + 10 - (gk(landK, F) - lead)];
@@ -765,75 +777,118 @@ const flightStars = (dK, F, y0, n = 3, down = true) => {
   if (down) out.push([x0 + 248.6 + (dK + 5 - (dK + 3.567)) * 37.85 + 39.5, y0 - 110]);
   return out;
 };
-const GY = { crater: 300, step: 274, rim: 248, gift: 231, floor: 308, shore1: 301, hearth: 221, shore2: 291, hop: 303, long: 315, voidShore: 330, rock1: 400, rock2: 470, plain: 540, heart1: 514, heart2: 488, heart3: 462 };
+/** The sixteenth of the gift (the relic on the crater floor, bar 11). */
+const G_GET = 168;
+const GY = {
+  plain: 440, frost1: 414, frost2: 388, ledge1: 318, ledge2: 248, shore: 248, stoneA: 260, lip: 166, inner: 233,
+  crater: 300, step: 274, rim: 248, gift: 231, floor: 308, shore1: 301, long: 315, voidShore: 387, rock1: 457, rock2: 527, plain2: 510, door: 484,
+};
 const G_MAIN = [
-  // The crater floor where I's door left her; the gift is on it.
-  ["crater", -700, GY.crater, gk(23) + 10 + 700],
-  // Out of the crater: two hops up 26 px (5/16 each) onto its rim, after
-  // the title card has gone.
-  gIsle("crater-step", 28, 0, 31, GY.step, 75),
-  gIsle("rim", 36, 0, 40, GY.rim, 75),
+  // Pluto's frost plain, the title card over it.
+  ["frost-plain", -700, GY.plain, gk(24) + 10 + 700],
+  // Two held hops up 26 px (5/16 each).
+  gIsle("frost-1", 29, 0, 32, GY.frost1, 75),
+  gIsle("frost-2", 37, 0, 40, GY.frost2, 75),
+  // Two doubles up 70 px (second press at 4/16, landing 9.07/16 after the
+  // takeoff); a jump alone falls short into the gap under them.
+  gIsle("ledge-1", 49, 0, 52, GY.ledge1, 90),
+  gIsle("ledge-2", 61, 0, 64, GY.ledge2, 90),
+  // The frost leap: level and long. Its near edge is 250 px past the
+  // takeoff, so a jump alone (202 px) falls short and every second press
+  // from 1.25/16 (200 ms real, I's quick double-tap) to 6/16 lands.
+  ["frost-shore", gk(64) + 250, GY.shore, gk(92) + 10 - (gk(64) + 250)],
+  // Land and go: a double down 12 px onto a short stone, then at once the
+  // climb up 94 px onto the crater's lip (second press at 3/16, landing on
+  // 8.08/16; anything from 1/16 to 5/16 climbs it, a jump alone cannot).
+  gIsle("stone-a", 102, 0, 104, GY.stoneA, 90),
+  gIsle("crater-lip", 112, 0, 120, GY.lip, 90),
+  // Down into the crater: two late doubles (second press at 5/16), 67 px
+  // down each, landing on 11/16; a jump alone falls short of each.
+  gIsle("inner-1", 131, 0, 136, GY.inner, 90),
+  // The crater floor and the asteroid's gift (sixteenth 168). From 1.25/16
+  // (200 ms) a second press reaches it.
+  ["crater", gk(136) + 300, GY.crater, gk(187) + 10 - (gk(136) + 300)],
+  // Out of the crater: two hops up 26 px (5/16 each).
+  gIsle("crater-step", 192, 0, 195, GY.step, 75),
+  gIsle("rim", 200, 0, 204, GY.rim, 75),
   // The safe first use: a flight at the apex lands 17 px up 9/16 later; a
   // double also makes it (it steps up); a plain jump comes down on the floor
   // 60 px below and hops back up 77 px (4/16).
-  gIsle("gift-stone", 49, 1, 68, GY.gift, 100),
+  gIsle("gift-stone", 213, 1, 232, GY.gift, 100),
   // The hearth void (382 px): a flight at the apex lands 70 px lower 10/16
-  // after the takeoff, along flight-line.
-  gIsle("hearth-shore", 78, 2, 82, GY.shore1, 100),
-  // A held hop up 80 px (4/16) onto the second hearth and its beacon.
-  gIsle("hearth-2", 86, 2, 100, GY.hearth, 80),
-  // The same void, without stars.
-  gIsle("void-shore-1", 110, 3, 112, GY.shore2, 100),
-  // The breath lesson: two short stones and gaps a double jump crosses
-  // (second press at 4/16, 12 px lower 10/16 later) while the bar shows a
-  // quarter, then the long stone where it fills (sixteenth 146).
-  gIsle("breath-1", 122, 3, 124, GY.hop, 100),
-  gIsle("long-stone", 134, 3, 164, GY.long, 100),
+  // after the takeoff, along flight-line. The shore runs 2/16 past I's habit
+  // (jump, double, then the cape: 14.5/16), so that lands too, and it is
+  // short: the bar breathes only 6/16 of a bar on it.
+  gIsle("hearth-shore", 242, 2, 248, GY.shore1, 100),
+  // The breath lesson: a double alone lands at most 394 px on; the long
+  // stone starts 435 px past the takeoff, so the leaf star at the double's
+  // top is the way across (545 px). There the bar fills, tick by tick.
+  ["long-stone", gk(259.5, 2), GY.long, gk(292, 2) + 10 - gk(259.5, 2)],
   // The long void: jump, flight, the void-song refills the cape, flight;
-  // 15 px lower 14/16 after the takeoff.
-  gIsle("void-shore", 178, 5, 196, GY.voidShore, 110),
-  // Pluto's steps: three flights in four bars, each 70 px lower.
-  gIsle("step-rock", 206, 6, 208, GY.rock1, 90),
-  gIsle("pluto-rock", 218, 7, 236, GY.rock2, 100),
-  // Pluto's heart plain: three held hops up 26 px to the door (bar 20).
-  gIsle("heart-plain", 246, 8, 252, GY.plain, 100),
-  gIsle("heart-1", 257, 8, 262, GY.heart1, 75),
-  gIsle("heart-2", 267, 8, 272, GY.heart2, 75),
-  ["heart-door", gk(277, 8) - 75, GY.heart3, gk(304, 8) + 520 - (gk(277, 8) - 75)],
+  // 72 px lower 15/16 after the takeoff. The shore sits that low so a
+  // second flight up to 1.2/16 (190 ms) late still flies over its top (a
+  // flight holds the height it starts at; 24 px of step-up).
+  gIsle("void-shore", 307, 4, 324, GY.voidShore, 110),
+  // Pluto's steps: two flights, each 70 px lower; the short rock between
+  // them gives no breath, a cape star on the jump's rise does.
+  // (It runs 3.5/16 past the takeoff, so I's habit, jump, double, then the
+  // cape, landing 14.5/16 after the void shore's edge, lands too; the run
+  // from the landing to the jump is still 2/16.)
+  ["step-rock", gk(334, 5) - 90, GY.rock1, gk(339.5, 5) + 16 - (gk(334, 5) - 90)],
+  gIsle("pluto-rock", 346, 6, 364, GY.rock2, 100),
+  // Pluto's heart plain: a flight at the apex lands 17 px up 9/16 later,
+  // then one held hop up 26 px onto the door stone (bar 26). Its near edge
+  // is only 10 px before that landing: II's narrowest window (the ladder's
+  // 320-420 ms) is this last flight, right after the Pluto beacon.
+  gIsle("heart-plain", 373, 7, 384, GY.plain2, 10),
+  ["heart-door", gk(389, 7) - 75, GY.door, gk(400, 7) + 520 - (gk(389, 7) - 75)],
 ];
-// The safe line: the floor under the first gap (a plain jump lands on it 60
-// px down and hops 77 px back up onto the gift stone, 4/16).
-const G_HIGH = [["crater-floor", gk(42), GY.floor, gk(50, 0) + 10 - gk(42)]];
+// The safe line: the floor under the first flight's gap (a plain jump lands
+// on it 60 px down and hops 77 px back up onto the gift stone, 4/16).
+const G_HIGH = [["crater-floor", gk(206), GY.floor, gk(214, 0) + 10 - gk(206)]];
+/** A song star on the rise of a held jump from a takeoff at k on ground y0
+ * (every hold is at -99 px 2/16 after the takeoff). */
+const gRise = (k, y0, F = 0) => [gk(k + 2, F) + 39.5, Math.round(y0 - 99 - 36)];
+/** A song star at a double's top (second press at 4/16): -165 px at 6/16. */
+const gTop = (k, y0, F = 0) => [gk(k + 6, F) + 39.5, Math.round(y0 - 165 - 36)];
 const G_CHAINS = [
-  { id: "first-flight", route: "low", stars: flightStars(43, 0, GY.rim) },
-  { id: "flight-line", route: "low", stars: flightStars(71, 1, GY.gift) },
+  // The frost: one note per hop, then the double's top.
+  { id: "frost-song", route: "low", stars: [gRise(24, GY.plain), gRise(32, GY.frost1), gRise(40, GY.frost2), gTop(40, GY.frost2)] },
+  // The two doubles up and the leap: each double's top.
+  { id: "frost-ledges", route: "low", stars: [gRise(52, GY.ledge1), gTop(52, GY.ledge1), gRise(64, GY.ledge2), gTop(64, GY.ledge2)] },
+  { id: "first-flight", route: "low", stars: flightStars(207, 0, GY.rim) },
+  { id: "flight-line", route: "low", stars: flightStars(235, 1, GY.gift) },
   // On the long void's first flight, one per sixteenth from the press: it
-  // completes on 170 (an eighth), so the second flight (173) has its cape.
-  { id: "void-song", route: "low", stars: flightStars(167, 3, GY.long, 4, false) },
-  // After the short rock: three on the jump's rise and one at its takeoff;
-  // complete on 210, before the second step's flight at 211.
-  { id: "steps-song", route: "low", stars: [[gk(207, 6) + 39.5, GY.rock1 - 40], [gk(208, 6) + 39.5, GY.rock1 - 40], [gk(209, 6) + 39.5, GY.rock1 - 101], [gk(210, 6) + 39.5, GY.rock1 - 135]] },
-  { id: "pluto-song", route: "low", stars: flightStars(239, 7, GY.rock2) },
+  // completes on 298 (an eighth), so the second flight (301) has its cape.
+  { id: "void-song", route: "low", stars: flightStars(295, 2, GY.long, 4, false) },
+  { id: "pluto-song", route: "low", stars: flightStars(367, 6, GY.rock2) },
 ];
 const G_GREAT = [
-  { id: "great-1", x: gk(48, 1) + 20, y: GY.rim - 165 - 46, line: "over the first flight: jump, jump again, then the cape" },
-  { id: "great-2", x: gk(164, 3) + 486, y: GY.long - 249, line: "above the long void: a double jump between the flights" },
-  { id: "great-3", x: gk(244, 8) + 10, y: GY.rock2 - 165 - 46, line: "over Pluto's last step: jump, jump again, then the cape" },
+  { id: "great-1", x: gk(212, 1) + 20, y: GY.rim - 165 - 46, line: "over the first flight: jump, jump again, then the cape" },
+  { id: "great-2", x: gk(292, 2) + 486, y: GY.long - 249, line: "above the long void: a double jump between the flights" },
+  { id: "great-3", x: gk(372, 7) + 10, y: GY.rock2 - 165 - 46, line: "over Pluto's last step: jump, jump again, then the cape" },
 ];
 const GJ = (k, F, when = "g") => [gk(k, F) - 0.3, "jump", when];
 const GD = (k, F) => [gk(k, F) - 0.3, "dash", "a"];
+const G_PLAN_FROST = [
+  GJ(24, 0), GJ(32, 0),
+  GJ(40, 0), GJ(44, 0, "a"), GJ(52, 0), GJ(56, 0, "a"),
+  GJ(64, 0), GJ(68, 0, "a"),
+  GJ(92, 0), GJ(96, 0, "a"), GJ(104, 0), GJ(107, 0, "a"),
+  GJ(120, 0), GJ(125, 0, "a"), GJ(136, 0), GJ(141, 0, "a"),
+];
 const G_PLAN_MAIN = [
-  GJ(23, 0), GJ(31, 0),
-  GJ(40, 0), GD(43, 0),
-  GJ(68, 1), GD(71, 1),
-  GJ(82, 2),
-  GJ(100, 2), GD(103, 2),
-  GJ(112, 3), GJ(116, 3, "a"), GJ(124, 3), GJ(128, 3, "a"),
-  GJ(164, 3), GD(167, 3), GD(173, 4),
-  GJ(196, 5), GD(199, 5),
-  GJ(208, 6), GD(211, 6),
-  GJ(236, 7), GD(239, 7),
-  GJ(252, 8), GJ(262, 8), GJ(272, 8),
+  ...G_PLAN_FROST,
+  GJ(187, 0), GJ(195, 0),
+  GJ(204, 0), GD(207, 0),
+  GJ(232, 1), GD(235, 1),
+  // The leaf: jump, double, the leaf star at the top, jump again.
+  GJ(248, 2), GJ(252, 2, "a"), GJ(257, 2, "a"),
+  GJ(292, 2), GD(295, 2), GD(301, 3),
+  GJ(324, 4), GD(327, 4),
+  GJ(336, 5), GD(339, 5),
+  GJ(364, 6), GD(367, 6),
+  GJ(384, 7),
 ];
 const GIFT = {
   key: "gift",
@@ -845,75 +900,106 @@ const GIFT = {
   clock: G_CLOCK,
   physics: {},
   verbs: { double: true, cape: false, glide: false, dive: false, super: false },
-  gets: [{ id: "asteroid-gift", verb: "cape", x: gk(4) }],
+  // The relic fills the bar (RESEARCH_REFILLS 2.2): the first flight is the
+  // gift's own, so the safe first use needs no wait.
+  gets: [{ id: "asteroid-gift", verb: "cape", x: gk(G_GET), full: true }],
   capeRule: "breath",
   view: null,
-  level: { title: "The Gift", speed: 270, startX: 220, startY: GY.crater, finishX: gk(304, 8), finishY: GY.heart3, beat: BEAT },
+  level: { title: "The Gift", speed: 270, startX: 220, startY: GY.plain, finishX: gk(400, 7), finishY: GY.door, beat: BEAT },
   movements: [{ id: "II", x: -1000, numeral: "II", name: "The Gift" }],
   sections: [
-    { x: -1000, movement: "II", step: "get", name: "II · The Gift" },
-    { x: gk(36), movement: "II", step: "safe", name: "II · The Gift — the first flight" },
-    { x: gk(60, 1), movement: "II", step: "need", name: "II · The Gift — the hearth void" },
-    { x: gk(104, 2), movement: "II", step: "develop", name: "II · The Gift — the breath" },
-    { x: gk(152, 3), movement: "II", step: "twist", name: "II · The Gift — the long void" },
-    { x: gk(190, 5), movement: "II", step: "conclude", name: "II · The Gift — Pluto's steps" },
-    { x: gk(248, 8), movement: "II", step: "coda", name: "II · The Gift — the heart plain" },
+    { x: -1000, movement: "II", step: "introduce", name: "II · The Gift" },
+    { x: gk(36), movement: "II", step: "develop", name: "II · The Gift — Pluto's frost" },
+    { x: gk(60), movement: "II", step: "develop", name: "II · The Gift — the frost leap" },
+    { x: gk(100), movement: "II", step: "develop", name: "II · The Gift — down to the crater" },
+    { x: gk(148), movement: "II", step: "get", name: "II · The Gift — the asteroid's gift" },
+    { x: gk(200), movement: "II", step: "safe", name: "II · The Gift — the first flight" },
+    { x: gk(224, 1), movement: "II", step: "need", name: "II · The Gift — the hearth void" },
+    { x: gk(244, 2), movement: "II", step: "develop", name: "II · The Gift — the breath" },
+    { x: gk(284, 2), movement: "II", step: "twist", name: "II · The Gift — the long void" },
+    { x: gk(318, 4), movement: "II", step: "conclude", name: "II · The Gift — Pluto's steps" },
+    { x: gk(376, 7), movement: "II", step: "coda", name: "II · The Gift — the heart plain" },
   ],
-  // Beacons on half bars 4½, 6½, 10½, 12½, 15 and 18½ (≤ 11.5 s real apart).
+  // Beacons on half bars 6, 10½, 14½, 18½, 20½ and 23 (≤ 12.8 s real apart),
+  // each with 12/16 of running before the next required press.
   checkpoints: [
-    { id: "gift", x: gk(56, 1) - 3, y: GY.gift, platform: "gift-stone", story: "Gather the falling stars, and it will carry you there.", tip: "Jump, then press the cape near the top of the jump." },
-    { id: "void", x: gk(88, 2) - 3, y: GY.hearth, platform: "hearth-2", story: "The same dark again. This time she knew how wide it was.", tip: "Jump at the edge, then press the cape near the top." },
-    { id: "long", x: gk(152, 3) - 3, y: GY.long, platform: "long-stone", story: "The gift breathes when she runs. A long stone is a full breath.", tip: "Take every star of the song on the first flight; it gives the cape back." },
-    { id: "steps", x: gk(184, 5) - 3, y: GY.voidShore, platform: "void-shore", story: "Below her the little world turned, cold and patient.", tip: "Short stones give no breath. The stars after them do." },
-    { id: "pluto", x: gk(224, 7) - 3, y: GY.rock2, platform: "pluto-rock", story: "On Pluto's heart the frost held still, as if it were listening.", tip: "Jump, then press the cape near the top, down to the plain." },
-    // On the door stone (bar 18½), so no beacon gap passes 13 s (the
-    // ladder); it marks the glide lock below the ledge.
-    { id: "lock", x: gk(280, 8) - 3, y: GY.heart3, platform: "heart-door", story: "Below the last ledge a line of stars drifted down, too slowly to follow.", tip: "Run on to the door." },
+    { id: "frost", x: gk(80) - 3, y: GY.shore, platform: "frost-shore", story: "Pluto's frost rang under her feet, and far ahead a crater smoked.", tip: "Jump, then jump again near the top to reach the far ice." },
+    { id: "crater", x: gk(152) - 3, y: GY.crater, platform: "crater", story: "At the bottom of the crater the asteroid lay half buried, and it opened one eye.", tip: "Run through the gift." },
+    { id: "gift", x: gk(216, 1) - 3, y: GY.gift, platform: "gift-stone", story: "Gather the falling stars, and it will carry you there.", tip: "Jump, then press the cape near the top of the jump." },
+    { id: "long", x: gk(280, 2) - 3, y: GY.long, platform: "long-stone", story: "The gift breathes when she runs. A long stone is a full breath.", tip: "Take every star of the song on the first flight; it gives the cape back." },
+    { id: "steps", x: gk(312, 4) - 3, y: GY.voidShore, platform: "void-shore", story: "Below her the little world turned, cold and patient.", tip: "Short stones give no breath. The bright star over the rock does." },
+    { id: "pluto", x: gk(352, 6) - 3, y: GY.rock2, platform: "pluto-rock", story: "On Pluto's heart the frost held still, as if it were listening.", tip: "Jump, then press the cape near the top, down to the plain." },
   ],
-  startTip: "Run through the gift. Jump, then press the cape near the top.",
+  startTip: "Jump at the edge, and jump again in the air.",
   main: G_MAIN,
   high: G_HIGH,
   updrafts: [],
   cascades: [],
   chains: G_CHAINS,
   great: G_GREAT,
+  // The leaf need (RESEARCH_REFILLS 3, II): at the top of the double over
+  // the breath gap, with the bar spent by the hearth void's flight. Pluto's
+  // second step: a cape star on the rise of the jump off the short rock
+  // (its ±44 × ±50 box takes a jump up to 1/16 early or late; it replaced a
+  // four-star song that an early jump broke: the human proxies' worst spot).
+  refills: [
+    // (Each sits 44 px past a sixteenth, so its note is touched on the grid.)
+    { id: "leaf-breath", kind: "leaf", x: gk(254, 2) + 44, y: GY.shore1 - 167 - 36, required: true },
+    { id: "cape-steps", kind: "cape", x: gk(337, 5) + 44, y: GY.rock1 - 75 - 36, required: true },
+  ],
   moments: [],
   // Decor: the glide lock (RESEARCH_PROGRESSION 2.1): a gently descending
-  // star line below the final ledge that a flight cannot follow (III's glide
+  // star line below the door stone that a flight cannot follow (III's glide
   // will); drawn, never collected.
-  decor: [{ id: "glide-lock", kind: "cluster", stars: [0, 1, 2, 3, 4].map((i) => [gk(282, 8) + 60 * i, GY.heart3 + 60 + 22 * i]) }],
+  decor: [{ id: "glide-lock", kind: "cluster", stars: [0, 1, 2, 3, 4].map((i) => [gk(392, 7) + 60 * i, GY.door + 60 + 22 * i]) }],
   prompts: [
+    // ↑ ↑: [from, inputX] is the first jump's window; `to` ends the second's.
+    { id: "p-double", glyph: ["up", "up"], action: "double-jump", x: gk(40) + 10, y: GY.frost2 - 250, from: gk(40) - 30, to: gk(46), inputX: gk(40) + 14 },
     // ↑ · →: [from, inputX] is the jump's window; `to` ends the cape's.
-    { id: "p-first-flight", glyph: ["up", "then", "right"], action: "dash", x: gk(40) + 20, y: GY.rim - 170, from: gk(40) - 30, to: gk(43) + 60, inputX: gk(40) + 14, optional: true, route: "main" },
-    { id: "p-cape", glyph: ["up", "then", "right"], action: "dash", x: gk(69, 1), y: GY.gift - 170, from: gk(68, 1) - 30, to: gk(71, 1) + 60, inputX: gk(68, 1) + 14 },
-    { id: "p-refill", glyph: ["right"], action: "dash", x: gk(172, 4) + 48, y: GY.long - 175, from: gk(171, 4), to: gk(175, 4), inputX: gk(173, 4) + 10 },
+    { id: "p-first-flight", glyph: ["up", "then", "right"], action: "dash", x: gk(204) + 20, y: GY.rim - 170, from: gk(204) - 30, to: gk(207) + 60, inputX: gk(204) + 14, optional: true, route: "main" },
+    // (The need's sign stands over the gift stone, 762+ px before the leaf's,
+    // so only one row shows at once (T4); the leaf's sits as far right as
+    // the 720 px portrait sky allows its 1.5 s lead (T3).)
+    { id: "p-cape", glyph: ["up", "then", "right"], action: "dash", x: gk(227, 1), y: GY.gift - 170, from: gk(232, 1) - 30, to: gk(235, 1) + 60, inputX: gk(232, 1) + 14 },
+    { id: "p-leaf", glyph: ["up", "up", "up"], action: "double-jump", x: gk(247, 2) - 30, y: GY.shore1 - 280, from: gk(248, 2) - 30, to: gk(257, 2), inputX: gk(248, 2) + 14 },
+    { id: "p-refill", glyph: ["right"], action: "dash", x: gk(300, 3) + 48, y: GY.long - 175, from: gk(299, 3), to: gk(303, 3), inputX: gk(301, 3) + 10 },
   ],
   stars: [
-    // The crater's two hops and the plain's three: a star on each rise.
-    ...[23, 31].map((k, i) => [`rim-star-${i}`, gk(k + 1) + 33.5, GY.crater - 26 * i - 64 - 36, "low"]),
-    ...[252, 262, 272].map((k, i) => [`plain-star-${i}`, gk(k + 1, 8) + 33.5, GY.plain - 26 * i - 64 - 36, "low"]),
-    // Running stars where the bar is already full (after a beacon or the
-    // first fill), so they add notes but never change when it fills.
-    ...[[58, 1, GY.gift], [61, 1, GY.gift], [64, 1, GY.gift], [90, 2, GY.hearth], [93, 2, GY.hearth], [96, 2, GY.hearth], [154, 3, GY.long], [157, 3, GY.long], [160, 3, GY.long], [186, 5, GY.voidShore], [189, 5, GY.voidShore], [192, 5, GY.voidShore], [226, 7, GY.rock2], [229, 7, GY.rock2], [232, 7, GY.rock2]].map(([k, F, y], i) => [`run-star-${i}`, gk(k, F) + 33.5, y - 40, "low"]),
-    // The breath lesson's hops (each at the second press's rise).
-    ...[116, 128].map((k, i) => [`breath-star-${i}`, gk(k + 1, 3) + 33.5, GY.shore2 + 12 * i - 120 - 36, "low"]),
+    // The crater's two hops and the plain's: a star on each rise.
+    ...[187, 195].map((k, i) => [`rim-star-${i}`, gk(k + 1) + 33.5, GY.crater - 26 * i - 64 - 36, "low"]),
+    [`plain-star-0`, gk(385, 7) + 33.5, GY.plain2 - 64 - 36, "low"],
+    // The short rock: one at running height (+1/8; the cape star fills).
+    [`step-star-0`, gk(335, 5) + 33.5, GY.rock1 - 40, "low"],
+    // Running stars on the long stones (the frost shore, the crater floor,
+    // the gift stone after its beacon, the void shore, Pluto's rock).
+    ...[[82, 0, GY.shore], [85, 0, GY.shore], [88, 0, GY.shore], [154, 0, GY.crater], [158, 0, GY.crater], [162, 0, GY.crater], [219, 1, GY.gift], [223, 1, GY.gift], [227, 1, GY.gift], [314, 4, GY.voidShore], [317, 4, GY.voidShore], [320, 4, GY.voidShore], [354, 6, GY.rock2], [357, 6, GY.rock2], [360, 6, GY.rock2]].map(([k, F, y], i) => [`run-star-${i}`, gk(k, F) + 33.5, y - 40, "low"]),
+    // The land-and-go and the climb: one on each rise.
+    [`frost-star-0`, gk(94) + 33.5, GY.shore - 99 - 36, "low"],
+    [`frost-star-1`, gk(109) + 33.5, GY.stoneA - 190 - 36, "low"],
+    // The doubles down into the crater: each second press's rise.
+    ...[[125, GY.lip], [141, GY.inner]].map(([k, y], i) => [`crater-star-${i}`, gk(k + 2) + 33.5, y - 80 - 36, "low"]),
+    // The breath gap: the jump's rise and the double's (the bar only fills
+    // 1/8 a star; the leaf star itself is no star).
+    [`breath-star-0`, gk(250, 2) + 33.5, GY.shore1 - 99 - 36, "low"],
+    [`breath-star-1`, gk(253, 2) + 33.5, GY.shore1 - 137 - 36, "low"],
   ],
   routes: {
     main: G_PLAN_MAIN,
     // The three Great Stars: jump, double and cape over the first gap and
     // over Pluto's last step, and the double between the long void's flights.
     upper: [
-      GJ(23, 0), GJ(31, 0), GJ(40, 0), GJ(44, 0, "a"), GD(47, 0),
-      ...G_PLAN_MAIN.filter(([x]) => x > gk(60, 1) && x < gk(160, 3)),
-      GJ(164, 3), GD(167, 3), GJ(171, 4, "a"), GD(175, 4),
-      ...G_PLAN_MAIN.filter(([x]) => x > gk(190, 5) && x < gk(230, 7)),
-      GJ(236, 7), GJ(240, 7, "a"), GD(243, 7),
-      ...G_PLAN_MAIN.filter(([x]) => x > gk(250, 8)),
+      ...G_PLAN_FROST,
+      GJ(187, 0), GJ(195, 0), GJ(204, 0), GJ(208, 0, "a"), GD(211, 0),
+      ...G_PLAN_MAIN.filter(([x]) => x > gk(224, 1) && x < gk(288, 2)),
+      GJ(292, 2), GD(295, 2), GJ(299, 3, "a"), GD(303, 3),
+      ...G_PLAN_MAIN.filter(([x]) => x > gk(318, 4) && x < gk(358, 6)),
+      GJ(364, 6), GJ(368, 6, "a"), GD(371, 6),
+      ...G_PLAN_MAIN.filter(([x]) => x > gk(378, 7)),
     ],
     ability: G_PLAN_MAIN,
     // The safe line: no cape over the first gap (a jump onto the floor, a
     // hop back up), then the main route.
-    safe: [GJ(23, 0), GJ(31, 0), GJ(40, 0), GJ(46, 0), ...G_PLAN_MAIN.filter(([x]) => x > gk(60, 1))],
+    safe: [...G_PLAN_FROST, GJ(187, 0), GJ(195, 0), GJ(204, 0), GJ(210, 0), ...G_PLAN_MAIN.filter(([x]) => x > gk(224, 1))],
   },
 };
 

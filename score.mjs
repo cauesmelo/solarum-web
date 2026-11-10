@@ -118,15 +118,18 @@ function mapOf(sections, coda) {
   };
 }
 // II · The Gift: Bm7 Gmaj7 Dadd9 A6 laid over its sections (the heartbeat
-// rests while the gift arrives and over the long void).
+// rests while the gift arrives and over the long void). Since the
+// 2026-11-10 re-solve the gift is on bar 11: bars 1-10 are Pluto's frost
+// (jump and double only), the cape's lessons follow it.
 const GIFT_SECTIONS = [
-  { id: "gift", from: 1, to: 4, pulse: false, cycle: [C.Bm7, C.Bm7, C.Bm7, C.Gmaj7] },
-  { id: "voids", from: 5, to: 7, cycle: [C.Dadd9, C.A6, C.Bm7] },
-  { id: "breath", from: 8, to: 9, cycle: [C.Gmaj7, C.Dadd9] },
-  { id: "long", from: 10, to: 11, pulse: false, cycle: [C.A6, C.Bm7] },
-  { id: "steps", from: 12, to: 16, cycle: [C.Gmaj7, C.Dadd9, C.A6, C.Bm7, C.Gmaj7] },
-  { id: "plain", from: 17, to: 19, cycle: [C.Dadd9, C.Gmaj7, C.A6] },
-  { id: "coda", from: 20, to: Infinity },
+  { id: "frost", from: 1, to: 10, cycle: [C.Bm7, C.Gmaj7, C.Dadd9, C.A6] },
+  { id: "gift", from: 11, to: 14, pulse: false, cycle: [C.Bm7, C.Gmaj7, C.Bm7, C.Bm7] },
+  { id: "voids", from: 15, to: 16, cycle: [C.Dadd9, C.A6] },
+  { id: "breath", from: 17, to: 18, cycle: [C.Gmaj7, C.Dadd9] },
+  { id: "long", from: 19, to: 20, pulse: false, cycle: [C.Bm7, C.A6] },
+  { id: "steps", from: 21, to: 23, cycle: [C.Dadd9, C.A6, C.Bm7] },
+  { id: "plain", from: 24, to: 25, cycle: [C.Gmaj7, C.Dadd9] },
+  { id: "coda", from: 26, to: Infinity },
 ];
 // III · Still Water: G Lydian, Gmaj7#11 A/G F#m7 Em9, a chord a bar; the
 // brush rests while the helper comes and over the warm-up flight.
@@ -287,28 +290,30 @@ const PRESETS = {
     },
   },
   gift: {
-    bpm: 94, bars: 20, pickup: 0,
+    bpm: 94, bars: 26, pickup: 0,
     // II · The Gift, calm with marked beats (RESEARCH_PROGRESSION 4.3): Bm7
     // Gmaj7 Dadd9 A6, a felt heartbeat on 1 and 3 from bar 3 and nothing else
     // in the bed. Restraint: no shaker (there is no wind in II), the
-    // heartbeat rests while the gift arrives and on the long void (bars 1-4
-    // and 10-11), so the cape's notes and the void-song carry those bars.
+    // heartbeat rests while the gift arrives and on the long void (bars
+    // 11-14 and 19-20), so the cape's notes and the void-song carry those bars.
     groove: "heartbeat", maxFlat: 14, space: { seconds: 5.5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
     sections: GIFT_SECTIONS,
     chordAt: mapOf(GIFT_SECTIONS, C.Dadd9),
-    // The gift (bar 1), the hearth void (bar 5), the long void (bar 10) and
-    // Pluto (bar 14); the theme closes from bar 18.
-    signalBars: [1, 5, 10, 14], closeFrom: 18,
+    // The wake (bar 1), the gift (bar 11), the hearth void (bar 15) and the
+    // long void (bar 19); the theme closes from bar 24.
+    signalBars: [1, 11, 15, 19], closeFrom: 24,
     phrases: {
-      // bar 3 (Bm7) into bar 4 (Gmaj7): the first flight, F#5 E5 D5 | B4.
+      // bar 2 (Gmaj7) into bar 3 (Dadd9): the frost's hops, D5 | E5 F#5 A5.
+      "frost-song": [74, 76, 78, 81],
+      // bar 4 (A6) into bar 5 (Bm7): the doubles up, E5 F#5 | A5 B5.
+      "frost-ledges": [76, 78, 81, 83],
+      // bar 14 (Bm7): the first flight, F#5 E5 D5 | B4.
       "first-flight": [78, 76, 74, 71],
-      // bar 5 (Dadd9): the hearth void rises, A4 B4 D5 | F#5.
+      // bar 15 (Dadd9): the hearth void rises, A4 B4 D5 | F#5.
       "flight-line": [69, 71, 74, 78],
-      // bar 11 (Bm7): the refill climbs, B4 D5 E5 F#5.
+      // bar 19 (Bm7): the refill climbs, B4 D5 E5 F#5.
       "void-song": [71, 74, 76, 78],
-      // bar 13 (Dadd9) into 14 (A6): the steps-song, D5 E5 F#5 A5.
-      "steps-song": [74, 76, 78, 81],
-      // bar 16 (Gmaj7): down to Pluto, D5 B4 A4 | G4.
+      // bar 24 (Gmaj7): down to Pluto's heart, D5 B4 A4 | G4.
       "pluto-song": [74, 71, 69, 67],
     },
   },

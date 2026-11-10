@@ -420,9 +420,10 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   assert.equal(still.notes.filter((v) => v.voice === "pulse" || v.voice === "marimba").length, 0);
   // II: the heartbeat alone (1 and 3), resting while the gift arrives and
   // over the long void; no shaker, no marimba (restraint).
-  assert.equal(bar(gift, "pulse", 3), 0, "II rests while the gift arrives");
-  assert.equal(bar(gift, "pulse", 5), 2);
-  assert.equal(bar(gift, "pulse", 11), 0, "II rests over the long void");
+  assert.equal(bar(gift, "pulse", 5), 2, "II's frost has the heartbeat");
+  assert.equal(bar(gift, "pulse", 11), 0, "II rests while the gift arrives");
+  assert.equal(bar(gift, "pulse", 15), 2);
+  assert.equal(bar(gift, "pulse", 19), 0, "II rests over the long void");
   assert.equal(gift.notes.filter((v) => v.voice === "shaker" || v.voice === "marimba").length, 0);
   // L1: no drums at all. VIII (restraint): no groove and no shaker; the
   // falling roads' knocks are the world's and her touch-downs are hers.

@@ -136,7 +136,8 @@ test("every level: main, upper (its three Great Stars), ability and safe routes 
 test("each main route reaches every beacon and uses its level's kit through public actions", () => {
   const kit = {
     1: { dash: 0, "double-jump": 5, constellations: 3 },
-    2: { dash: 8, "double-jump": 2, constellations: 5 },
+    // II: the first half's eight doubles and the leaf's two; seven flights.
+    2: { dash: 7, "double-jump": 10, constellations: 6 },
     [LEVEL_ID["still-water"]]: { dash: 9, "double-jump": 3, constellations: 6 },
     [LEVEL_ID["way-down"]]: { dash: 8, dive: 1, "double-jump": 2, constellations: 5 },
     [LEVEL_ID["borrowed-wind"]]: { dash: 3, "double-jump": 5, constellations: 6 },
@@ -717,7 +718,8 @@ test("beacons are at most 14 s of real run apart and leave 400 px before the nex
 test("a beacon (or the level's start) sits right before the first required use of each mechanic", () => {
   const firstUse = {
     1: { tap: gx(90), "double-jump": gx(152) },
-    2: { flight: 220 + 37.85 * 71 + 113.55, constellation: 220 + 37.85 * 167 + 113.55 * 3 + 39.5 },
+    // II: the hearth void's flight after the gift (bar 11) and the void-song.
+    2: { flight: 220 + 37.85 * 235 + 113.55, constellation: 220 + 37.85 * 295 + 113.55 * 2 + 39.5 },
     [LEVEL_ID["still-water"]]: { flight: gx(26), glide: 220 + 37.85 * 79 + 113.55, constellation: 220 + 37.85 * 266 + 113.55 * 6 + 39.5 },
     [LEVEL_ID["way-down"]]: { flight: gx(26), dive: 220 + 37.85 * 79 + 113.55 + 3 * 69.69, constellation: 220 + 37.85 * 138 + 113.55 + 94.9 + 39.5 },
     // VI: the first wind, the flight out of the fly-out wind's top, the
@@ -777,7 +779,8 @@ test("main-route gaps and rises respect each level's authoring limits", () => {
       // (A floor under a lid is reached by the dive through it.)
       const lid = createLevel(n).platforms.find((q) => q.type === "lid" && q.x <= b.x + 1 && q.x + q.width > b.x);
       if (gap <= 0 || windBetween(n, a, b) || lid) continue;
-      const refill = chains.some((q) => q.x > a.x + a.width && q.x < b.x);
+      // (A refill star over the gap counts as a refill: II's leaf star.)
+      const refill = chains.some((q) => q.x > a.x + a.width && q.x < b.x) || (levelDef(n).refills ?? []).some((q) => q.x > a.x + a.width && q.x < b.x);
       assert.ok(rise <= limits[n].rise, `L${n} ${a.id}→${b.id} rise ${rise}`);
       // (III: a held glide crosses up to 820 px; IV: 600.)
       assert.ok(gap <= (limits[n].long?.[a.id] ?? (refill && limits[n].void ? limits[n].void : limits[n].glide ?? limits[n].gap)), `L${n} ${a.id}→${b.id} gap ${gap}`);
