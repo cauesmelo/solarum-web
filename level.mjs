@@ -371,39 +371,11 @@ const PROMPTS = [
   { id: "p-super", glyph: ["right", "then", "up"], action: "super-jump", x: 18300, y: 190, from: 18262, to: 18340, inputX: 18300, optional: true, after: "p-wind", route: "upper" },
   { id: "p-lid2", glyph: ["down"], action: "dive", x: 18660, y: 231, from: 18580, to: 18790, inputX: 18780, optional: true, after: "p-super", route: "ability" },
 ];
-export function createLevel() {
-  const platforms = [
-    ...MAIN.map(([id, x, y, width, type], phase) => ({
-      id,
-      x,
-      y,
-      width,
-      type,
-      phase,
-      route: "low",
-    })),
-    ...HIGH.map(([id, x, y, width, type], phase) => ({
-      id,
-      x,
-      y,
-      width,
-      type,
-      phase: phase + 60,
-      route: "high",
-    })),
-  ]
-    .map((q) => ({
-      ...q,
-      crumbleAfter: q.type === "crumble" ? 0.65 : null,
-      triggeredAt: null,
-      collapseAt: null,
-      collapsed: false,
-      cascade: CASCADES.find((c) => c.tiles.includes(q.id))?.id ?? null,
-    }))
-    .sort((a, b) => a.y - b.y || a.x - b.x);
-  const pickups = [];
-  const add = (id, x, y, route = "low", extra = {}) =>
-    pickups.push({ id, x, y, route, collected: false, ...extra });
+/** Today's chapter's loose stars (tap and hold rows, the loose arcs, the hearth
+ * breeze) as [id, x, y, route]. */
+function chapterStars() {
+  const out = [];
+  const add = (id, x, y, route = "low") => out.push([id, x, y, route]);
   // Waking: three stars at tap height (a tap reaches them), then three at hold
   // height (only a held jump reaches them). Stars teach; they never gate.
   [505, 533, 561].forEach((x, i) => add(`tap-${i}`, x, i === 1 ? 437 : 442));
@@ -443,34 +415,75 @@ export function createLevel() {
     [14152.2, 97],
     [14202.2, 85],
   ].forEach(([x, y], i) => add(`breeze-${i}`, x, y, "high"));
-  for (const c of CHAINS)
-    c.stars.forEach(([x, y], i) =>
-      add(`${c.id}-${i}`, x, y, c.route, { chain: c.id, index: i }),
-    );
-  for (const g of GREAT)
-    add(g.id, g.x, g.y, "high", { great: true, line: g.line });
-  const chains = CHAINS.map((c) => ({
-    id: c.id,
-    count: c.stars.length,
-    got: 0,
-    lastAt: -1,
-    broken: false,
-    complete: false,
-    links: [],
-  }));
-  const updrafts = UPDRAFTS.map((u) => ({ ...u }));
-  const cascades = CASCADES.map((c) => ({ ...c, tiles: [...c.tiles], t0: null }));
-  const prompts = PROMPTS.map((q) => ({ ...q, glyph: [...q.glyph], done: false }));
+  return out;
+}
+
+/* ---------- levels (RESEARCH_LEVELS) ----------
+ * A level is a definition: tempo and clock (the simulation always runs in
+ * 107 BPM units, at clock = BPM / 107 of real time, like Gentle pace), the
+ * physics overrides, which verbs exist, and its geometry and story. */
+const ALL_VERBS = Object.freeze({ cape: true, dive: true, glide: true });
+const CHAPTER = Object.freeze({
+  id: 1,
+  key: "chapter",
+  numeral: "I",
+  title: "A Signal in the Dark",
+  bpm: 107,
+  clock: 1,
+  physics: {},
+  verbs: ALL_VERBS,
+  level: LEVEL,
+  movements: MOVEMENTS,
+  sections: SECTIONS,
+  checkpoints: CHECKPOINTS,
+  startTip: START_TIP,
+  main: MAIN,
+  high: HIGH,
+  updrafts: UPDRAFTS,
+  cascades: CASCADES,
+  chains: CHAINS,
+  great: GREAT,
+  prompts: PROMPTS,
+  stars: chapterStars(),
+});
+export const LEVELS = Object.freeze([CHAPTER]);
+export function levelDef(n = 1) {
+  return LEVELS[Math.max(0, Math.min(LEVELS.length - 1, (n ?? 1) - 1))];
+}
+export function createLevel(n = 1) {
+  const d = levelDef(n);
+  const platforms = [
+    ...d.main.map(([id, x, y, width, type, extra], phase) => ({ id, x, y, width, type, phase, route: "low", ...(extra ?? {}) })),
+    ...d.high.map(([id, x, y, width, type, extra], phase) => ({ id, x, y, width, type, phase: phase + 60, route: "high", ...(extra ?? {}) })),
+  ]
+    .map((q) => ({
+      ...q,
+      crumbleAfter: q.type === "crumble" ? d.physics.crumbleAfter ?? 0.65 : null,
+      triggeredAt: null,
+      collapseAt: null,
+      collapsed: false,
+      cascade: d.cascades.find((c) => c.tiles.includes(q.id))?.id ?? null,
+    }))
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  const pickups = [];
+  const add = (id, x, y, route = "low", extra = {}) => pickups.push({ id, x, y, route, collected: false, ...extra });
+  for (const [id, x, y, route] of d.stars) add(id, x, y, route);
+  for (const c of d.chains) c.stars.forEach(([x, y], i) => add(`${c.id}-${i}`, x, y, c.route, { chain: c.id, index: i }));
+  for (const g of d.great) add(g.id, g.x, g.y, "high", { great: true, line: g.line });
+  const chains = d.chains.map((c) => ({ id: c.id, count: c.stars.length, got: 0, lastAt: -1, broken: false, complete: false, links: [] }));
+  const updrafts = d.updrafts.map((u) => ({ ...u }));
+  const cascades = d.cascades.map((c) => ({ ...c, tiles: [...c.tiles], t0: null }));
+  const prompts = d.prompts.map((q) => ({ ...q, glyph: [...q.glyph], done: false }));
   return { platforms, pickups, chains, updrafts, cascades, prompts };
 }
-export function sectionAt(x) {
-  return SECTIONS.filter((q) => x >= q.x).at(-1) || SECTIONS[0];
+export function sectionAt(x, d = levelDef(1)) {
+  return d.sections.filter((q) => x >= q.x).at(-1) || d.sections[0];
 }
-export function movementAt(x) {
-  return MOVEMENTS.filter((q) => x >= q.x).at(-1) || MOVEMENTS[0];
+export function movementAt(x, d = levelDef(1)) {
+  return d.movements.filter((q) => x >= q.x).at(-1) || d.movements[0];
 }
-export function checkpointIndex(id) {
-  return CHECKPOINTS.findIndex((q) => q.id === id);
+export function checkpointIndex(id, d = levelDef(1)) {
+  return d.checkpoints.findIndex((q) => q.id === id);
 }
 /** Which glyph prompts are on display for Diana at x (pure, shared with the
  * renderer). A prompt with `after` waits until that one is done or passed;

@@ -1,10 +1,4 @@
-import {
-  LEVEL,
-  CHECKPOINTS,
-  createLevel,
-  sectionAt,
-  movementAt,
-} from "./level.mjs";
+import { createLevel, levelDef, sectionAt, movementAt } from "./level.mjs";
 /** Pure deterministic runner simulation. Units: world px, seconds, px/s and
  * px/s². player.y is the feet position and y grows downward. Nothing here
  * touches the DOM, images, audio, storage or wall-clock time. */
@@ -84,11 +78,35 @@ export function physicsOf(s) {
 export function isCracked(platform) {
   return CRACKED.has(platform?.type);
 }
+/** Level n's movement constants in simulation units. Each level runs the
+ * simulation at clock = BPM / 107 of real time, so human-time forgiveness
+ * (coyote, buffer, respawn, the cascade's shake telegraph) is multiplied by
+ * the clock to stay constant in real seconds (RESEARCH_LEVELS 3, 7). */
+export function levelPhysics(def) {
+  const c = def.clock;
+  return Object.freeze({
+    ...RULES,
+    coyote: RULES.coyote * c,
+    jumpBuffer: RULES.jumpBuffer * c,
+    respawnShatter: RULES.respawnShatter * c,
+    respawnIris: RULES.respawnIris * c,
+    respawnPop: RULES.respawnPop * c,
+    cascadeShake: RULES.cascadeShake * c,
+    ...def.physics,
+  });
+}
 export function createGame(seed = 2021, options = {}) {
-  const world = createLevel();
+  const def = levelDef(options.level);
+  const LEVEL = def.level;
+  const world = createLevel(def.id);
   const capeRule = options.capeRule ?? RULES.capeRule;
+  const physics = levelPhysics(def);
   return {
     seed,
+    level: def.id,
+    def,
+    clock: def.clock,
+    physics,
     capeRule,
     status: "ready",
     time: 0,
@@ -102,7 +120,7 @@ export function createGame(seed = 2021, options = {}) {
     dashRemaining: 0,
     superUsed: false,
     launched: false, // a jump or flight began this airtime (lip catch)
-    coyote: RULES.coyote,
+    coyote: physics.coyote,
     jumpBuffer: 0,
     jumpBufferReleased: false,
     airTime: 0,
@@ -132,8 +150,8 @@ export function createGame(seed = 2021, options = {}) {
       endlessCape: !!options.endlessCape,
       starNet: !!options.starNet,
     },
-    section: sectionAt(LEVEL.startX),
-    movement: movementAt(LEVEL.startX),
+    section: sectionAt(LEVEL.startX, def),
+    movement: movementAt(LEVEL.startX, def),
     animation: { name: "idle", age: 0 },
     player: {
       x: LEVEL.startX,
@@ -199,7 +217,7 @@ export function start(s) {
 export function restart(s) {
   const assist = { ...s.assist },
     serial = s.eventSerial;
-  Object.assign(s, createGame(s.seed, { capeRule: s.capeRule, ...assist }));
+  Object.assign(s, createGame(s.seed, { capeRule: s.capeRule, level: s.level, ...assist }));
   // Event serials stay monotonic so a renderer never mistakes new events for old.
   s.eventSerial = serial;
   return start(s);
@@ -219,7 +237,7 @@ function restoreCheckpoint(s) {
   };
   Object.assign(
     s,
-    createGame(s.seed, { capeRule: s.capeRule, ...keep.assist }),
+    createGame(s.seed, { capeRule: s.capeRule, level: s.level, ...keep.assist }),
   );
   Object.assign(s, keep);
   s.status = "running";
@@ -235,7 +253,7 @@ function restoreCheckpoint(s) {
     s.stars = cp.stars;
     s.highStars = cp.highStars;
     s.time = cp.time;
-    s.distance = (cp.x - LEVEL.startX) / 10;
+    s.distance = (cp.x - s.def.level.startX) / 10;
     for (const q of s.pickups)
       q.collected = cp.collected.includes(q.id) || keep.greatBanked.includes(q.id);
     for (const c of s.chains) {
@@ -246,8 +264,8 @@ function restoreCheckpoint(s) {
   } else {
     for (const q of s.pickups) q.collected = keep.greatBanked.includes(q.id);
   }
-  s.section = sectionAt(s.player.x);
-  s.movement = movementAt(s.player.x);
+  s.section = sectionAt(s.player.x, s.def);
+  s.movement = movementAt(s.player.x, s.def);
   animate(s, "start");
 }
 export function retry(s) {
@@ -282,7 +300,7 @@ export function jump(s) {
     // M6: flight + jump = super jump, once per flight, whatever jumps remain.
     s.superUsed = true;
     s.dashRemaining = 0;
-    p.vy = -RULES.superJump;
+    p.vy = -s.physics.superJump;
     p.jumps = 2;
     p.grounded = false;
     p.diving = false;
@@ -295,16 +313,16 @@ export function jump(s) {
     return true;
   }
   if (p.jumps >= 2 && s.coyote <= 0) {
-    s.jumpBuffer = RULES.jumpBuffer;
+    s.jumpBuffer = s.physics.jumpBuffer;
     s.jumpBufferReleased = false;
     return false;
   }
   const bufferedTap = s.jumpBuffer > 0 && s.jumpBufferReleased;
   const first = p.grounded || s.coyote > 0;
-  p.vy = -(first ? RULES.jump : RULES.doubleJump);
+  p.vy = -(first ? s.physics.jump : s.physics.doubleJump);
   // A tap released before landing must keep its short arc when consumed later;
   // otherwise input forgiveness would turn that tap into an unwanted full jump.
-  if (bufferedTap) p.vy = Math.max(-RULES.tapCap, p.vy);
+  if (bufferedTap) p.vy = Math.max(-s.physics.tapCap, p.vy);
   p.jumps = first ? 1 : 2;
   p.grounded = false;
   p.diving = false;
@@ -314,16 +332,20 @@ export function jump(s) {
   s.jumpBufferReleased = false;
   s.dashRemaining = 0;
   animate(s, "jump");
+  s.jumpHeld = true;
   markPrompts(s, first ? "jump" : "double-jump");
   event(s, first ? "jump" : "double-jump");
   return true;
 }
 export function releaseJump(s) {
   if (s.status !== "running") return;
+  s.jumpHeld = false;
   if (s.jumpBuffer > 0) s.jumpBufferReleased = true;
-  if (s.player.vy < -RULES.tapCap) s.player.vy = -RULES.tapCap;
+  if (s.player.vy < -s.physics.tapCap) s.player.vy = -s.physics.tapCap;
 }
 export function dash(s) {
+  // A level that has not given Diana her cape yet ignores the button.
+  if (!s.def.verbs.cape) return false;
   if (s.status !== "running" || s.player.grounded || !capeReady(s))
     return false;
   // Inside solar wind the cape does not dash level (a level flight there can
@@ -331,9 +353,9 @@ export function dash(s) {
   if (updraftAt(s)) return false;
   if (!s.assist.endlessCape) {
     s.capeCharges = 0;
-    if (s.capeRule === "cooldown") s.dashCooldown = RULES.dashCooldown;
+    if (s.capeRule === "cooldown") s.dashCooldown = s.physics.dashCooldown;
   }
-  s.dashRemaining = RULES.dashDuration;
+  s.dashRemaining = s.physics.dashDuration;
   s.superUsed = false;
   s.launched = true;
   s.flights++;
@@ -346,7 +368,7 @@ export function dash(s) {
   return true;
 }
 export function dive(s) {
-  if (s.status !== "running") return false;
+  if (!s.def.verbs.dive || s.status !== "running") return false;
   const p = s.player;
   if (p.grounded) {
     // Only drawn cracks are smashable. Ordinary ground ignores a grounded dive.
@@ -355,8 +377,8 @@ export function dive(s) {
     smash(s, q);
     p.grounded = false;
     p.y += 1;
-    p.vy = Math.max(RULES.smashCarry, p.vy);
-  } else p.vy = Math.max(RULES.diveSpeed, p.vy);
+    p.vy = Math.max(s.physics.smashCarry, p.vy);
+  } else p.vy = Math.max(s.physics.diveSpeed, p.vy);
   p.diving = true;
   p.gliding = false;
   s.dashRemaining = 0;
@@ -406,7 +428,7 @@ function advanceAnimation(s, dt) {
  * her heels and finally forces hops right at the tile edges. */
 function triggerCascade(s, group) {
   const first = s.platforms.find((q) => q.id === group.tiles[0]);
-  group.t0 = s.time - (s.player.x - first.x) / LEVEL.speed + group.lead / LEVEL.speed;
+  group.t0 = s.time - (s.player.x - first.x) / s.def.level.speed + group.lead / s.def.level.speed;
   group.tiles.forEach((id, i) => {
     const q = s.platforms.find((t) => t.id === id);
     q.collapseAt = group.t0 + i * group.interval;
@@ -433,7 +455,7 @@ function landOn(s, q, wasGrounded, hard) {
   p.jumps = 0;
   p.diving = false;
   p.gliding = false;
-  s.coyote = RULES.coyote;
+  s.coyote = s.physics.coyote;
   s.anchorY = q.y;
   s.fallTime = 0;
   s.launched = false;
@@ -470,7 +492,7 @@ function collectStar(s, q) {
   if (q.route === "high") s.highStars++;
   const c = q.chain ? s.chains.find((k) => k.id === q.chain) : null;
   if (c && !c.complete && !c.broken) {
-    if (c.got === 0 || s.time - c.lastAt <= RULES.constellationGap) {
+    if (c.got === 0 || s.time - c.lastAt <= s.physics.constellationGap) {
       c.got++;
       c.lastAt = s.time;
       c.links.push(q.id);
@@ -503,8 +525,8 @@ function die(s) {
     t: 0,
     fromX: s.player.x,
     fromY: s.player.y,
-    toX: s.checkpoint ? s.checkpoint.x : LEVEL.startX,
-    toY: s.checkpoint ? s.checkpoint.y : LEVEL.startY,
+    toX: s.checkpoint ? s.checkpoint.x : s.def.level.startX,
+    toY: s.checkpoint ? s.checkpoint.y : s.def.level.startY,
     net: false,
   };
   if (s.assist.starNet && !s.starNetUsed && s.lastStable) {
@@ -521,7 +543,7 @@ function die(s) {
 function catchInStarNet(s) {
   const at = s.lastStable;
   s.starNetUsed = true;
-  const fresh = createLevel();
+  const fresh = createLevel(s.level);
   const freshById = new Map(fresh.platforms.map((q) => [q.id, q]));
   for (const q of s.platforms)
     if (q.x + q.width > at.x) Object.assign(q, freshById.get(q.id));
@@ -565,7 +587,7 @@ function catchInStarNet(s) {
 function tickRespawn(s, dt) {
   const r = s.respawn;
   r.t += dt;
-  const out = RULES.respawnShatter + RULES.respawnIris;
+  const out = s.physics.respawnShatter + s.physics.respawnIris;
   if (s.status === "dead" && r.t >= out) {
     const queued = s.queuedJump;
     if (r.net) catchInStarNet(s);
@@ -576,7 +598,7 @@ function tickRespawn(s, dt) {
     event(s, "respawn", { source: r.net ? "net" : "beacon" });
   } else if (s.status === "respawning") {
     advanceAnimation(s, dt);
-    if (r.t >= out + RULES.respawnPop) {
+    if (r.t >= out + s.physics.respawnPop) {
       s.status = "running";
       s.respawn = null;
       if (s.queuedJump) jump(s);
@@ -611,9 +633,9 @@ function tick(s, dt, controls) {
   s.jumpBuffer = Math.max(0, s.jumpBuffer - dt);
   const previousY = p.y,
     wasGrounded = p.grounded;
-  const advance = s.speed * dt + RULES.dashSpeed * flightDt;
+  const advance = s.speed * dt + s.physics.dashSpeed * flightDt;
   p.x += advance;
-  s.distance = (p.x - LEVEL.startX) / 10;
+  s.distance = (p.x - s.def.level.startX) / 10;
   // Entering the wind ends a flight: the column takes over and lifts.
   if (s.dashRemaining > 0 && !p.grounded && !p.diving && updraftAt(s)) {
     s.dashRemaining = 0;
@@ -621,21 +643,25 @@ function tick(s, dt, controls) {
   }
   const wind = !p.grounded && !p.diving && s.dashRemaining <= 0 && updraftAt(s);
   p.inWind = !!wind;
-  p.gliding = !!controls.glide && !p.diving && !p.grounded && s.dashRemaining <= 0;
+  p.gliding = !!controls.glide && s.def.verbs.glide && !p.diving && !p.grounded && s.dashRemaining <= 0;
   if (p.gliding && wind) markPrompts(s, "glide");
   if (flightDt > 0) p.vy = 0;
   else if (wind) {
     // M5: inside a column gravity becomes lift. A fast upward jump keeps its
     // ordinary deceleration until it slows to the cap, so entering a column
     // never yanks Diana down.
-    const boost = p.gliding ? RULES.updraftGlideBoost : 1,
-      cap = RULES.updraftRise * boost;
-    if (p.vy < -cap) p.vy = Math.min(-cap, p.vy + RULES.gravity * dt);
-    else p.vy = Math.max(-cap, p.vy - RULES.updraftLift * boost * dt);
+    const boost = p.gliding ? s.physics.updraftGlideBoost : 1,
+      cap = s.physics.updraftRise * boost;
+    if (p.vy < -cap) p.vy = Math.min(-cap, p.vy + s.physics.gravity * dt);
+    else p.vy = Math.max(-cap, p.vy - s.physics.updraftLift * boost * dt);
   } else {
     const glide = p.gliding && p.vy > 0;
-    p.vy += (glide ? RULES.glideGravity : RULES.gravity) * dt;
-    if (glide) p.vy = Math.min(RULES.glideFall, p.vy);
+    // L1's float: half gravity near the apex while the jump is held
+    // (Celeste's half-gravity threshold), and a lower terminal speed.
+    const hang = s.physics.apexHang && s.jumpHeld && Math.abs(p.vy) < s.physics.apexHang.below ? s.physics.apexHang.factor : 1;
+    p.vy += (glide ? s.physics.glideGravity : s.physics.gravity * hang) * dt;
+    if (glide) p.vy = Math.min(s.physics.glideFall, p.vy);
+    if (s.physics.maxFall && !p.diving) p.vy = Math.min(s.physics.maxFall, p.vy);
   }
   p.y += p.vy * dt;
   p.grounded = false;
@@ -669,7 +695,7 @@ function tick(s, dt, controls) {
       // falling, so a lower platform in the same substep can still catch.
       if (p.diving && isCracked(q)) {
         smash(s, q);
-        p.vy = Math.max(RULES.smashCarry, p.vy);
+        p.vy = Math.max(s.physics.smashCarry, p.vy);
         continue;
       }
       landOn(s, q, wasGrounded, p.vy > 630 || p.diving);
@@ -683,7 +709,7 @@ function tick(s, dt, controls) {
     const rise = p.vy < 0 ? (p.vy * p.vy) / (2 * physicsOf(s).gravity) : 0;
     const lead = p.x + RULES.playerWidth / 2;
     for (const q of s.platforms) {
-      if (q.noPop || q.collapsed || q.triggeredAt != null || (q.collapseAt != null && s.time >= q.collapseAt - RULES.cascadeShake)) continue;
+      if (q.noPop || q.collapsed || q.triggeredAt != null || (q.collapseAt != null && s.time >= q.collapseAt - s.physics.cascadeShake)) continue;
       const overlap = Math.min(lead, q.x + q.width) - Math.max(p.x - RULES.playerWidth / 2, q.x);
       if (overlap < RULES.stepUpOverlap) continue;
       const depth = p.y - q.y,
@@ -717,17 +743,17 @@ function tick(s, dt, controls) {
     const passed = s.pickups.some(
       (q) => q.chain === c.id && !q.collected && q.x + 50 < p.x,
     );
-    if (passed || (c.got > 0 && s.time - c.lastAt > RULES.constellationGap))
+    if (passed || (c.got > 0 && s.time - c.lastAt > s.physics.constellationGap))
       breakChain(s, c);
   }
   s.score = s.stars * 100 + s.greatBanked.length * 1000;
-  s.section = sectionAt(p.x);
-  const movement = movementAt(p.x);
+  s.section = sectionAt(p.x, s.def);
+  const movement = movementAt(p.x, s.def);
   if (movement.id !== s.movement.id) {
     s.movement = movement;
     event(s, "movement", { id: movement.id });
   }
-  for (const mark of CHECKPOINTS) {
+  for (const mark of s.def.checkpoints) {
     if (
       s.checkpointsReached.includes(mark.id) ||
       p.x < mark.x ||
@@ -755,11 +781,11 @@ function tick(s, dt, controls) {
     s.fallsHere = 0;
     s.starNetUsed = false;
     refillCape(s, "beacon");
-    event(s, "checkpoint", { id: mark.id, index: CHECKPOINTS.indexOf(mark) });
+    event(s, "checkpoint", { id: mark.id, index: s.def.checkpoints.indexOf(mark) });
   }
-  if (p.y > s.anchorY + RULES.fallLimit) die(s);
-  else if (p.x >= LEVEL.finishX && p.grounded) {
-    p.x = LEVEL.finishX;
+  if (p.y > s.anchorY + s.physics.fallLimit) die(s);
+  else if (p.x >= s.def.level.finishX && p.grounded) {
+    p.x = s.def.level.finishX;
     s.status = "won";
     bankGreatStars(s);
     animate(s, "stop");
@@ -807,7 +833,7 @@ export function snapshot(s) {
     superUsed: s.superUsed,
     progress: Math.max(
       0,
-      Math.min(1, (s.player.x - LEVEL.startX) / (LEVEL.finishX - LEVEL.startX)),
+      Math.min(1, (s.player.x - s.def.level.startX) / (s.def.level.finishX - s.def.level.startX)),
     ),
     deaths: s.deaths,
     fallsHere: s.fallsHere,
@@ -839,6 +865,7 @@ export function snapshot(s) {
     updrafts: s.updrafts.map((q) => ({ ...q })),
     event: s.event,
     eventSerial: s.eventSerial,
-    level: { ...LEVEL },
+    level: s.level,
+    world: { ...s.def.level },
   };
 }
