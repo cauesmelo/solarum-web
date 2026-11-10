@@ -28,11 +28,15 @@
  *
  *   node scripts/human-proxy.mjs [levels=1-8] [seeds=20] [proxy=all]
  * prints falls per run (mean, max), wins, the worst spot (falls in a row at
- * one beacon) and where the falls happen. Real = simulation / clock. */
+ * one beacon) and where the falls happen. Real = simulation / clock.
+ *   node scripts/human-proxy.mjs rescue [levels]
+ * prints the late-press rescue (RESEARCH_PROGRESSION 4.2): the share of
+ * required ground jumps that still survive when pressed more than 30 ms
+ * past their strict window (the press turns into the double jump). */
 import { createGame, start, update, jump, releaseJump, dash, dive, TICK } from "../model.mjs";
 import { LEVELS, levelDef } from "../level.mjs";
 import { viewGeometry, VIEW } from "../geometry.mjs";
-import { nominalRun } from "./movement-audit.mjs";
+import { nominalRun, timingWindow, lateRecovery } from "./movement-audit.mjs";
 
 export const PROXIES = Object.freeze({
   "first-timer": { sigma: 90, react: 280 },
@@ -301,7 +305,26 @@ export function proxyStats(n, proxy, seeds = 20) {
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+/** Late-press rescue for level n: each required ground jump of the main
+ * route with how far past its strict window (real ms, up to 400 ms of
+ * shift) a press still survives to the next beacon. */
+export function lateRescue(n) {
+  const nom = nominalRun(n);
+  const rows = [];
+  nom.plan.forEach(([x, a, w], i) => {
+    if (w !== "g" || !(a === "jump" || a === "tap") || nom.steps[i].kind !== "jump") return;
+    const win = timingWindow(n, nom, i);
+    if (win.required && win.works) rows.push({ i, x, late: lateRecovery(n, nom, win) });
+  });
+  return { rows, share: rows.filter((r) => r.late > 30).length / rows.length };
+}
+
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === "rescue") {
+  for (const n of (process.argv[3] ?? "2,3,4,5,6,7,8").split(",").map(Number)) {
+    const r = lateRescue(n);
+    console.log(`L${n}: ${r.rows.length} required ground jumps, ${Math.round(100 * r.share)}% rescued beyond +30 ms (${r.rows.map((q) => `${q.i}:${Math.round(q.late)}`).join(" ")})`);
+  }
+} else if (import.meta.url === `file://${process.argv[1]}`) {
   const arg = process.argv[2] ?? "1-8";
   const levels = arg.includes("-") ? LEVELS.map((q) => q.id).filter((x) => x >= +arg.split("-")[0] && x <= +arg.split("-")[1]) : arg.split(",").map(Number);
   const seeds = +(process.argv[3] ?? 20);
