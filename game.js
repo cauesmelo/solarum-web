@@ -35,6 +35,7 @@ import { owns, spriteSetName, capeMeter, capeTint, doubleInHand } from "./hud.mj
 import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, bodyTop, earthBox, ringsCrop, HUD_BAND, LOOKS } from "./backdrop.mjs";
 import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt, SIXTEENTH_SIM, MOMENT_KINDS, scriptedMoments, fallAt, flashAt, asteroidAt, plumeAt, farPlace, eyeAt, eyeSeconds, eyeTimes, rideAt, slopeAt } from "./moments.mjs";
 import { ISLAND_LOOKS, islandShape, markable, paintMarks, paintParticles } from "./islands.mjs";
+import { platformStyleFrom, isPlatformStyle, createRockCache, rockShape, traceRock, paintRock, paintDrift } from "./platform-style.mjs";
 
 /* Renderer, input and UI. All gameplay rules live in model.mjs / level.mjs;
  * this file only draws the simulation, forwards input and plays sound. */
@@ -523,6 +524,7 @@ function drawSky() {
  * lip never reaches past the collider, so a near miss cannot look like
  * Diana sinking into stone. */
 function islandPath(q, x, w, thick, jitter = 0) {
+  if (platformStyle === "meteor") return meteorPath(q, x, jitter);
   // The shape is islands.mjs islandShape: the marks and particles share it.
   const shape = islandShape(q, x, w, thick, jitter),
     { y, inset } = shape;
@@ -536,6 +538,18 @@ function islandPath(q, x, w, thick, jitter = 0) {
   ctx.quadraticCurveTo(x + inset * 0.4, y + 9, x, y + 3);
   ctx.closePath();
   return shape;
+}
+/* Platform style (platform-style.mjs, an experiment): "meteor" draws each
+ * island as a floating rock on the same top, "classic" as above. Drawing
+ * only, so ?platforms=classic or __game.setPlatformStyle("classic") reverts
+ * it at once; DEFAULT_PLATFORM_STYLE flips the default. */
+let platformStyle = platformStyleFrom(location.search);
+const rocks = createRockCache();
+const rockOf = (q) => rocks.get(q, { levelKey: state.def.key, look: islandLook, world: state });
+function meteorPath(q, x, jitter) {
+  const rock = rockOf(q);
+  traceRock(ctx, rock, x - q.x, jitter);
+  return rockShape(rock, x - q.x, jitter);
 }
 function crackLines(q, x, w, y, lid) {
   ctx.strokeStyle = INK;
@@ -607,12 +621,15 @@ function drawPlatform(q) {
     ctx.fillStyle = `rgba(119,119,113,${0.4 * warn})`;
     ctx.fill();
   }
-  ctx.strokeStyle = MUTE;
-  ctx.lineWidth = 0.9;
-  ctx.beginPath();
-  ctx.moveTo(x + 22, q.y + 10);
-  ctx.quadraticCurveTo(x + w * 0.34, q.y + 15, x + w * 0.78, q.y + 9);
-  ctx.stroke();
+  if (platformStyle === "meteor") paintRock(ctx, shape.rock, { dx: jitter * 0.6, dy: Math.abs(jitter) * 0.5 });
+  else {
+    ctx.strokeStyle = MUTE;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(x + 22, q.y + 10);
+    ctx.quadraticCurveTo(x + w * 0.34, q.y + 15, x + w * 0.78, q.y + 9);
+    ctx.stroke();
+  }
   if (q.type === "crumble" || q.type === "cascade") crackLines(q, x + jitter, w, q.y, false);
   else if (q.type === "lid") drawLid(q, x, w);
   else if (q.route === "high") {
@@ -629,6 +646,8 @@ function drawPlatform(q) {
     ctx.restore();
     diamond(x + 12, q.y + 8, 4.5, INK, 0.85);
   }
+  // Rocks carry their craters instead of the classic ticks.
+  if (platformStyle === "meteor") return;
   ctx.fillStyle = INK;
   for (let k = 46; k < w - 30; k += 86) {
     ctx.beginPath();
@@ -666,14 +685,24 @@ function drawIslandMarks(shape) {
 }
 function drawIslandParticles() {
   particlesDrawn = 0;
+  if (platformStyle === "meteor") drawRockDrift();
   if (!islandLook || !ISLAND_LOOKS[islandLook]?.particles) return;
   ctx.save();
   clipBelowBand();
   for (const q of state.platforms) {
     if (q.collapsed || !markable(q) || q.x > camera.x + W + 160 || q.x + q.width < camera.x - 160) continue;
     const thick = q.route === "high" && q.y < 600 ? 30 : 64;
-    particlesDrawn += paintParticles(ctx, islandLook, islandShape(q, q.x, q.width, thick), { t: clock, reduced });
+    particlesDrawn += paintParticles(ctx, islandLook, platformStyle === "meteor" ? rockShape(rockOf(q)) : islandShape(q, q.x, q.width, thick), { t: clock, reduced });
   }
+  ctx.restore();
+}
+/** Meteor style: each rock's pebbles and turning chunk (and Saturn's far
+ * ring half), behind every island and under the HUD band. */
+function drawRockDrift() {
+  ctx.save();
+  clipBelowBand();
+  for (const q of state.platforms)
+    if (!q.collapsed && q.x < camera.x + W + 160 && q.x + q.width > camera.x - 160) paintDrift(ctx, rockOf(q), { t: clock, reduced });
   ctx.restore();
 }
 /** A cracked lid has its own look: one star-shaped break radiating from its
@@ -4130,6 +4159,10 @@ window.__game = {
   // level that names none; setLook(null) returns to the level's own (or to
   // revision seven's sky when it has none).
   setLook: (id) => ((lookOverride = id || null), currentLook()),
+  // The platform style (platform-style.mjs): "meteor" or "classic". Drawing
+  // only, so it switches at once and back losslessly; returns the style.
+  setPlatformStyle: (style) => (isPlatformStyle(style) && (platformStyle = style), ready && draw(), platformStyle),
+  getPlatformStyle: () => platformStyle,
   // The breath bar on a model without `capeCharge`: previewCape(0.6) shows
   // that charge (bar, touch rim and the cape's tint); previewCape(null) ends it.
   previewCape: (charge) => {
