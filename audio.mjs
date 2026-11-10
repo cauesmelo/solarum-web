@@ -2381,6 +2381,15 @@ export function createAudioEngine(options = {}) {
       if (r) runFxQuiet(r.fx);
       return;
     }
+    // A context that is still starting (the wake's resume, Continue after a
+    // pause) has a clock that does not move yet: following it would re-anchor
+    // the grid frame after frame. Wait until it runs; the wake's anchor stays
+    // pending, and a resume is slewed from where the clock froze.
+    if (!offline && ctx.state !== "running") {
+      sc.lastAudio = null;
+      if (r) runFxQuiet(r.fx);
+      return;
+    }
     try {
       const now = t();
       const dt = sc.lastAudio == null ? 0 : now - sc.lastAudio;

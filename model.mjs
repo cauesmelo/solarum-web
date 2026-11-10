@@ -41,16 +41,22 @@ export const RULES = Object.freeze({
   // Ledge forgiveness: arriving up to 25 px below a top surface right at its
   // lip (the first 40 px) while falling or barely rising pops Diana onto it,
   // so a near miss never reads as sinking through the drawn island edge.
+  // One step-up rule (RESEARCH_LEVELS F2), hidden margin like Canabalt's
+  // building edges: launched (a jump or flight, never a walk-off), not
+  // diving, not in the wind, the collider over the top by stepUpOverlap px,
+  // the feet below the top by at most a depth, and a predicted remaining rise
+  // (vy^2 / 2g) smaller than that depth, so she provably cannot clear it on
+  // her own. Depth: lipDepth within the first lipReach px of the lip,
+  // stepUpDepth on the span, flightStepDepth during a flight (Celeste's
+  // dash nudge is 6 px on an 11 px body; 24 px is 41% of Diana's 58). Never
+  // onto a collapsing top, within smashGrace after a smash, or onto a
+  // platform authored `noPop`. It replaces the old single-substep lip catch.
   lipDepth: 25,
   lipReach: 40,
-  lipRiseLimit: 120,
-  // Step-up assist: rising into an island from below (or drifting under its
-  // lip), Diana can top out with her feet a little under the drawn top while
-  // her body is over it. On screen she made it, so if her feet are within
-  // stepUpDepth px below the top, her body overlaps it by stepUpOverlap px
-  // and she cannot clear it on her own, she steps up (user report, rev. 5).
   stepUpDepth: 20,
+  flightStepDepth: 24,
   stepUpOverlap: 10,
+  smashGrace: 0.1,
   // Death line sits a fixed distance below the camera anchor (the last
   // grounded y). With the vertical camera in geometry.mjs this is about 60 px
   // below the visible bottom, instead of the old fixed y=850 far off-screen.
@@ -71,6 +77,10 @@ const DURATIONS = {
   dash: 23 / 24,
   stop: 0.75,
 };
+/** The movement constants in force (per level: see level.mjs physics). */
+export function physicsOf(s) {
+  return s.physics ?? RULES;
+}
 export function isCracked(platform) {
   return CRACKED.has(platform?.type);
 }
@@ -368,6 +378,7 @@ function supportOf(s) {
 function smash(s, q) {
   q.collapsed = true;
   q.smashedAt = s.time;
+  s.lastSmashAt = s.time;
   s.smashes++;
   event(s, "smash", { platform: q.id, px: q.x, py: q.y, width: q.width });
 }
@@ -665,42 +676,24 @@ function tick(s, dt, controls) {
       break;
     }
   }
-  if (!p.grounded && s.launched && !p.diving && !wind) {
-    // The rise still ahead of her at this speed (none while falling, and the
-    // wind would carry her: skipped above). Platforms are sorted top-down, so
-    // the highest one she is just under wins.
-    const rise = p.vy < 0 ? (p.vy * p.vy) / (2 * RULES.gravity) : 0;
+  if (!p.grounded && s.launched && !p.diving && !wind && s.time - (s.lastSmashAt ?? -9) >= RULES.smashGrace) {
+    // The rise still ahead of her at this speed (none while falling or
+    // flying). Platforms are sorted top-down, so the highest top she is just
+    // under wins.
+    const rise = p.vy < 0 ? (p.vy * p.vy) / (2 * physicsOf(s).gravity) : 0;
+    const lead = p.x + RULES.playerWidth / 2;
     for (const q of s.platforms) {
-      if (q.collapsed || (q.collapseAt != null && s.time >= q.collapseAt)) continue;
-      const depth = p.y - q.y;
-      if (depth <= 0 || depth > RULES.stepUpDepth || rise >= depth) continue;
-      const overlap = Math.min(p.x + RULES.playerWidth / 2, q.x + q.width) - Math.max(p.x - RULES.playerWidth / 2, q.x);
+      if (q.noPop || q.collapsed || q.triggeredAt != null || (q.collapseAt != null && s.time >= q.collapseAt - RULES.cascadeShake)) continue;
+      const overlap = Math.min(lead, q.x + q.width) - Math.max(p.x - RULES.playerWidth / 2, q.x);
       if (overlap < RULES.stepUpOverlap) continue;
+      const depth = p.y - q.y,
+        limit = flightDt > 0 ? RULES.flightStepDepth : lead - q.x <= RULES.lipReach ? RULES.lipDepth : RULES.stepUpDepth;
+      if (depth <= 0 || depth > limit || rise >= depth) continue;
       p.vy = 0;
       landOn(s, q, wasGrounded, false);
       s.stepUps = (s.stepUps || 0) + 1;
-      event(s, "lip-catch", { platform: q.id, step: true });
-      break;
-    }
-  }
-  if (!p.grounded && s.launched && p.vy > -RULES.lipRiseLimit && !p.diving) {
-    // Lip catch: the leading edge has just crossed a platform's left lip and
-    // the feet are a little below its top. Pop up instead of sliding down the
-    // drawn side. Only the first lipReach px count, so a body that is already
-    // well under a platform (a drop from above) is never pulled up through it.
-    // It forgives near misses of a jump or flight only: walking off an edge
-    // never earns it, so short gaps still need their hop.
-    const lead = p.x + RULES.playerWidth / 2;
-    for (const q of s.platforms) {
-      if (q.collapsed || (q.collapseAt != null && s.time >= q.collapseAt)) continue;
-      if (lead < q.x || lead > q.x + RULES.lipReach || q.x + q.width < p.x) continue;
-      if (p.y <= q.y || p.y - q.y > RULES.lipDepth) continue;
-      // The previous step was outside the platform's span (just arrived).
-      if (lead - advance > q.x + 1) continue;
-      p.vy = Math.max(0, p.vy);
-      landOn(s, q, wasGrounded, false);
-      s.lipCatches = (s.lipCatches || 0) + 1;
-      event(s, "lip-catch", { platform: q.id });
+      if (lead - q.x <= RULES.lipReach) s.lipCatches = (s.lipCatches || 0) + 1;
+      event(s, "lip-catch", { platform: q.id, step: true, depth });
       break;
     }
   }
@@ -773,14 +766,25 @@ function tick(s, dt, controls) {
     event(s, "win", { earth: s.greatBanked.length === 3 });
   }
 }
+/** The simulation's fixed step (RESEARCH_LEVELS F4). */
+export const TICK = 1 / 120;
+/** Advance by `seconds` of simulation time in exact 1/120 s ticks; the
+ * remainder waits in an accumulator for the next call, so an arc is the same
+ * at 30, 60, 120, 144 or 240 Hz (it used to end each call with a shorter
+ * substep). Inputs applied between calls take effect on the next tick.
+ * `s.alpha` is how far the next tick is, for rendering interpolation. */
 export function update(s, seconds, controls = {}) {
   if (!Number.isFinite(seconds) || seconds < 0)
     throw new RangeError("seconds must be finite and nonnegative");
-  for (let left = seconds; left > 1e-9; ) {
-    const dt = Math.min(left, 1 / 120);
-    tick(s, dt, controls);
-    left -= dt;
+  s.acc = (s.acc ?? 0) + seconds;
+  while (s.acc >= TICK - 1e-9) {
+    s.acc -= TICK;
+    s.player.px = s.player.x;
+    s.player.py = s.player.y;
+    tick(s, TICK, controls);
   }
+  if (s.acc < 0) s.acc = 0;
+  s.alpha = Math.min(1, s.acc / TICK);
   return s;
 }
 export function snapshot(s) {

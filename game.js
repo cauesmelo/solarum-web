@@ -926,7 +926,7 @@ function puff(kind, x, y, n, spread = 40, opts = {}) {
 /* ---------- Diana, death and respawn ---------- */
 let tint = 0;
 function drawPlayer() {
-  const p = state.player;
+  const p = { ...state.player, ...viewPos() };
   const spent = !capeReady(state) && state.dashRemaining <= 0.08;
   tint += ((spent ? 1 : 0) - tint) * 0.25;
   if (state.status === "ready") {
@@ -1028,8 +1028,17 @@ function titleGround(alpha) {
 }
 
 /* ---------- frame ---------- */
-function updateCamera(dt) {
+/** Diana between the last two simulation ticks (RESEARCH_LEVELS F4: the
+ * simulation steps in fixed 1/120 s ticks, the screen interpolates). A jump
+ * of more than 60 px is a teleport (respawn, retry): drawn as is. */
+function viewPos() {
   const p = state.player,
+    a = state.status === "running" ? state.alpha ?? 1 : 1;
+  if (p.px == null || Math.abs(p.x - p.px) > 60 || Math.abs(p.y - p.py) > 60) return { x: p.x, y: p.y };
+  return { x: p.px + (p.x - p.px) * a, y: p.py + (p.y - p.py) * a };
+}
+function updateCamera(dt) {
+  const p = viewPos(),
     view = viewGeometry(W);
   let screenX = view.playerScreenX;
   const sinceWake = clock - wakeAt;

@@ -852,6 +852,8 @@ test("cracked shelves collapse while Diana is still on them and keep coyote grac
 
 /* ---------- forgiveness, glyphs, stars ---------- */
 test("lip catch: a jump that arrives up to 25 px below a lip pops onto it; walk-offs and deep misses do not", () => {
+  // The step-up needs 10 px of the collider over the top, so arriving at the
+  // lip it fires a few ticks in, while the feet are still within 25 px.
   const make = (below, opts = {}) => {
     const s = fixture([
       { id: "from", x: 0, y: 500, width: 300 },
@@ -860,16 +862,16 @@ test("lip catch: a jump that arrives up to 25 px below a lip pops onto it; walk-
     Object.assign(s.player, { x: 600 - 16 - 1, y: 430 + below, vy: opts.vy ?? 120, grounded: false, jumps: 1 });
     s.anchorY = 500;
     s.launched = opts.launched ?? true;
-    update(s, 1 / 30);
+    update(s, 1 / 20);
     return s;
   };
-  const near = make(20);
+  const near = make(15);
   assert.equal(near.player.grounded, true);
   assert.equal(near.player.y, 430);
   assert.equal(near.lipCatches, 1);
   assert.equal(make(32).player.grounded, false, "too deep");
-  assert.equal(make(20, { launched: false }).player.grounded, false, "walking off never earns it");
-  assert.equal(make(20, { vy: -300 }).player.grounded, false, "not while rising fast");
+  assert.equal(make(15, { launched: false }).player.grounded, false, "walking off never earns it");
+  assert.equal(make(15, { vy: -300 }).player.grounded, false, "not while she can still clear it herself");
 });
 test("step-up: an approach from below that tops out within 20 px of the top lands; clearly short ones never do", () => {
   // User report: "it looks like you made it, but you don't go up". Sweep
@@ -945,6 +947,51 @@ test("step-up: an approach from below that tops out within 20 px of the top land
   assert.equal(diver.stepUps ?? 0, 0, "a dive never steps up");
   // The main route never needs it (its takeoffs and landings are on the grid).
   assert.equal(traverse("main").s.stepUps ?? 0, 0);
+});
+test("step-up bounds: 20 px on the span, 25 at the lip, 24 in flight; never collapsing, noPop or right after a smash", () => {
+  // Place Diana at her apex (vy = 0, so she cannot clear the top herself)
+  // with her feet `depth` px under a top, `into` px past its left lip.
+  const probe = (depth, into, opts = {}) => {
+    const s = fixture([{ id: "top", x: 1000, y: 400, width: 400, ...(opts.platform ?? {}) }]);
+    Object.assign(s.player, { x: 1000 + into - 16, y: 400 + depth, vy: 0, grounded: false, jumps: 1 });
+    s.anchorY = 600;
+    s.launched = true;
+    s.speed = 0;
+    if (opts.flight) s.dashRemaining = 0.3;
+    if (opts.smash) s.lastSmashAt = s.time;
+    update(s, 1 / 120);
+    return s.player.grounded && Math.abs(s.player.y - 400) < 1e-6;
+  };
+  for (const d of [1, 10, 19.5]) assert.ok(probe(d, 200), `span ${d}`);
+  assert.ok(!probe(21, 200), "21 px on the span is short");
+  assert.ok(probe(24.5, 20), "25 px within the lip's first 40 px");
+  assert.ok(!probe(26, 20), "26 px at the lip is short");
+  assert.ok(probe(23.5, 200, { flight: true }), "24 px during a flight");
+  assert.ok(!probe(25.5, 200, { flight: true }), "25 px in flight is short");
+  assert.ok(!probe(10, 5), "under 10 px of overlap is not over the top");
+  assert.ok(!probe(10, 200, { platform: { type: "crumble", crumbleAfter: 0.65, triggeredAt: 0 } }), "never onto a breaking shelf");
+  assert.ok(!probe(10, 200, { platform: { noPop: true } }), "never onto a platform authored noPop");
+  assert.ok(!probe(10, 200, { smash: true }), "never right after a smash");
+});
+test("fixed step: the same input gives the same arc at 30, 60, 120, 144 and 240 Hz (F4)", () => {
+  const landings = [30, 60, 120, 144, 240].map((hz) => {
+    const s = fixture([
+      { id: "floor", x: 0, y: 600, width: 3000 },
+      { id: "shelf", x: 900, y: 520, width: 300 },
+    ]);
+    Object.assign(s.player, { x: 700, y: 600, grounded: true });
+    s.anchorY = 600;
+    let jumped = false;
+    for (let i = 0; i < hz * 3 && !(jumped && s.player.grounded && s.time > 0.6); i++) {
+      if (!jumped && Math.abs(s.time - 0.5) < 1e-6) (jump(s), (jumped = true));
+      update(s, 1 / hz);
+    }
+    return { hz, x: s.player.x, y: s.player.y, t: s.time };
+  });
+  for (const l of landings) {
+    assert.ok(Math.abs(l.x - landings[0].x) < 0.01 && Math.abs(l.t - landings[0].t) < 1e-9 && l.y === landings[0].y, `${l.hz} Hz lands at ${l.x.toFixed(3)} / ${l.t.toFixed(4)} s, not ${landings[0].x.toFixed(3)} / ${landings[0].t.toFixed(4)}`);
+  }
+  assert.equal(landings[0].y, 520, "on the shelf");
 });
 test("the first gap forgives a first input (a held jump or a 0 ms tap clears it) but still needs one", async () => {
   const { followGlyph } = await import("./glyphs.mjs");
