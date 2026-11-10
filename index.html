@@ -99,17 +99,40 @@
         <p class="turn-hint" id="turn-hint" hidden>Turn sideways for a wider sky</p>
       </div>
 
-      <!-- Pause: a paper card over the dimmed scene. -->
-      <!-- Between levels: the orbit line grows from one station to the next (skippable). -->
-      <div class="veil map-veil" id="map-veil" role="dialog" aria-label="The orbit map" hidden>
-        <svg id="map-svg" class="map-svg" viewBox="0 0 720 240" aria-hidden="true"></svg>
-        <p class="map-hint" id="map-hint">Any key or tap to go on</p>
+      <!-- The end-of-level tally (RESEARCH_TRANSITIONS 2.4): part of the
+           automatic transition, never a card. No buttons, no focus,
+           pointer-events none; announced once through the hidden sentence. -->
+      <div class="tally" id="tally" role="status" aria-live="polite" hidden>
+        <span class="sr-only" id="tally-say"></span>
+        <div class="tally-row" aria-hidden="true">
+          <span class="tally-label" id="tally-name">I · Waking</span>
+          <span class="tally-item"><i class="star-icon"></i><b id="tally-stars">0</b><small id="tally-total">/ 0</small></span>
+          <span class="great-slots" id="tally-great"><i class="slot"></i><i class="slot"></i><i class="slot"></i></span>
+          <span class="tally-item falls"><b id="tally-falls">0 falls</b></span>
+        </div>
+        <div class="tally-row" aria-hidden="true">
+          <span class="tally-label">Journey</span>
+          <span class="tally-item"><i class="star-icon"></i><b id="tally-journey-stars">0</b></span>
+          <span class="tally-item"><i class="slot filled" id="tally-journey-slot"></i><b id="tally-journey-great">0</b><small id="tally-journey-total">/ 0</small></span>
+          <span class="tally-item falls"><b id="tally-journey-falls">0 falls</b></span>
+        </div>
+        <p class="tally-line" id="tally-line" aria-hidden="true" hidden></p>
       </div>
+      <p class="tally-hint" id="tally-hint" aria-hidden="true" hidden><span class="key">R</span> again <span class="sep">·</span> <span class="key">Esc</span> menu</p>
+      <button id="tally-again" class="ink-btn tally-again" type="button" aria-label="Play this level again" hidden>↺ again</button>
+      <!-- The journey's end: the credits, one card at a time (first completion only). -->
+      <div class="credits" id="credits" aria-hidden="true" hidden>
+        <img id="credits-logo" src="./assets/logo.png" alt="" width="1217" height="254" />
+        <p id="credits-text"></p>
+      </div>
+
       <div class="veil" id="pause-veil" hidden>
         <div class="card pause-card" id="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
           <div class="card-page" id="pause-main">
             <h2 id="pause-title">Paused</h2>
             <svg class="orbit big" id="pause-orbit" viewBox="0 0 360 80" aria-hidden="true"></svg>
+            <!-- The journey so far: always one key away (the tally may be skipped). -->
+            <p class="journey" id="pause-journey"><span class="journey-label">Journey</span> <i class="star-icon" aria-hidden="true"></i><b id="pause-journey-stars">0</b> <span class="sep" aria-hidden="true">·</span> <i class="slot filled" aria-hidden="true"></i><b id="pause-journey-great">0/0</b> <span class="sep" aria-hidden="true">·</span> <b id="pause-journey-falls">0 falls</b></p>
             <div class="stack">
               <button id="resume" class="ink-btn primary" type="button">Continue</button>
               <button id="back-to-light" class="ink-btn" type="button">Back to last light</button>
@@ -146,23 +169,6 @@
             </div>
             <button id="assist-back" class="ink-btn primary" type="button">Back</button>
           </div>
-        </div>
-      </div>
-
-      <!-- Victory: slides up beside the portal, never over it. -->
-      <div class="card victory-card" id="victory-card" role="dialog" aria-labelledby="victory-title" hidden>
-        <p class="victory-title" id="victory-title">I · Waking</p>
-        <p class="victory-line" id="victory-line"><i class="earth" aria-hidden="true"></i>The signal is stronger now.</p>
-        <dl class="results">
-          <div><dt><i class="star-icon" aria-hidden="true"></i><span class="sr-only">Stars</span></dt><dd id="result-stars">0 / 0</dd></div>
-          <div><dt class="great-slots" id="result-great"><i class="slot"></i><i class="slot"></i><i class="slot"></i><span class="sr-only">Great Fallen Stars</span></dt><dd id="result-great-count">0 / 3</dd></div>
-          <div><dt>Time</dt><dd id="result-time">0:00</dd></div>
-          <div><dt>Falls</dt><dd id="result-falls">0</dd></div>
-          <div><dt>Song</dt><dd id="result-song">—</dd></div>
-        </dl>
-        <div class="row">
-          <button id="continue" class="ink-btn primary" type="button">Continue</button>
-          <button id="again" class="ink-btn" type="button">Retry</button>
         </div>
       </div>
 

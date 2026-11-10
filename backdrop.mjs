@@ -336,15 +336,27 @@ export function createBackdrop({ makeCanvas, images, sprite, reduced = false }) 
     g.setTransform(S, 0, 0, S, reach * S, reach * S);
     PAINT[LOOKS[id].body]?.(g, r);
     const entry = { canvas: c, reach };
-    cache.clear(); // one look at a time: a level never shows two
+    // Two looks at most: a level shows one, the transition between levels
+    // two (RESEARCH_TRANSITIONS 3.4); the older entry goes.
+    while (cache.size >= 2) cache.delete(cache.keys().next().value);
     cache.set(key, entry);
     return entry;
+  }
+  /** Build a look's cached body ahead of time (before the door), so no
+   * transition frame paints a body from scratch. Returns the build ms. */
+  function warm(id, H) {
+    const L = LOOKS[id];
+    if (!L || L.body === "brightStar" || L.body === "moon") return 0;
+    const t0 = globalThis.performance?.now?.() ?? 0;
+    cached(id, L.radius * H * (1 + L.grow));
+    return (globalThis.performance?.now?.() ?? 0) - t0;
   }
 
   /** The body ahead, behind the sky's accents and the world. */
   function drawBody(ctx, id, view) {
     const L = LOOKS[id];
-    const { x, y, r, grow } = bodyBox(id, view);
+    // `view.box` places the body elsewhere (the transition's arcs).
+    const { x, y, r } = view.box ?? bodyBox(id, view);
     if (L.body === "brightStar") return drawBrightStar(ctx, x, y, r, view);
     if (L.body === "moon") {
       // The Moon is too large to cache (only its limb shows): drawn live.
@@ -539,7 +551,7 @@ export function createBackdrop({ makeCanvas, images, sprite, reduced = false }) 
     ctx.restore();
   }
 
-  return { drawBody, drawAccent, cacheSize: () => cache.size };
+  return { drawBody, drawAccent, warm, cacheSize: () => cache.size, cached: () => [...cache.keys()] };
 }
 
 /** Only the ring strokes of the original saturn.png (its left 56.5%, where

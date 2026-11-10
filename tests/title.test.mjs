@@ -63,15 +63,27 @@ test("the sprite set is a parameter; the extracted no-cape set is used, and fall
 });
 
 /* ---------- title, pause and victory UI (static contract) ---------- */
-test("victory card: Continue and Retry only (no Title button); Continue leads on after the last level", async () => {
+test("the level end is a transition, not a card: a #tally status with no buttons; R and Esc are handled while it runs", async () => {
   const html = await read("index.html"),
-    js = await read("game.js");
-  const card = html.slice(html.indexOf('id="victory-card"'), html.indexOf("</div>\n      </div>", html.indexOf('id="victory-card"')) + 30);
-  assert.match(card, /id="continue"/);
-  assert.match(card, /id="again"/);
+    js = await read("game.js"),
+    css = await read("style.css");
+  // RESEARCH_TRANSITIONS 2.1 and 4: no victory card, no orbit-map veil.
+  assert.ok(!/id="victory-card"|id="map-veil"|id="continue"/.test(html), "the victory card and the map are gone");
+  assert.ok(!/showVictory|showMap/.test(js));
   assert.ok(!/to-title|>Title</.test(html), "no Title button anywhere");
-  assert.match(js, /\$\("continue"\)\.addEventListener\("click", \(\) => \(state\.level >= LEVELS\.length \? toTitle\(\) : showMap\(state\.level \+ 1\)\)\)/);
-  assert.match(js, /\$\("continue"\)\.focus\(/, "Continue is the default focus");
+  const tally = html.slice(html.indexOf('id="tally"') - 30, html.indexOf("</div>\n      <p class=\"tally-hint\""));
+  assert.match(tally, /role="status"/);
+  assert.match(tally, /aria-live="polite"/);
+  assert.ok(!/<button/.test(tally), "the tally has no buttons");
+  const rule = css.slice(css.indexOf("\n.tally {"), css.indexOf("}", css.indexOf("\n.tally {")));
+  assert.match(rule, /pointer-events: none;/);
+  // Keys while the transition runs: R plays the level again, Esc/P pauses.
+  const keys = js.slice(js.indexOf("function transitionKey(e) {"), js.indexOf("\n}\n", js.indexOf("function transitionKey(e) {")));
+  assert.match(keys, /e\.code === "KeyR"\) return replayFinished\(\)/);
+  assert.match(keys, /\["KeyP", "Escape"\]\.includes\(e\.code\)\) return pauseTransition\(\)/);
+  assert.match(js, /if \(trans\) return transitionKey\(e\);/);
+  // The result is saved at the door, from the win event.
+  assert.match(js, /case "win":\n        wonAt = clock;\n        beginTransition\(\);/);
 });
 test("pause card offers Main menu, which returns to the title through toTitle()", async () => {
   const html = await read("index.html"),
@@ -101,7 +113,7 @@ test("title: the level select is built from LEVELS, opaque, and the world is hid
   assert.match(locked, /color: var\(--mute\)/);
   assert.ok(!/opacity/.test(locked));
   // The world layer (stars, glyphs, beacons) is not drawn on the title.
-  assert.match(js, /const worldAlpha = state\.status === "ready" \? 0 :/);
+  assert.match(js, /let worldAlpha = state\.status === "ready" \? 0 :/);
   // The shooting stars never run on the title either.
-  assert.match(js, /if \(!reduced && state\.status !== "ready"\) \{\n    if \(!cadent/);
+  assert.match(js, /if \(!reduced && state\.status !== "ready"\) \{\n    \/\/ \(No new shooting star starts during a transition; a running one finishes\.\)\n    if \(!cadent && clock > nextCadent && !trans\)/);
 });

@@ -822,5 +822,7 @@ test("browser layer: touch controls appear on the first real touch", async () =>
     css = await read("style.css");
   assert.match(js, /e\.pointerType !== "touch" \|\| root\.classList\.contains\("touch"\)/);
   assert.match(css, /\.solarum\.touch \.controls \{\n  display: block;/);
-  assert.match(js, /if \(!reduced\) audio\.countIn\(\{ bpm: LEVELS\[next - 1\]\.bpm \* pace, delay: 0\.35 \}\);/);
+  // (The count-in now plays at B0 of the automatic transition, under
+  // reduced motion too: tests/transition.test.mjs and the root QA, T6/T9.)
+  assert.match(js, /handle = audio\.countIn\(\{ bpm: next\.bpm \* pace, delay: plan\.B\[0\] \}\);/);
 });

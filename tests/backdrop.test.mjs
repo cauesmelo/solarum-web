@@ -127,7 +127,8 @@ test("each look draws; under reduced motion every accent is still; Earth's cresc
       assert.equal(a.includes('"rgba(111,168,220,'), id === "moon-earth", `${id}: Earth's blue`);
     }
     // One cached body at a time (a level never shows two).
-    assert.ok(b.cacheSize() <= 1);
+    // Two looks at most: the level's, and the next one during a transition.
+    assert.ok(b.cacheSize() <= 2);
     assert.ok(sprites.length >= 2, "home's bright star is the original star sprite");
   }
 });

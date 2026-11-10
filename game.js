@@ -14,7 +14,8 @@ import {
   capeReady,
   RULES,
 } from "./model.mjs";
-import { LEVELS, CARD, checkpointIndex, readSave, writeSave } from "./level.mjs";
+import { LEVELS, CARD, checkpointIndex } from "./level.mjs";
+import { transitionPlan, frameAt, countUp, readSave, writeSave, recordWin, journeyOf, tallyOf, endingLine, CREDITS } from "./transition.mjs";
 import { signsAt, refWidthOf, layoutScale, dianaBox, rectsTouch } from "./signage.mjs";
 import { characterLayers, frameForClip, footFor, clipFor } from "./animation.mjs";
 import {
@@ -31,7 +32,7 @@ import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetti
 import { createFrameClock } from "./frame-clock.mjs";
 import { emergenceAt, emergenceSeconds, resolveSet } from "./emergence.mjs";
 import { owns, spriteSetName, capeMeter, capeTint, doubleInHand } from "./hud.mjs";
-import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, earthBox, ringsCrop, HUD_BAND } from "./backdrop.mjs";
+import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, bodyTop, earthBox, ringsCrop, HUD_BAND, LOOKS } from "./backdrop.mjs";
 import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt, SIXTEENTH_SIM, MOMENT_KINDS, scriptedMoments, fallAt, flashAt, asteroidAt, plumeAt, farPlace, eyeAt, eyeSeconds, eyeTimes, rideAt, slopeAt } from "./moments.mjs";
 import { ISLAND_LOOKS, islandShape, markable, paintMarks, paintParticles } from "./islands.mjs";
 
@@ -55,12 +56,14 @@ const INK = "#0c0c0f",
 const PROGRESS_KEY = "solarum.levels";
 function readProgress() {
   try {
-    // level.mjs readSave: a version-1 save keeps its numeral, not its stars.
+    // transition.mjs readSave: version 3 (best stars, lifetime falls,
+    // credits seen); a version-2 save migrates without loss, a version-1
+    // save keeps its numeral, not its stars.
     return readSave(JSON.parse(window.localStorage.getItem(PROGRESS_KEY) || "null"));
   } catch {
-    /* storage blocked or corrupt: start fresh */
+    /* storage blocked or corrupt: start fresh (session-only totals) */
   }
-  return { unlocked: 1, great: {}, done: {} };
+  return readSave(null);
 }
 function writeProgress() {
   try {
@@ -105,7 +108,6 @@ const ui = {
   tip: null,
   orbitBrightUntil: 0,
   beaconLitAt: {},
-  victoryShown: false,
   breathShown: undefined,
   breath: null,
   breathFull: null,
@@ -182,7 +184,7 @@ function resetShelfWatch() {
 function syncAudio() {
   // Every pause path (button, P/Esc, blur, hidden tab, assist panel) sets
   // status 'paused'; the engine suspends the context and the music with it.
-  audio.setPaused(state.status === "paused");
+  audio.setPaused(state.status === "paused" || !!trans?.paused);
   const p = state.player,
     live = state.status === "running";
   audio.setAir({ wind: live && p.inWind, glide: live && p.gliding && !p.inWind });
@@ -361,7 +363,7 @@ const ringsOnly = (img) => ringsCrop(img, makeCanvas); // the planet body starts
 /** Why she runs: a tiny Earth glint far ahead with the signal pulsing out of
  * it. It sits in the sky beyond the course and grows a little with progress. */
 function drawSignal() {
-  if (state.status === "ready") return;
+  if (state.status === "ready" || trans?.last) return;
   const progress = progressOf(state.player.x),
     t = reduced ? 0.4 : (clock % 2.4) / 2.4;
   // The last look draws Earth itself (a growing crescent); the signal pulses from it.
@@ -420,7 +422,7 @@ function drawSky() {
   for (const [i, d] of dust.entries()) {
     // Pluto's emptiness keeps half the dust; the Moon's sky has more.
     if (density.dust < 1 && d.y > HUD_BAND + 4 && i % Math.round(1 / density.dust) !== 0) continue;
-    let sx = (d.x * W * 1.4 - camera.x * 0.015) % (W * 1.4);
+    let sx = (d.x * W * 1.4 - skyX() * 0.015) % (W * 1.4);
     if (sx < 0) sx += W * 1.4;
     ctx.fillStyle = `rgba(251,251,234,${d.a})`;
     ctx.beginPath();
@@ -442,14 +444,14 @@ function drawSky() {
       if (pass === 1 && i >= sky.length * (density.stars - 1)) break;
       const ox = pass ? 0.43 : 0,
         oy = pass ? 233 : 0,
-        sy = ((s.y + oy - 30) % 520) + 30 - camera.y * 0.05,
+        sy = ((s.y + oy - 30) % 520) + 30 - skyY() * 0.05,
         // The tallest frame of its twinkle group (long sparkles reach far
         // above their centre), plus the wobble: does it touch the band?
         reach = Math.max(...[0, 1, 2, 3].map((k) => frameRect("background", s.group + k)?.h ?? 0)) * s.size * 0.8 + 3,
         band = sy - reach < HUD_BAND;
       if (!band && pass === 0 && density.stars < 1 && i % Math.round(1 / density.stars) !== 0) continue;
       if (band && pass === 1) continue;
-      let sx = ((s.x + ox) * (W + 200) - camera.x * s.depth) % (W + 200);
+      let sx = ((s.x + ox) * (W + 200) - skyX() * s.depth) % (W + 200);
       if (sx < 0) sx += W + 200;
       const f = s.group + (reduced ? 2 : Math.floor(clock * 3 + s.phase) % 4);
       const wob = !band && density.wobble && !reduced ? Math.sin(Math.PI * 2 * density.wobble * clock + s.phase * 1.7) * 2.2 : 0;
@@ -459,7 +461,10 @@ function drawSky() {
   // world. Like the world, they are not drawn on the title (nothing may sit
   // near its options) and fade in with the run.
   const lookAlpha = state.status === "ready" ? 0 : Math.min(1, Math.max(clock - wakeAt, state.time / (state.clock ?? 1)) / 0.8);
-  if (look && lookAlpha > 0) {
+  // The transition draws both bodies on their arcs, the orbit line and the
+  // ending's Earth itself (§3.4-3.5).
+  if (trans?.f) drawTransitionSky(trans.f);
+  else if (look && lookAlpha > 0) {
     backdrop ??= createBackdrop({ makeCanvas, images, sprite: spriteOn, reduced });
     const view = backdropView();
     ctx.save();
@@ -477,12 +482,20 @@ function drawSky() {
     ctx.drawImage(saturnRings, W * 0.08 - ((camera.x * 0.003) % 30), (H - saturnRings.height * scale) / 2, saturnRings.width * scale, saturnRings.height * scale);
     ctx.restore();
   }
-  // The scripted far sky: the brightest star's flash, the asteroid, the plume.
-  drawScriptedFar();
+  // The scripted far sky: the brightest star's flash, the asteroid, the plume
+  // (it fades with the finished level's world).
+  if (!trans) drawScriptedFar();
+  else if (!trans.swapped && trans.f.world > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = trans.f.world;
+    drawScriptedFar();
+    ctx.restore();
+  }
   // Original shooting-star clips (cadent1/2), never under reduced motion;
   // home's sky (level I) is a shower: they come about twice as often.
   if (!reduced && state.status !== "ready") {
-    if (!cadent && clock > nextCadent) {
+    // (No new shooting star starts during a transition; a running one finishes.)
+    if (!cadent && clock > nextCadent && !trans) {
       const big = hash(clock) > 0.5;
       cadent = {
         clip: big ? "cadent1" : "cadent2",
@@ -887,18 +900,26 @@ function drawGreatStar(star) {
   sprite("star", 2, star.x, y, 0.42, 1, reduced ? 0 : Math.sin(clock * 0.8) * 0.12);
   ctx.restore();
 }
-/** L2-L4 open with Diana stepping out of the door she entered last level. */
+/** After a transition the level begins with the original portal standing
+ * behind Diana (§2.7): centred 60 px behind the start, lit from B2 and
+ * ebbing over the run's first beat, then scenery that scrolls away. A level
+ * started from the title wakes from the earth instead (no door behind a girl
+ * rising from the soil). Restart level, startLevel and the title clear it. */
 function drawEntryDoor() {
-  if (state.level <= 1 || !images.portal) return;
-  const x = WORLD().startX - 90,
+  if (!arrival || !images.portal) return;
+  const x = WORLD().startX - 60,
     y = WORLD().startY;
   if (x < camera.x - 160 || x > camera.x + W + 200) return;
   const placement = portalPlacement(x, y, manifest.portal.visibleBounds);
   const b = placement.source;
-  ctx.save();
-  ctx.globalAlpha = 0.75;
   ctx.drawImage(images.portal, b.x, b.y, b.w, b.h, placement.x, placement.y, placement.width, placement.height);
-  ctx.restore();
+  const lit = trans ? trans.f?.arrivalLight ?? 0 : arrival.at == null ? 0 : 0.85 * Math.max(0, 1 - (clock - arrival.at) / arrival.beat);
+  if (lit > 0.001) {
+    ctx.save();
+    ctx.globalAlpha *= lit / 0.85;
+    drawDoorLight(doorOpening(x, y), 1, "paper");
+    ctx.restore();
+  }
 }
 function drawPortal() {
   drawEntryDoor();
@@ -2099,10 +2120,31 @@ function draw() {
   // The title shows only the sky, the soil and the sprout: the level's
   // stars, glyphs, beacons and islands appear as the title ground fades, so
   // nothing in the world can sit over the title's options.
-  const worldAlpha = state.status === "ready" ? 0 : Math.min(1, sinceWake / 0.5);
+  let worldAlpha = state.status === "ready" ? 0 : Math.min(1, sinceWake / 0.5);
+  // The transition's camera (§3.3): a pull-back about the door, then the
+  // next level's push-in about Diana. The view rectangle in world px is
+  // handed to every culling test by standing in for camera and W.
+  const f = trans?.f ?? null;
+  let zoom = 1,
+    vx = camera.x - sx,
+    vy = camera.y - sy,
+    dianaAlpha = 1;
+  if (f) {
+    const v = transitionView(f);
+    worldAlpha *= v.alpha;
+    zoom = v.zoom;
+    vx = v.x;
+    vy = v.y;
+    dianaAlpha = v.diana;
+  }
+  const kept = { x: camera.x, y: camera.y, W };
+  camera.x = vx;
+  camera.y = vy;
+  W /= zoom;
   ctx.save();
-  ctx.translate(-camera.x + sx, -camera.y + sy);
-  if (worldAlpha > 0) {
+  ctx.scale(zoom, zoom);
+  ctx.translate(-vx, -vy);
+  if (worldAlpha > 0.01) {
     ctx.save();
     ctx.globalAlpha = worldAlpha;
     drawUpdrafts();
@@ -2121,12 +2163,26 @@ function draw() {
     drawScriptedBack();
     drawConstellations();
     drawStars();
+    // The finished level's door blooms (§3.2), Earth's blue at the last one.
+    if (f && !trans.swapped) {
+      drawDoorLight(trans.opening, f.light, trans.door.earth ? "earth" : "paper");
+      drawRings(trans.opening, f.rings);
+    }
     ctx.restore();
   }
-  drawPlayer();
-  drawMoments();
-  drawFx(dt, (q) => q.kind !== "crumb");
+  if (!f || (worldAlpha > 0.01 && dianaAlpha > 0.01)) {
+    ctx.save();
+    ctx.globalAlpha = dianaAlpha;
+    drawPlayer();
+    ctx.restore();
+    drawMoments();
+    drawFx(dt, (q) => q.kind !== "crumb");
+  }
+  if (f && !trans.swapped) drawMotes(f, trans.opening);
   ctx.restore();
+  camera.x = kept.x;
+  camera.y = kept.y;
+  W = kept.W;
   if (state.status === "ready") titleGround(1);
   else if (sinceWake < 0.7) titleGround(1 - sinceWake / 0.6);
   drawSoilMarks();
@@ -2196,7 +2252,7 @@ function setSlots(container) {
   });
 }
 function sync() {
-  root.dataset.state = state.status === "ready" ? "title" : state.status;
+  root.dataset.state = trans ? "transition" : state.status === "ready" ? "title" : state.status;
   if (state.stars !== ui.stars) {
     ui.stars = state.stars;
     $("stars").textContent = String(state.stars);
@@ -2229,7 +2285,8 @@ function sync() {
     else root.dataset.verbs = verbs;
   }
   const live = state.status !== "ready";
-  const age = (q) => (q && live ? state.time - q.at : -1);
+  // (simNow: an arriving level's card starts two beats before its bar 1.)
+  const age = (q) => (q && live ? simNow() - q.at : -1);
   // Card: 300 ms in, 1600 ms hold, 500 ms out, measured on the simulation clock.
   const a = age(ui.card),
     total = CARD.fadeIn + CARD.hold + CARD.fadeOut;
@@ -2306,46 +2363,6 @@ function clearWords() {
 function announce(text) {
   $("announcement").textContent = text;
 }
-function formatTime(t) {
-  const s = Math.floor(t);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-function showVictory() {
-  ui.victoryShown = true;
-  // Progress: the next level opens; the best Great Stars of this one stay.
-  const n = state.level,
-    last = n >= LEVELS.length;
-  progress.unlocked = Math.max(progress.unlocked, Math.min(LEVELS.length, n + 1));
-  progress.great[n] = Math.max(progress.great[n] ?? 0, state.greatBanked.length);
-  progress.done[n] = true;
-  writeProgress();
-  syncLevelMap();
-  $("victory-title").textContent = `${state.def.numeral} · ${state.def.title}`;
-  // Continue is always the way on: the next level, or after the last level
-  // back to the title (the user disliked a separate Title button here).
-  $("continue").dataset.to = last ? "title" : "next";
-  $("continue").setAttribute("aria-label", last ? "Continue to the title" : `Continue to ${LEVELS[n].numeral} · ${LEVELS[n].title}`);
-  const song = audio.stats().score?.song;
-  $("result-song").textContent = song && song.total ? `${song.notes} / ${song.total}` : "—";
-  const total = state.pickups.filter((q) => !q.great).length;
-  $("result-stars").textContent = `${state.stars} / ${total}`;
-  // Real seconds at the level's tempo (the simulation runs BPM / 107 faster).
-  $("result-time").textContent = formatTime(state.time / (state.clock ?? 1));
-  $("result-falls").textContent = String(state.deaths);
-  setSlots($("result-great"));
-  $("result-great-count").textContent = `${state.greatBanked.length} / 3`;
-  const lines = {
-    1: "She was awake now, and the signal was close.",
-    2: "The wind had carried her this far.",
-    3: "The broken stars still sang, if she was quick.",
-    4: paintedStars() >= 12 ? "Earth, whole and blue, remembered every star." : "Earth. Small, blue, and listening. She was home.",
-  };
-  $("victory-line").lastChild.textContent = lines[n] ?? "The signal is stronger now.";
-  $("victory-card").hidden = false;
-  $("continue").focus({ preventScroll: true });
-  announce(`${state.def.title} complete. ${state.stars} of ${total} stars, ${state.greatBanked.length} of 3 Great Fallen Stars, ${state.deaths} falls.`);
-}
-
 /* ---------- simulation events → feedback ---------- */
 function processEvents(quiet = false) {
   for (const e of state.events) {
@@ -2451,6 +2468,10 @@ function processEvents(quiet = false) {
         break;
       case "death":
         held.glide = false;
+        // Every fall of the save, written at once: restarts and Main menu
+        // never lose one (a star-net catch is a fall; Back to last light is not).
+        progress.falls = (progress.falls ?? 0) + 1;
+        writeProgress();
         break;
       case "respawn":
         camera.snap = true;
@@ -2463,6 +2484,7 @@ function processEvents(quiet = false) {
         break;
       case "win":
         wonAt = clock;
+        beginTransition();
         break;
     }
   }
@@ -2525,19 +2547,38 @@ function doDive() {
   processEvents();
 }
 function openPause() {
+  // Mid-transition the beat freezes with the clock (§2.5).
+  if (trans) return pauseTransition();
   if (state.status !== "running") return;
   togglePause(state);
   held.glide = false;
   syncAudio(); // freeze music, tails and the wind bed right now, not next frame
+  showPauseCard();
+}
+function showPauseCard() {
+  // In a transition: Continue resumes it, "Play I · Waking again" is the
+  // Restart level button relabelled, and there is no last light to return to.
+  const finished = trans ? LEVELS[trans.from - 1] : null;
+  $("back-to-light").hidden = !!finished;
+  $("restart-chapter").textContent = finished ? `Play ${finished.numeral} · ${finished.title} again` : "Restart level";
   $("pause-main").hidden = false;
   $("pause-assist").hidden = true;
   $("pause-veil").hidden = false;
-  syncOrbit(pauseOrbit, progressOf(state.player.x));
+  syncOrbit(pauseOrbit, trans && !trans.swapped ? 1 : progressOf(state.player.x));
+  syncJourney();
   $("pause-title").textContent = "Paused";
   $("resume").focus({ preventScroll: true });
   sync();
 }
 function closePause() {
+  if (trans?.paused) {
+    trans.paused = false;
+    syncAudio();
+    $("pause-veil").hidden = true;
+    canvas.focus({ preventScroll: true });
+    sync();
+    return;
+  }
   const wasPaused = state.status === "paused";
   if (wasPaused) togglePause(state);
   syncAudio();
@@ -2552,8 +2593,6 @@ function pause() {
 }
 function hideCards() {
   $("pause-veil").hidden = true;
-  $("victory-card").hidden = true;
-  ui.victoryShown = false;
 }
 function backToLight() {
   if (!ready || state.status === "ready") return;
@@ -2563,6 +2602,8 @@ function backToLight() {
 }
 function restartChapter() {
   if (!ready) return;
+  if (trans) return replayFinished();
+  arrival = null;
   // A fresh song: bar 1, in tune. The door's soundtrack gives way.
   audio.scoreReset();
   audio.fadeOutMusic(1);
@@ -2618,7 +2659,8 @@ function startLevel(n, { wake: wakeNow = true, force = true, fromMap = false } =
   if (!ready) return null;
   const level = Math.max(1, Math.min(LEVELS.length, Math.round(n) || 1));
   if (!force && level > progress.unlocked) return null;
-  map?.cancel();
+  finishTransition();
+  arrival = null;
   hideCards();
   clearWords();
   // From the map the last level's held chord fades over 1.4 s, under the
@@ -2643,74 +2685,6 @@ function startLevel(n, { wake: wakeNow = true, force = true, fromMap = false } =
     draw();
   }
   return snapshot(state);
-}
-/** Between levels (RESEARCH_LEVELS 4): the orbit line grows from the
- * station just finished to the next over one bar of the next tempo
- * (0.3 s with reduced motion); any key or tap skips it. Then that level
- * begins with its title card. */
-let map = null;
-function showMap(next) {
-  if (!ready || next > LEVELS.length) return;
-  // (The win stays shown as seen, so the frame loop does not bring the card back.)
-  $("victory-card").hidden = true;
-  const svg = $("map-svg");
-  svg.innerHTML = "";
-  const w = 720,
-    h = 240,
-    at = (i) => bezier(0.06 + (0.88 * i) / (LEVELS.length - 1), w, h);
-  const [x0, y0] = bezier(0, w, h),
-    [x2, y2] = bezier(1, w, h);
-  const d = `M${x0} ${y0} Q${w / 2} ${-h * 0.25} ${x2} ${y2}`;
-  el("path", { d, class: "arc" }, svg);
-  const travelled = el("path", { d, class: "travelled" }, svg);
-  const length = travelled.getTotalLength?.() || 800;
-  LEVELS.forEach((lv, i) => {
-    const [x, y] = at(i);
-    el("circle", { cx: x, cy: y, r: lv.id === next ? 11 : 8, class: `station${lv.id === next ? " next" : ""}` }, svg);
-    el("text", { x, y: y + 40, "text-anchor": "middle", class: "label" }, svg).textContent = lv.numeral;
-    // Names for the stop just finished and the next one only, so eight or
-    // ten stations never collide; the rest keep their numerals.
-    if (lv.id === next || lv.id === next - 1) el("text", { x, y: y + 60, "text-anchor": "middle", class: "name" }, svg).textContent = lv.title;
-  });
-  el("circle", { cx: x2, cy: y2, r: 9, class: "earth-dot" }, svg);
-  const leaf = el("g", {}, svg);
-  el("path", { d: "M0 0 C-7 -2 -9 -9 -6 -13 C-1 -11 1 -5 0 0Z", class: "leaf" }, leaf);
-  el("path", { d: "M0 0 C5 -1 9 -6 9 -11 C4 -11 0 -6 0 0Z", class: "leaf" }, leaf);
-  const t0 = 0.06 + (0.88 * (next - 2)) / (LEVELS.length - 1),
-    t1 = 0.06 + (0.88 * (next - 1)) / (LEVELS.length - 1);
-  const seconds = reduced ? 0.3 : (4 * 60) / LEVELS[next - 1].bpm;
-  const begin = performance.now();
-  $("map-veil").hidden = false;
-  audio.play("ui-select");
-  // A one-bar count-in of the next level's pulse, landing its downbeat on
-  // the moment the level begins (the line grows for one bar, then 0.35 s).
-  if (!reduced) audio.countIn({ bpm: LEVELS[next - 1].bpm * pace, delay: 0.35 });
-  announce(`${LEVELS[next - 1].numeral}. ${LEVELS[next - 1].title}.`);
-  let done = false;
-  const draw = (u) => {
-    const t = t0 + (t1 - t0) * u;
-    travelled.style.strokeDasharray = `${(length * t).toFixed(1)} ${length}`;
-    const [x, y] = bezier(t, w, h);
-    leaf.setAttribute("transform", `translate(${x.toFixed(1)} ${(y - 4).toFixed(1)}) scale(1.6)`);
-  };
-  const finish = () => {
-    if (done) return;
-    done = true;
-    map = null;
-    $("map-veil").hidden = true;
-    startLevel(next, { fromMap: true });
-  };
-  const step = (now) => {
-    if (done) return;
-    const u = Math.min(1, (now - begin) / 1000 / seconds);
-    draw(u);
-    if (u >= 1) setTimeout(finish, reduced ? 0 : 350);
-    else requestAnimationFrame(step);
-  };
-  draw(0);
-  requestAnimationFrame(step);
-  // cancel: another level was opened directly (QA startLevel) meanwhile.
-  map = { finish, next, cancel: () => ((done = true), (map = null), ($("map-veil").hidden = true)) };
 }
 /** The title's orbit line: one numbered stop per level, built from LEVELS so
  * that 8-10 levels fit as well as four. Open stops select; locked ones stay
@@ -2823,7 +2797,8 @@ function paintedStars() {
   return n;
 }
 function toTitle() {
-  map?.cancel();
+  finishTransition();
+  arrival = null;
   emergence = null;
   wokeFromEarth = false;
   clearTimeout(wakingTimer);
@@ -2852,11 +2827,654 @@ function toTitle() {
   $("start").focus({ preventScroll: true });
 }
 
+/* ---------- the automatic end-of-level transition (RESEARCH_TRANSITIONS §2) ----------
+ * The door flows into the next level on the music's own pulse: four beats
+ * of the finished level (the door blooms, Diana becomes light, the camera
+ * eases back into space, the planets travel, the tally shows), then the
+ * next level's four-beat count-in (its world fades in, its title card, the
+ * arrival door) and bar 1, where Diana steps out running. transition.mjs
+ * holds the beats and every parameter of the picture; this file draws them.
+ * No card, no choice: R plays the level again, Esc/P pauses (freezing the
+ * beat), any other press after a one-beat lockout skips to the arrival.
+ * The result is saved at the door (A0). */
+let trans = null,
+  // The lit door behind Diana after a transition ({ at: B4 clock, beat });
+  // cleared by Restart level, startLevel and the title.
+  arrival = null,
+  // The sky camera's offset from the world camera: re-based at the swap so
+  // the starfield never jumps (it is procedural and wraps).
+  skyOffset = { x: 0, y: 0 },
+  lastTransition = null; // the last finished transition's frame-time stats (QA)
+const downKeys = new Set(), // keys down now (e.code)
+  staleKeys = new Set(), // down at the run's start or used to skip: swallowed until released
+  pointersDown = new Set(),
+  stalePointers = new Set();
+const skyX = () => camera.x + skyOffset.x + (trans?.f?.skyTravel ?? 0) * W;
+const skyY = () => camera.y + skyOffset.y;
+/** Simulation seconds on the run's clock: negative before bar 1 of an
+ * arriving level (so its title card can start at B2), else state.time. */
+function simNow() {
+  if (!trans?.swapped) return state.time;
+  return (clock - runAt()) * simScale();
+}
+const runAt = () => (trans.skipAt != null ? trans.skipAt + trans.dissolve : trans.at + trans.plan.B[4]);
+function beginTransition({ preview = false } = {}) {
+  if (trans || !ready) return;
+  const def = state.def,
+    n = state.level,
+    last = n >= LEVELS.length,
+    next = last ? null : LEVELS[n];
+  // The result is saved now (§2.11): a skip, R, Main menu or a closed tab
+  // mid-transition all keep it. Falls were already counted at each death.
+  const run = { stars: state.stars, total: state.pickups.filter((q) => !q.great).length, great: state.greatBanked.length, falls: state.deaths };
+  // (A QA preview records on a copy: it never touches the save.)
+  const book = preview ? structuredClone(progress) : progress;
+  const { before, after } = recordWin(book, { level: n, stars: run.stars, great: run.great });
+  if (!preview) {
+    writeProgress();
+    syncLevelMap();
+  }
+  const plan = transitionPlan({ bpmFrom: def.bpm, bpmTo: next?.bpm ?? def.bpm, pace, last, credits: last && !book.credits });
+  const look = currentLook(),
+    view = backdropView();
+  trans = {
+    plan,
+    at: clock,
+    from: n,
+    to: next?.id ?? null,
+    last,
+    run,
+    before,
+    after,
+    tally: tallyOf(def, run, after, next),
+    look,
+    endBox: look ? bodyBox(look, view) : null,
+    lookView: view,
+    nextLook: next ? lookOf(next) : null,
+    // D: the door's world point; its screen point at A0 is where the pull-back starts.
+    door: { x: WORLD().finishX, y: WORLD().finishY - 60, sx: WORLD().finishX - camera.x, sy: WORLD().finishY - 60 - camera.y, earth: !!WORLD().earth || last },
+    opening: doorOpening(WORLD().finishX, WORLD().finishY),
+    swapped: false,
+    paused: false,
+    skipAt: null,
+    dissolve: reduced ? 0 : 0.3,
+    said: false,
+    counted: { stars: -1, great: -1 },
+    frames: [],
+    lastFrame: null,
+    f: null,
+    countIn: null,
+    preview,
+    hold: null, // QA: a beat time the picture is frozen at
+  };
+  trans.f = frameAt(plan, 0, { reduced });
+  clearWords();
+  held.glide = false;
+  if (!last) trans.countIn = scheduleCountIn(next, plan);
+  fillTally();
+  warmNextBody();
+  sync();
+}
+/** The next level's four-beat count-in, B0-B3, under the held closing
+ * chord (it plays under reduced motion too: that setting is about motion).
+ * audio.countIn schedules on the AudioContext clock, which a pause
+ * suspends with the transition's own clock. */
+function scheduleCountIn(next, plan) {
+  const beats = [0, 1, 2, 3].map((k) => trans.at + plan.B[k]);
+  let handle = null;
+  try {
+    handle = audio.countIn({ bpm: next.bpm * pace, delay: plan.B[0] });
+  } catch {
+    /* sound off or blocked: the picture keeps the beat */
+  }
+  return { handle, beats, scheduled: typeof handle === "number" ? handle : handle?.beats ?? 0, cancelled: 0 };
+}
+/** Beats of the count-in not yet sounded are cancelled (skip, R, menu): the
+ * engine's score reset fades every pending music voice in 15 ms. */
+function cancelCountIn(t) {
+  const c = t?.countIn;
+  if (!c || c.done) return;
+  c.done = true;
+  c.cancelled = c.beats.filter((b) => b > clock + 0.005).length;
+  if (typeof c.handle?.cancel === "function") c.handle.cancel();
+}
+function warmNextBody() {
+  const id = trans?.nextLook;
+  if (!id) return;
+  backdrop ??= createBackdrop({ makeCanvas, images, sprite: spriteOn, reduced });
+  trans.warmMs = backdrop.warm(id, H);
+}
+/** Build the next look's cached body while the level is ending (progress ≥
+ * 0.85), in idle time, so no transition frame paints it from scratch. */
+let warmed = null;
+function warmAhead() {
+  if (state.status !== "running" || trans || state.level >= LEVELS.length) return;
+  const id = lookOf(LEVELS[state.level]);
+  if (!id || warmed === `${state.level}:${id}` || progressOf(state.player.x) < 0.85) return;
+  warmed = `${state.level}:${id}`;
+  const build = () => {
+    backdrop ??= createBackdrop({ makeCanvas, images, sprite: spriteOn, reduced });
+    warmedMs = backdrop.warm(id, H);
+  };
+  if (window.requestIdleCallback) requestIdleCallback(build, { timeout: 500 });
+  else setTimeout(build, 0);
+}
+let warmedMs = null;
+/** The world's view during the transition: its alpha, zoom and top-left. */
+function transitionView(f) {
+  if (!trans.swapped) {
+    const D = trans.door,
+      Sx = D.sx + (0.5 * W - D.sx) * f.anchor,
+      Sy = D.sy + (0.58 * H - D.sy) * f.anchor;
+    return { alpha: f.world, zoom: f.zoom, x: D.x - Sx / f.zoom, y: D.y - Sy / f.zoom, diana: f.diana };
+  }
+  // The push-in is about Diana's screen point; at B4 it is the run's identity.
+  const p = viewPos(),
+    Px = p.x - camera.x,
+    Py = p.y - 50 - camera.y;
+  return { alpha: f.newWorld, zoom: f.push, x: camera.x + Px - Px / f.push, y: camera.y + Py - Py / f.push, diana: f.newDiana };
+}
+/** The frame's step: the beat plan, the swap at A4 = B0, the run at B4. */
+function stepTransition(real) {
+  if (!trans || trans.paused) return;
+  if (trans.hold != null) trans.at = clock - trans.hold;
+  const t = clock - trans.at;
+  if (trans.lastFrame != null && real > 0 && trans.hold == null) trans.frames.push(real * 1000);
+  trans.lastFrame = clock;
+  let f;
+  if (trans.skipAt != null) {
+    const u = trans.dissolve > 0 ? (clock - trans.skipAt) / trans.dissolve : 1;
+    if (u >= 1) return arrive(true);
+    f = skipFrame(u);
+  } else f = frameAt(trans.plan, t, { reduced });
+  trans.f = f;
+  if (trans.last) {
+    if (f.phase === "credits" && !progress.credits && !trans.preview) {
+      progress.credits = true;
+      writeProgress();
+    }
+    if (t >= trans.plan.titleAt) return endJourney(trans.plan.bar);
+  } else {
+    if (!trans.swapped && f.swapped) swapLevel();
+    if (t >= trans.plan.B[4]) return arrive(false);
+  }
+  syncTransitionDom(f);
+}
+/** After a skip: a 0.3 s cross-dissolve into the arrival (a cut under
+ * reduced motion), no zoom, Diana already in the door's light. */
+function skipFrame(u) {
+  const a = reduced ? 1 : Math.max(0, Math.min(1, u));
+  return { t: clock - trans.at, phase: "arrive", skip: true, reduced, light: 0, rings: [], diana: 0, world: 0, zoom: 1, anchor: 0, motes: false, skyTravel: trans.f?.skyTravel ?? 0, hudOld: 0, oldBody: { u: 1, alpha: 0 }, newBody: { u: 1, alpha: 1 }, orbit: { draw: 1, alpha: 0, leaf: 1 }, tally: 0, count: 1, swapped: true, newWorld: a, push: 1, arrivalLight: 0.85, newDiana: 1, hudNew: a, controls: true, card: true };
+}
+function requestSkip() {
+  if (!trans || trans.paused) return;
+  const t = clock - trans.at;
+  // The one-beat lockout catches the reflex press of a player still jumping at the door.
+  if (t < trans.plan.lockout || trans.skipAt != null) return;
+  if (trans.last) return endJourney(0.6);
+  if (!trans.swapped) swapLevel();
+  trans.skipAt = clock;
+  cancelCountIn(trans);
+  // Pending count-in beats go in 15 ms; the held chord keeps its 1.4 s handover.
+  audio.hush(0.015, { hold: 1.4 });
+  // The title card starts with the press, as usual.
+  showMovement(state.def.movements[0].id, simNow());
+  trans.f = skipFrame(0);
+  syncTransitionDom(trans.f);
+}
+/** A4 = B0: the next level loads unseen, already at its run framing. Its
+ * simulation is started but held (and its events, the wake among them,
+ * wait) until bar 1. */
+function swapLevel() {
+  trans.swapped = true;
+  const sx = camera.x + skyOffset.x,
+    sy = camera.y + skyOffset.y;
+  const assist = { ...state.assist };
+  Object.assign(state, createGame(state.seed, { level: trans.to, ...assist }));
+  audio.setLevel(state.level);
+  hudOrbit = buildOrbit($("orbit"), 264, 44, false);
+  pauseOrbit = buildOrbit($("pause-orbit"), 360, 80, true);
+  root.dataset.level = String(state.level);
+  syncLevelMap();
+  start(state);
+  clearMoments();
+  fx.length = 0;
+  resetShelfWatch();
+  clearWords();
+  emergence = null;
+  wokeFromEarth = false;
+  // A wake long ago: no sprout pop, no title-ground fade, no wake pan.
+  wakeAt = clock - 1;
+  ui.great = "";
+  ui.orbitDirty = true;
+  resize();
+  camera.snap = true;
+  updateCamera(0);
+  skyOffset = { x: sx - camera.x, y: sy - camera.y };
+  arrival = { at: null, beat: 60 / (state.def.bpm * pace) };
+  // The title card from B2, two beats before the run (§2.7).
+  showMovement(state.def.movements[0].id, -(trans.plan.B[4] - trans.plan.B[2]) * simScale());
+}
+/** B4 (or a skip's run start): bar 1. Diana steps out running. */
+function arrive(skipped) {
+  const t = trans;
+  finishTransition(t);
+  // The next score's bar 1 with the held chord's 1.4 s handover (as the
+  // old map did), then the held wake event starts the song now.
+  audio.scoreReset({ hold: 1.4 });
+  audio.hush(skipped ? 0.015 : 0.12, { hold: 1.4 });
+  audio.clearMoments();
+  if (arrival) arrival.at = clock;
+  // Keys and pointers down now are stale until released (no input lost or doubled).
+  for (const k of downKeys) staleKeys.add(k);
+  for (const id of pointersDown) stalePointers.add(id);
+  held.glide = false;
+  processEvents();
+  canvas.focus({ preventScroll: true });
+  sync();
+}
+/** End the transition's bookkeeping (arrival, skip, R, menu, QA). */
+function finishTransition(t = trans) {
+  if (!t) return;
+  if (t.frames.length) lastTransition = { from: t.from, to: t.to, frames: frameStats(t.frames), warmMs: t.warmMs ?? warmedMs };
+  // Fold the sky's extra travel into its offset so nothing jumps.
+  skyOffset.x += (t.f?.skyTravel ?? 0) * W;
+  cancelCountIn(t);
+  trans = null;
+  hideTally();
+  delete root.dataset.controls;
+  root.style.removeProperty("--level-hud");
+}
+function frameStats(list) {
+  const s = [...list].sort((a, b) => a - b),
+    q = (p) => s[Math.min(s.length - 1, Math.floor(p * s.length))];
+  return { count: s.length, median: +q(0.5).toFixed(2), p95: +q(0.95).toFixed(2), max: +s.at(-1).toFixed(2) };
+}
+/** R (or the pause card's "Play … again"): the finished level again. */
+function replayFinished() {
+  if (!trans) return;
+  const n = trans.from,
+    swapped = trans.swapped;
+  $("pause-veil").hidden = true;
+  finishTransition();
+  if (swapped) startLevel(n);
+  else restartChapter();
+}
+/** The journey's end (§2.8): the title, selecting the last level. */
+function endJourney(fade = 0.6) {
+  const seconds = Math.max(0.3, fade);
+  finishTransition();
+  root.style.setProperty("--title-fade", `${seconds.toFixed(2)}s`);
+  root.classList.add("from-ending");
+  clearTimeout(endFadeTimer);
+  endFadeTimer = setTimeout(() => root.classList.remove("from-ending"), seconds * 1000 + 100);
+  toTitle();
+}
+let endFadeTimer = 0;
+function pauseTransition() {
+  if (!trans || trans.paused) return;
+  trans.paused = true;
+  held.glide = false;
+  syncAudio();
+  showPauseCard();
+}
+
+/* The tally (§2.4): DOM, because the canvas has no text. Non-blocking: no
+ * buttons, no focus, pointer-events none, opacity and transform only, its
+ * text set at most 12 times (the count-up), announced once at A2. */
+function fillTally() {
+  const t = trans,
+    L = t.tally.level;
+  $("tally-name").textContent = L.name;
+  $("tally-stars").textContent = String(L.stars);
+  $("tally-total").textContent = `/ ${L.total}`;
+  $("tally-falls").textContent = t.tally.falls;
+  const slots = $("tally-great").querySelectorAll(".slot");
+  slots.forEach((s, i) => s.classList.toggle("filled", i < L.great));
+  $("tally-great").setAttribute("aria-label", `${L.great} of 3`);
+  // The journey row starts at the save's old totals (it counts up A3-A4).
+  const j = reduced ? t.after : t.before;
+  $("tally-journey-stars").textContent = String(j.stars);
+  $("tally-journey-great").textContent = String(j.great);
+  $("tally-journey-total").textContent = `/ ${t.after.greatTotal}`;
+  $("tally-journey-falls").textContent = t.tally.journeyFalls;
+  t.counted = { stars: j.stars, great: j.great };
+  $("tally-line").hidden = !t.last;
+  $("tally-line").textContent = t.last ? endingLine(t.after) : "";
+  $("tally-say").textContent = "";
+  $("tally").classList.toggle("ending", t.last);
+  $("tally").style.opacity = "0";
+  $("tally").hidden = false;
+  $("tally-hint").hidden = false;
+  $("tally-hint").style.opacity = "0";
+  // The hint and the ↺ button sit under the panel (one layout read per transition).
+  root.style.setProperty("--tally-h", `${$("tally").offsetHeight}px`);
+}
+function hideTally() {
+  for (const id of ["tally", "tally-hint", "tally-again", "credits"]) {
+    $(id).hidden = true;
+    $(id).style.opacity = "0";
+  }
+}
+function syncTransitionDom(f) {
+  const t = trans;
+  const a = Math.max(0, Math.min(1, f.tally));
+  $("tally").style.opacity = a.toFixed(3);
+  $("tally").style.transform = reduced || a >= 1 ? "" : `translate(-50%, ${((1 - a) * 6).toFixed(1)}px)`;
+  $("tally-hint").style.opacity = a.toFixed(3);
+  const again = $("tally-again");
+  again.hidden = a <= 0.01;
+  again.style.opacity = a.toFixed(3);
+  if (a > 0 && !t.said) {
+    t.said = true;
+    $("tally-say").textContent = t.tally.say;
+  }
+  // The journey's stars and Great Stars count up from the old totals.
+  const stars = countUp(t.before.stars, t.after.stars, f.count),
+    great = countUp(t.before.great, t.after.great, f.count);
+  if (stars !== t.counted.stars) $("tally-journey-stars").textContent = String((t.counted.stars = stars));
+  if (great !== t.counted.great) {
+    if (great > t.counted.great && t.counted.great >= 0) pulseClass($("tally-journey-slot"), "pulse", 500);
+    $("tally-journey-great").textContent = String((t.counted.great = great));
+  }
+  root.style.setProperty("--level-hud", (f.swapped ? f.hudNew : f.hudOld).toFixed(3));
+  if (f.controls) delete root.dataset.controls;
+  else root.dataset.controls = "off";
+  // The ending's credits: one card at a time.
+  const c = $("credits");
+  if (f.credit) {
+    const card = CREDITS[f.credit.index];
+    if (c.dataset.index !== String(f.credit.index)) {
+      c.dataset.index = String(f.credit.index);
+      $("credits-logo").hidden = !card.logo;
+      $("credits-text").hidden = !!card.logo;
+      $("credits-text").textContent = card.logo ? "" : card.text;
+      announce(card.text);
+    }
+    c.hidden = false;
+    c.style.opacity = f.credit.alpha.toFixed(3);
+  } else if (!c.hidden) {
+    c.hidden = true;
+    delete c.dataset.index;
+  }
+}
+/** The Journey line of the pause card (§2.4): always one key away. */
+function syncJourney() {
+  const j = journeyOf(progress);
+  $("pause-journey-stars").textContent = String(j.stars);
+  $("pause-journey-great").textContent = `${j.great}/${j.greatTotal}`;
+  $("pause-journey-falls").textContent = j.falls === 1 ? "1 fall" : `${j.falls} falls`;
+  $("pause-journey").setAttribute("aria-label", `Journey: ${j.stars} stars, ${j.great} of ${j.greatTotal} Great Fallen Stars, ${j.falls === 1 ? "1 fall" : `${j.falls} falls`}`);
+}
+
+/* ---------- the transition's picture (§3) ---------- */
+const LEAF_PATHS = typeof Path2D === "function" ? ["M0 0 C-7 -2 -9 -9 -6 -13 C-1 -11 1 -5 0 0Z", "M0 0 C5 -1 9 -6 9 -11 C4 -11 0 -6 0 0Z"].map((d) => new Path2D(d)) : [];
+const quad = (a, c, b, u) => (1 - u) * (1 - u) * a + 2 * (1 - u) * u * c + u * u * b;
+/** Where the finished level's body travels: from its level-end box on an
+ * arc to (0.17 W, 0.36 H) at 0.4 of its radius, its top kept under the HUD band. */
+function oldBodyBox(f) {
+  const s = trans.endBox,
+    e = { x: 0.17 * W, y: 0.36 * H, r: s.r * 0.4 };
+  let cy = Math.min(s.y, e.y) - 0.12 * H;
+  // Lower the control point until the body's top stays ≥ HUD band + 8.
+  for (let k = 0; k < 20; k++) {
+    let ok = true;
+    for (let u = 0; u <= 1; u += 0.05) {
+      const y = quad(s.y, cy, e.y, u),
+        r = s.r + (e.r - s.r) * u;
+      if (y - bodyTop(trans.look, r) < HUD_BAND + 8) ok = false;
+    }
+    if (ok) break;
+    cy += 10;
+  }
+  const u = f.oldBody.u;
+  return { x: quad(s.x, (s.x + e.x) / 2, e.x, u), y: quad(s.y, cy, e.y, u), r: s.r + (e.r - s.r) * u, end: e };
+}
+/** The next body arrives on its arc from (1.15 W, its start y) at half its
+ * radius and ends exactly at its level-start box (nothing jumps at bar 1). */
+function newBodyBox(f, id) {
+  const e = bodyBox(id, { W, H, progress: 0, driftX: 0, driftY: 0 }),
+    u = f.newBody.u;
+  if (LOOKS[id]?.body === "moon") return { x: e.x, y: e.y + 0.5 * H * (1 - u), r: e.r };
+  const s = { x: 1.15 * W, y: e.y, r: e.r * 0.5 },
+    cy = (s.y + e.y) / 2 - 0.06 * H;
+  return { x: quad(s.x, (s.x + e.x) / 2, e.x, u), y: quad(s.y, cy, e.y, u), r: s.r + (e.r - s.r) * u, end: e };
+}
+function drawTransitionSky(f) {
+  backdrop ??= createBackdrop({ makeCanvas, images, sprite: spriteOn, reduced });
+  const view = { ...backdropView(), clock };
+  if (trans.last) return drawEnding(f, view);
+  const oldId = trans.look,
+    newId = trans.nextLook;
+  let oldEnd = null,
+    newEnd = null;
+  if (oldId && f.oldBody.alpha > 0.01) {
+    const box = oldBodyBox(f);
+    oldEnd = box.end;
+    ctx.save();
+    ctx.globalAlpha = f.oldBody.alpha;
+    if (f.reduced && f.oldBody.cross != null && f.oldBody.cross < 1) {
+      // Reduced motion: no travel; the level-end body cross-fades to its end box.
+      ctx.globalAlpha = f.oldBody.alpha * (1 - f.oldBody.cross);
+      backdrop.drawBody(ctx, oldId, { ...trans.lookView, clock, box: trans.endBox });
+      ctx.globalAlpha = f.oldBody.alpha * f.oldBody.cross;
+    }
+    backdrop.drawBody(ctx, oldId, { ...trans.lookView, clock, box: f.reduced && !f.oldBody.cross ? trans.endBox : { x: box.x, y: box.y, r: box.r } });
+    ctx.restore();
+    // Its accent fades with the old world.
+    if (f.world > 0.01) {
+      ctx.save();
+      ctx.globalAlpha = f.world;
+      backdrop.drawAccent(ctx, oldId, trans.lookView);
+      ctx.restore();
+    }
+  }
+  if (newId && f.newBody.alpha > 0.01) {
+    const box = newBodyBox(f, newId);
+    newEnd = box.end;
+    ctx.save();
+    ctx.globalAlpha = f.newBody.alpha;
+    backdrop.drawBody(ctx, newId, { ...view, box: { x: box.x, y: box.y, r: box.r } });
+    if (f.newWorld > 0.01) {
+      ctx.globalAlpha = f.newWorld;
+      backdrop.drawAccent(ctx, newId, { ...view, progress: 0 });
+    }
+    ctx.restore();
+  }
+  drawOrbitLine(f, oldEnd ?? { x: 0.17 * W, y: 0.36 * H }, newEnd ?? { x: 0.78 * W, y: 0.42 * H });
+}
+/** The title's orbit line brought into the sky (§3.5): dotted, drawn on
+ * A2-A3, a stop at each end, Diana's two-leaf marker sliding A3-B2. */
+function drawOrbitLine(f, a, b) {
+  if (f.orbit.alpha <= 0.01) return;
+  const cx = (a.x + b.x) / 2,
+    cy = (a.y + b.y) / 2 - 0.15 * H,
+    at = (u) => ({ x: quad(a.x, cx, b.x, u), y: quad(a.y, cy, b.y, u) });
+  ctx.save();
+  ctx.globalAlpha = f.orbit.alpha;
+  ctx.strokeStyle = "rgba(251,251,234,0.3)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([2, 7]);
+  ctx.beginPath();
+  const n = Math.round(32 * f.orbit.draw);
+  for (let i = 0; i <= n; i++) {
+    const p = at(i / 32);
+    if (i) ctx.lineTo(p.x, p.y);
+    else ctx.moveTo(p.x, p.y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  for (const [p, done] of [[a, true], [b, false]]) {
+    ctx.fillStyle = INK;
+    ctx.strokeStyle = PAPER;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (done) sprite("star", 2, p.x + 6, p.y - 6, 0.07);
+  }
+  const m = at(f.orbit.leaf);
+  ctx.translate(m.x, m.y - 2);
+  ctx.scale(1.6, 1.6);
+  ctx.fillStyle = PAPER;
+  for (const path of LEAF_PATHS) ctx.fill(path);
+  ctx.restore();
+}
+/** The ending (§2.8): the Moon sinks, Earth turns to face her, whole and blue. */
+function drawEnding(f, view) {
+  const id = trans.look;
+  if (id && LOOKS[id]?.body === "moon") {
+    const b = bodyBox(id, trans.lookView);
+    backdrop.drawBody(ctx, id, { ...trans.lookView, box: { x: b.x, y: b.y + 0.5 * H * f.moonSink, r: b.r } });
+  } else if (id) backdrop.drawBody(ctx, id, { ...trans.lookView, box: trans.endBox });
+  const e0 = earthBox("moon-earth", { W, H, progress: 1 }),
+    u = f.earth,
+    x = e0.x + (0.5 * W - e0.x) * u,
+    y = e0.y + (0.42 * H - e0.y) * u,
+    r = e0.r + (0.2 * H - e0.r) * u,
+    off = 0.42 + (1.6 - 0.42) * u;
+  ctx.save();
+  ctx.globalAlpha = f.earthAlpha;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(111,168,220,0.95)";
+  ctx.fill();
+  // The ink disc that made it a crescent slides off: Earth turns full.
+  ctx.clip();
+  ctx.beginPath();
+  ctx.arc(x - r * off, y - r * 0.12, r * 0.94, 0, Math.PI * 2);
+  ctx.fillStyle = INK;
+  ctx.fill();
+  ctx.restore();
+}
+/** The door's opening on portal.png (250 × 397): a rect from (0.12, 0.30)
+ * to (0.83, 1.0) and a half-ellipse cap up to the crown at 0.17, mapped
+ * through visibleBounds as portalPlacement does. */
+function doorOpening(x, groundY) {
+  const b = manifest.portal.visibleBounds,
+    pl = portalPlacement(x, groundY, b),
+    k = pl.width / b.w,
+    px = (fx) => pl.x + (fx * manifest.portal.width - b.x) * k,
+    py = (fy) => pl.y + (fy * manifest.portal.height - b.y) * k;
+  const left = px(0.12),
+    right = px(0.83),
+    top = py(0.3),
+    crown = py(0.17),
+    base = Math.min(pl.baseY, py(1));
+  const path = new Path2D();
+  path.moveTo(left, base);
+  path.lineTo(left, top);
+  path.ellipse((left + right) / 2, top, (right - left) / 2, top - crown, 0, Math.PI, 0);
+  path.lineTo(right, base);
+  path.closePath();
+  return { path, left, right, top, crown, base, cx: (left + right) / 2, cy: (crown + base) / 2, w: right - left };
+}
+/** The door blooms (§3.2): a front of light rising from the threshold to
+ * the crown over one beat, a soft glow and two ring pulses; Earth's blue at
+ * the journey's last door. Drawn in the world, under the zoom. */
+function drawDoorLight(o, level, colour) {
+  if (level <= 0.001 || !manifest?.portal) return;
+  const rgb = colour === "earth" ? "111,168,220" : "251,251,234",
+    a = colour === "earth" ? 0.9 : 0.85;
+  ctx.save();
+  const glow = ctx.createRadialGradient(o.cx, o.cy, 2, o.cx, o.cy, 1.4 * o.w);
+  glow.addColorStop(0, `rgba(${rgb},${0.12 * Math.min(1, level)})`);
+  glow.addColorStop(1, `rgba(${rgb},0)`);
+  ctx.fillStyle = glow;
+  ctx.fillRect(o.cx - 1.4 * o.w, o.cy - 1.4 * o.w, 2.8 * o.w, 2.8 * o.w);
+  const front = o.base - (o.base - o.crown) * Math.min(1, level),
+    g = ctx.createLinearGradient(0, o.base, 0, o.crown);
+  const stop = Math.max(0.001, Math.min(0.999, (o.base - front) / (o.base - o.crown)));
+  g.addColorStop(0, `rgba(${rgb},${a})`);
+  g.addColorStop(stop, `rgba(${rgb},${a})`);
+  g.addColorStop(Math.min(1, stop + 0.04), `rgba(${rgb},0)`);
+  ctx.fillStyle = g;
+  ctx.fill(o.path);
+  ctx.restore();
+}
+function drawRings(o, rings) {
+  ctx.save();
+  ctx.strokeStyle = PAPER;
+  for (const ring of rings) {
+    ctx.globalAlpha = ring.alpha;
+    ctx.lineWidth = ring.width;
+    ctx.beginPath();
+    ctx.arc(o.cx, o.cy, ring.r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+/** Motes (§3.6): 12 star-sheet sprites and 3 tail-star streaks rising from
+ * the opening's lower third, from A1; seeded by the level id so frames are
+ * deterministic. They keep rising after Diana is gone (follow-through). */
+function drawMotes(f, o) {
+  if (!f.motes) return;
+  const b = trans.plan.b,
+    t = f.t - trans.plan.A[1],
+    seed = trans.from * 101;
+  for (let i = 0; i < 12; i++) {
+    const age = t - (i * b) / 12,
+      life = 1.5 * b;
+    if (age < 0 || age > life) continue;
+    const u = age / life,
+      x0 = o.left + hash(seed + i) * o.w,
+      y0 = o.base - hash(seed + i + 40) * (o.base - o.crown) * 0.33,
+      vy = 90 + hash(seed + i + 80) * 60,
+      x = x0 + Math.sin(age * Math.PI * 2 * 1.2 + i) * 6,
+      y = y0 - vy * age;
+    sprite("star", Math.floor(hash(seed + i + 120) * 3), x, y, 0.06 + hash(seed + i + 160) * 0.06, 1 - u * u);
+  }
+  for (let i = 0; i < 3; i++) {
+    const age = t - (i * b) / 3;
+    if (age < 0 || age > b) continue;
+    const u = age / b,
+      heading = ((-80 + (hash(seed + i + 200) - 0.5) * 20) * Math.PI) / 180,
+      len = 40 + hash(seed + i + 240) * 30,
+      x = o.left + hash(seed + i + 280) * o.w,
+      y = o.base - 20 - 140 * age;
+    streak(x, y, heading, len / 555, 1 - u);
+  }
+}
+
 /* ---------- input ---------- */
 const GAME_KEYS = ["Space", "ArrowUp", "ArrowRight", "ArrowDown", "KeyW", "KeyD", "KeyS"];
+// Which keys and pointers are down (stale-press bookkeeping, §2.5).
+window.addEventListener("keydown", (e) => downKeys.add(e.code), true);
+window.addEventListener("keyup", (e) => downKeys.delete(e.code), true);
+window.addEventListener("pointerdown", (e) => pointersDown.add(e.pointerId), true);
+for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, (e) => pointersDown.delete(e.pointerId), true);
+const MODIFIERS = ["Tab", "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight", "CapsLock"];
+/** Keys during the transition: R plays the finished level again, Esc/P
+ * pauses, any other fresh press skips after the one-beat lockout. The
+ * press is consumed: it never reaches jump, cape or dive, nor the jump
+ * buffer, and its release is swallowed. */
+function transitionKey(e) {
+  if (MODIFIERS.includes(e.code)) return;
+  e.preventDefault();
+  if (e.repeat) return; // a key held through the door never skips
+  if (e.code === "KeyR") return replayFinished();
+  if (["KeyP", "Escape"].includes(e.code)) return pauseTransition();
+  staleKeys.add(e.code);
+  requestSkip();
+}
+// A click or tap on the stage skips too, except the HUD's own buttons; it
+// never reaches the jump zone or the canvas (captured here, first).
+root.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (!trans || trans.paused) return;
+    if (e.target instanceof Element && e.target.closest("#pause, .itch-fullscreen, #sound, #tally-again, #pause-veil")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    stalePointers.add(e.pointerId);
+    requestSkip();
+  },
+  true,
+);
 window.addEventListener("keydown", (e) => {
   const onButton = e.target instanceof HTMLElement && e.target.matches("button");
-  if (state.status === "paused") {
+  if (state.status === "paused" || trans?.paused) {
     const onSlider = e.target instanceof HTMLInputElement && e.target.type === "range";
     if (e.code === "Tab") {
       // Keep keyboard focus inside the pause card (aria-modal).
@@ -2884,11 +3502,9 @@ window.addEventListener("keydown", (e) => {
     }
     return;
   }
-  if (map) {
-    // Any key skips the map between levels.
-    e.preventDefault();
-    return map.finish();
-  }
+  if (trans) return transitionKey(e);
+  // Keys still down from before the run began are stale until released.
+  if (staleKeys.has(e.code)) return e.preventDefault();
   if (onButton && ["Space", "Enter"].includes(e.code)) return; // native activation
   if (GAME_KEYS.includes(e.code)) e.preventDefault();
   if (e.repeat) return;
@@ -2935,7 +3551,7 @@ window.addEventListener("keydown", () => audio.nudge(), true);
   // gameplay and already voiced). The pause card stays silent: the engine
   // refuses new sounds while paused, so its buttons need no exception.
   const canHover = matchMedia("(hover: hover)").matches;
-  const menu = "#again, #continue, #sound, #pause, .itch-fullscreen";
+  const menu = "#tally-again, #sound, #pause, .itch-fullscreen";
   document.addEventListener("pointerover", (e) => {
     const b = canHover && e.target instanceof Element ? e.target.closest(menu) : null;
     if (b && !b.contains(e.relatedTarget)) audio.play("ui-hover");
@@ -2949,6 +3565,9 @@ window.addEventListener("keydown", () => audio.nudge(), true);
   });
 }
 window.addEventListener("keyup", (e) => {
+  // A stale key's release is swallowed: it never releases a fresh jump.
+  if (staleKeys.delete(e.code)) return;
+  if (trans) return;
   if (GAME_KEYS.includes(e.code)) atInput(e);
   if (["KeyD", "ArrowRight"].includes(e.code)) held.glide = false;
   if (["Space", "ArrowUp", "KeyW"].includes(e.code)) releaseJump(state);
@@ -2957,11 +3576,13 @@ window.addEventListener("keyup", (e) => {
 // and the cape here (A3: no jump stays "held" behind the pause card).
 window.addEventListener("blur", () => {
   held.glide = false;
-  if (state.status === "running") openPause();
+  if (state.status === "running" || trans) openPause();
   releaseJump(state);
+  downKeys.clear();
+  staleKeys.clear();
 });
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && state.status === "running") openPause();
+  if (document.hidden && (state.status === "running" || trans)) openPause();
   if (document.hidden) ((held.glide = false), releaseJump(state));
 });
 function bindTouch(id, down, up) {
@@ -2979,6 +3600,9 @@ function bindTouch(id, down, up) {
   });
   const end = (e) => {
     b.classList.remove("pressed");
+    // The tap that skipped a transition (or was down at its end) never
+    // reaches the jump zone: its release is swallowed.
+    if (stalePointers.delete(e.pointerId) || trans) return;
     atInput(e);
     up?.();
   };
@@ -3029,15 +3653,17 @@ canvas.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "mouse") atInput(e);
   if (e.pointerType === "mouse" || state.status === "ready") doJump();
 });
-canvas.addEventListener("pointerup", (e) => (atInput(e), releaseJump(state)));
+canvas.addEventListener("pointerup", (e) => {
+  if (stalePointers.delete(e.pointerId) || trans) return;
+  atInput(e);
+  releaseJump(state);
+});
 $("start").addEventListener("click", pressWake);
 $("pause").addEventListener("click", openPause);
 $("resume").addEventListener("click", closePause);
 $("back-to-light").addEventListener("click", backToLight);
 $("restart-chapter").addEventListener("click", restartChapter);
-$("again").addEventListener("click", restartChapter);
-$("continue").addEventListener("click", () => (state.level >= LEVELS.length ? toTitle() : showMap(state.level + 1)));
-$("map-veil").addEventListener("pointerdown", () => map?.finish());
+$("tally-again").addEventListener("click", () => trans && replayFinished());
 // Pause → Main menu: the level's score stops, the title song returns and the
 // saved progress (open levels, best Great Stars) is kept.
 $("main-menu").addEventListener("click", toTitle);
@@ -3067,7 +3693,7 @@ for (const b of document.querySelectorAll("[data-assist]")) {
 if (!reduced) {
   let seed = 3;
   setInterval(() => {
-    if (!$("pause-veil").hidden || !$("victory-card").hidden || state.status === "ready")
+    if (!$("pause-veil").hidden || state.status === "ready")
       $("ink-noise")?.setAttribute("seed", String((seed = (seed % 4) + 1)));
   }, 125);
 }
@@ -3078,10 +3704,11 @@ if (!reduced) {
 const frameClock = createFrameClock({ maxStep: 0.1 });
 function advanceTo(now) {
   const real = frameClock.advance(now);
-  clock += state.status === "paused" ? 0 : real;
+  clock += state.status === "paused" || trans?.paused ? 0 : real;
   // The level's clock (BPM / 107) and Gentle pace scale time only, so
-  // every arc and gap stays identical (RESEARCH_LEVELS 3).
-  if (ready && real > 0) update(state, real * simScale(), held);
+  // every arc and gap stays identical (RESEARCH_LEVELS 3). An arriving
+  // level is held at bar 1 until the transition ends.
+  if (ready && real > 0 && !trans?.swapped) update(state, real * simScale(), held);
   return real;
 }
 /** Before an input acts: catch the simulation up to the event's time (the
@@ -3095,10 +3722,12 @@ function frame(now) {
   caughtUp = 0;
   if (ready) {
     if (emergence && clock - emergence.at >= emergenceSeconds(reduced)) wake();
-    processEvents();
+    // (An arriving level's events, its wake among them, wait for bar 1.)
+    if (!trans?.swapped) processEvents();
     scriptedCues();
+    stepTransition(real);
+    warmAhead();
     syncAudio();
-    if (state.status === "won" && !ui.victoryShown && clock - wonAt > 1.5) showVictory();
     updateCamera(real);
     sync();
     draw();
@@ -3224,8 +3853,6 @@ window.__game = {
   // Levels: startLevel(n) opens level n (1-4) and wakes it; levels() lists
   // them with their tempo and whether they are open in this browser.
   startLevel: (n, options) => startLevel(n, options),
-  // The animated map between levels, as Continue plays it (skippable).
-  showMap: (n) => (showMap(n), !!map),
   // Each also lists its key, look, GETs, scripted moments (`at` in
   // simulation seconds from the wake) and decor, so root QA follows the
   // campaign as stages are built.
@@ -3262,6 +3889,73 @@ window.__game = {
   // Music / Sounds volumes (0-1, saved): setVolumes({ music: 0.5 }).
   setVolumes: (v = {}) => setVolumes(v),
   getState: () => snapshot(state),
+  // The transition (§2): { phase: door | space | arrive | null (the
+  // ending: door, space, tally, credits, title), t, beat, plan, zoom,
+  // world, tally, countIn, frames { count, median, p95, max } }; with no
+  // transition running, the last one's frame stats as `last`.
+  getTransition: () => {
+    if (!trans) return { phase: null, last: lastTransition, warmMs: warmedMs };
+    const f = trans.f ?? {},
+      t = clock - trans.at,
+      beats = trans.last ? trans.plan.A : [...trans.plan.A.slice(0, 4), ...trans.plan.B];
+    return {
+      phase: f.phase ?? null,
+      t,
+      beat: beats.filter((b) => b <= t + 1e-6).length - 1,
+      plan: { b: trans.plan.b, c: trans.plan.c, A: trans.plan.A, B: trans.plan.B, total: trans.plan.total, lockout: trans.plan.lockout, titleAt: trans.plan.titleAt ?? null, credits: trans.plan.cards ?? 0 },
+      from: trans.from,
+      to: trans.to,
+      last: trans.last,
+      swapped: trans.swapped,
+      paused: trans.paused,
+      skipped: trans.skipAt != null,
+      zoom: trans.swapped ? f.push : f.zoom,
+      world: trans.swapped ? f.newWorld : f.world,
+      motes: !!f.motes,
+      bodies: { old: trans.look && trans.endBox && f.oldBody ? oldBodyBox(f) : null, next: trans.nextLook && f.newBody ? newBodyBox(f, trans.nextLook) : null, nextStart: trans.nextLook ? bodyBox(trans.nextLook, { W, H, progress: 0 }) : null },
+      tally: { opacity: Number($("tally").style.opacity), level: trans.tally.level, journey: trans.after, before: trans.before, text: $("tally").innerText, say: $("tally-say").textContent },
+      countIn: trans.countIn ? { scheduled: trans.countIn.scheduled, cancelled: trans.countIn.cancelled, beats: trans.countIn.beats.map((b) => +(b - trans.at).toFixed(3)) } : null,
+      frames: trans.frames.length ? frameStats(trans.frames) : null,
+      warmMs: trans.warmMs ?? warmedMs,
+    };
+  },
+  // A transition frozen at one beat, for evidence (it never touches the
+  // save): previewTransition(n, { beat: "A3" | seconds }); hold(null) lets it run.
+  previewTransition: (n, { beat = "A3" } = {}) => {
+    startLevel(n);
+    state.player.x = WORLD().finishX;
+    state.player.y = WORLD().finishY;
+    state.player.grounded = true;
+    state.status = "won";
+    wakeAt = clock - 60; // as at the end of a real run (no title ground)
+    camera.snap = true;
+    updateCamera(0);
+    beginTransition({ preview: true });
+    const p = trans.plan,
+      named = /^([AB])(\d+(?:\.\d+)?)$/.exec(String(beat));
+    const at = named ? (named[1] === "A" ? Number(named[2]) * p.b : p.B[0] + Number(named[2]) * p.c) : Number(beat);
+    trans.hold = at;
+    trans.at = clock - at;
+    stepTransition(0);
+    sync();
+    draw();
+    return window.__game.getTransition();
+  },
+  holdTransition: (at = null) => {
+    if (!trans) return false;
+    trans.hold = at;
+    if (at != null) trans.at = clock - at;
+    return true;
+  },
+  // The stored save as written (version 3), or null when storage is blocked.
+  getSave: () => {
+    try {
+      return JSON.parse(window.localStorage.getItem(PROGRESS_KEY) || "null");
+    } catch {
+      return null;
+    }
+  },
+  getProgress: () => ({ ...writeSave(progress), journey: journeyOf(progress) }),
   // The signs drawn in the last frame, in world px (T1b): { id, x, y,
   // alpha, scale, discs }; keylines counts frames that drew Diana's keyline.
   getSigns: () => signsDrawn.map((r) => ({ id: r.id, x: r.x, y: r.y, alpha: r.alpha, scale: r.scale, discs: r.discs.map((d) => ({ x: d.x, y: d.y })) })),
