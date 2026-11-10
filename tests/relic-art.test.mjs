@@ -64,8 +64,25 @@ test("the banner: an ink plate under the HUD band, at most 64 px tall, 2.45 s th
   assert.match(html, /id="banner" aria-hidden="true" hidden/);
   const show = body("showBanner");
   assert.match(show, /const full = !\(progress\.relics \?\? \[\]\)\.includes\(verb\);/, "full the first time a save takes the relic");
-  assert.match(show, /announce\(full \? art\.say/);
+  assert.match(show, /say: full \? art\.say : `\$\{art\.name\}\.`/, "announced: in full, or the name");
+  assert.match(body("syncBanner"), /announce\(banner\.say\)/, "when it shows");
   assert.match(show, /touch \? art\.touch/, "a touch variant");
-  // A beacon's story line waits until it is gone.
-  assert.match(js, /if \(banner\) ui\.storyWaiting = mark\.story;/);
+  // It never meets the level's title card: it waits until the card has faded.
+  assert.match(show, /at: clock \+ cardRemaining\(\)/);
+  assert.match(body("cardRemaining"), /CARD\.fadeIn \+ CARD\.hold \+ CARD\.fadeOut/);
+  // The five-fall assist hint (and an opted-in story line) waits until it is gone.
+  assert.match(js, /if \(banner\) ui\.tipWaiting = "Need a hand\? Assists are in the pause menu\.";/);
+});
+
+test("in-play words: no beacon story lines or generic tips by default; the data keeps them; one assist hint stays", async () => {
+  // Owner, 2026-11-10: the lines running at the bottom add little.
+  assert.match(js, /stories: \/\[\?&\]stories=1\\b\/\.test\(location\.search\)/, "story lines only with ?stories=1");
+  assert.match(js, /tips: \/\[\?&\]tips=1\\b\/\.test\(location\.search\)/, "generic tips only with ?tips=1");
+  assert.match(js, /else if \(WORDS\.stories\) showStory\(mark\.story\);/);
+  assert.match(js, /\} else if \(loud && WORDS\.tips && state\.fallsHere >= 3\) \{/);
+  // Every other showStory/showTip call is behind those switches or is the assist hint.
+  const calls = [...js.matchAll(/show(Story|Tip)\(([^)]*)\)/g)].map((m) => m[0]);
+  for (const c of calls) assert.ok(/mark\.story|Need a hand|ui\.(story|tip)Waiting|cp \? cp\.tip|^show(Story|Tip)\(text\)$/.test(c), c);
+  const { LEVELS } = await import("../level.mjs");
+  assert.ok(LEVELS.every((d) => d.checkpoints.every((c) => typeof c.story === "string")), "the level data keeps its story lines");
 });

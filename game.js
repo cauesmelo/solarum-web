@@ -101,6 +101,17 @@ let manifest = null,
   // yet: a look id for the sky, and a cape charge (0-1) for the breath bar.
   lookOverride = null,
   capePreview = null;
+/* In-play words (owner, 2026-11-10: the lines "running at the bottom" add
+ * little). The beacons' story lines and the generic three-fall tips are no
+ * longer shown; the level data keeps its `story` / `tip` / `startTip` fields.
+ * To bring them back, set these to true (or open the game with ?stories=1 /
+ * ?tips=1). What stays: the unlock banner, the pause card, the transition's
+ * tally and one quiet hint after five falls at a beacon ("Assists are in
+ * the pause menu"), which points at a function a struggling player needs. */
+const WORDS = Object.freeze({
+  stories: /[?&]stories=1\b/.test(location.search),
+  tips: /[?&]tips=1\b/.test(location.search),
+});
 const held = { glide: false };
 const camera = { x: 0, y: 0, snap: true };
 const fx = []; // short-lived particles in world space
@@ -1841,20 +1852,41 @@ function showBanner(verb) {
   control.hidden = !full;
   control.innerHTML = touch ? "" : `${discSvg(art.key[0])}<span class="or">${art.key[1]}</span>`;
   control.append(document.createTextNode(touch ? art.touch : art.line ? ` ${art.line}` : ""));
-  banner = { verb, at: clock, full, seconds: full ? BANNER.fadeIn + BANNER.hold + BANNER.fadeOut : BANNER.replay };
-  $("banner").hidden = false;
-  announce(full ? art.say : `${art.name}.`);
+  // The title card and the banner share the top of the view: a banner that
+  // would meet the card waits until it has faded (the owner saw II's
+  // "Cape flight" on "II The Gift"); a GET anywhere in a level works the same.
+  banner = { verb, at: clock + cardRemaining(), full, said: false, say: full ? art.say : `${art.name}.`, seconds: full ? BANNER.fadeIn + BANNER.hold + BANNER.fadeOut : BANNER.replay };
+}
+/** Real seconds until the level's title card has faded (0 when none). */
+function cardRemaining() {
+  if (!ui.card) return 0;
+  const total = CARD.fadeIn + CARD.hold + CARD.fadeOut,
+    a = simNow() - ui.card.at;
+  return a < total ? (total - Math.max(a, -60)) / simScale() : 0;
 }
 function syncBanner() {
   const el = $("banner");
   if (!banner) return;
+  // A card that started after the banner was queued pushes it back too.
+  if (clock < banner.at + 0.02 && ui.card) banner.at = Math.max(banner.at, clock + cardRemaining());
   const t = clock - banner.at;
-  if (t >= banner.seconds || t < 0) {
+  if (t < 0) {
+    el.hidden = true;
+    el.style.opacity = "0";
+    return;
+  }
+  if (t >= banner.seconds) {
     banner = null;
     el.hidden = true;
     el.style.opacity = "0";
     if (ui.storyWaiting) (showStory(ui.storyWaiting), (ui.storyWaiting = null));
+    if (ui.tipWaiting) (showTip(ui.tipWaiting), (ui.tipWaiting = null));
     return;
+  }
+  if (!banner.said) {
+    banner.said = true;
+    el.hidden = false;
+    announce(banner.say);
   }
   const out = banner.full ? BANNER.fadeOut : 0.25;
   const a = reduced ? 1 : Math.min(1, t / BANNER.fadeIn, (banner.seconds - t) / out);
@@ -2842,9 +2874,9 @@ function processEvents(quiet = false) {
         ui.orbitDirty = true;
         if (loud) {
           ui.beaconLitAt[e.id] = state.time; // simulation time, like the words
-          // A beacon's story line waits while an unlock banner is up.
-          if (banner) ui.storyWaiting = mark.story;
-          else showStory(mark.story);
+          // (Story lines are off by default: WORDS.) One waits while an unlock banner is up.
+          if (WORDS.stories && banner) ui.storyWaiting = mark.story;
+          else if (WORDS.stories) showStory(mark.story);
           announce("A light to return to.");
         }
         break;
@@ -2862,8 +2894,12 @@ function processEvents(quiet = false) {
       case "respawn":
         camera.snap = true;
         clearWords();
-        if (loud && state.fallsHere >= 5) showTip("Need a hand? Assists are in the pause menu.");
-        else if (loud && state.fallsHere >= 3) {
+        // The one hint kept: after five falls at one beacon, where the assists
+        // are (it waits while an unlock banner holds the top of the view).
+        if (loud && state.fallsHere >= 5) {
+          if (banner) ui.tipWaiting = "Need a hand? Assists are in the pause menu.";
+          else showTip("Need a hand? Assists are in the pause menu.");
+        } else if (loud && WORDS.tips && state.fallsHere >= 3) {
           const cp = state.checkpoint ? state.def.checkpoints[checkpointIndex(state.checkpoint.id, state.def)] : null;
           showTip(cp ? cp.tip : state.def.startTip);
         }
