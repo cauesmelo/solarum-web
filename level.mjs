@@ -2152,9 +2152,9 @@ const FALLING_ROAD = {
   decor: [{ id: "super-lock", kind: "cluster", stars: [[gk(322, 2) + 115, RY.marsShore - 300 - 40]] }],
   prompts: [
     { id: "p-road", glyph: ["up"], action: "jump", x: gk(84), y: RY.b0 - 120, from: gk(82), to: gk(86), inputX: gk(84) + 8 },
-    { id: "p-dive", glyph: ["down"], action: "dive", x: gk(158), y: RY.c0 - 140, from: gk(157), to: gk(159) - 10, inputX: gk(158) + 30 },
-    { id: "p-gap", glyph: ["up", "then", "right"], action: "dash", x: gk(218), y: RY.d0 - 160, from: gk(216) - 20, to: gk(221), inputX: gk(216) + 50 },
-    { id: "p-mars", glyph: ["up", "then", "hold-right"], action: "glide", x: gk(325, 4), y: RY.e3 - 230, from: gk(324, 4), to: gk(337, 4), inputX: gk(325, 4) + 40 },
+    { id: "p-dive", glyph: ["down"], action: "dive", x: gk(158) + 80, y: RY.c0 - 120, from: gk(157), to: gk(159) - 10, inputX: gk(158) + 30 },
+    { id: "p-gap", glyph: ["up", "then", "right"], action: "dash", x: gk(218) - 20, y: RY.d0 - 210, from: gk(216) - 20, to: gk(221), inputX: gk(216) + 50 },
+    { id: "p-mars", glyph: ["up", "then", "hold-right"], action: "glide", x: gk(325, 4), y: RY.e3 - 310, from: gk(324, 4), to: gk(337, 4), inputX: gk(325, 4) + 40 },
   ],
   stars: R_STARS,
   routes: {
