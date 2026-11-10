@@ -57,7 +57,7 @@ test("every main route: each takeoff, landing, star, chain note, beacon and tile
     [LEVEL_ID["still-water"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID["way-down"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID.wind]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
-    [LEVEL_ID.constellation]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
+    [LEVEL_ID.breaking]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID.door]: ["jump", "dash", "super-jump", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
   };
   for (const n of IDS) {
@@ -92,7 +92,7 @@ test("constellations complete on an eighth, beacons sit on half bars, flights mo
   // A full flight adds 0.5 s x 227.1 px/s = 113.55 px = 3 x 37.85 px of run.
   assert.ok(Math.abs(RULES.dashSpeed * RULES.dashDuration - 3 * 270 * SIXTEENTH) < 0.01);
   // The beat cascade's pitch is one wave-beat: 207 px.
-  for (const n of [LEVEL_ID.constellation, LEVEL_ID.door]) {
+  for (const n of [LEVEL_ID.door]) {
     const tiles = createLevel(n).platforms.filter((q) => q.cascade).sort((a, b) => a.x - b.x);
     for (let i = 1; i < tiles.length; i++) assert.ok(Math.abs(tiles[i].x - tiles[i - 1].x - 207) < 1);
   }
@@ -265,7 +265,7 @@ test("a perfect run completes each level's song; a sloppy one does not; three Gr
     [LEVEL_ID["still-water"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID["way-down"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID.wind]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
-    [LEVEL_ID.constellation]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings", "glass"],
+    [LEVEL_ID.breaking]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID.door]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
   };
   for (const n of IDS) {
@@ -305,10 +305,10 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
   // The engine's loop with a fake clock: frames of 8-50 ms (seeded), one
   // 200 ms hitch; the simulation advances min(frame, 50 ms) like game.js;
   // the audio clock advances in 128-sample render quanta.
-  // L3: shaker sixteenths through its body, at 118 BPM (clock 1.103).
-  const c = createConductor({ level: LEVEL_ID.constellation, path: PATHS[LEVEL_ID.constellation], cracked: CRACKED });
+  // The interim wind level: shaker sixteenths through its body.
+  const c = createConductor({ level: LEVEL_ID.wind, path: PATHS[LEVEL_ID.wind], cracked: CRACKED });
   const clock = createClockMap();
-  const scale = levelDef(LEVEL_ID.constellation).clock;
+  const scale = levelDef(LEVEL_ID.wind).clock;
   let seed = 9;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   let wall = 0,
@@ -320,7 +320,7 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
     maxDrift = 0,
     hitchAt = null;
   const quantum = 128 / 48000;
-  for (let i = 0; sim < 40; i++) {
+  for (let i = 0; sim < 50; i++) {
     let dt = 0.008 + rnd() * 0.042;
     if (i === 700) (dt = 0.2), (hitchAt = wall + dt);
     wall += dt;
@@ -378,7 +378,17 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   }
   const bar = (run, voice, b) => run.notes.filter((v) => v.voice === voice && v.event === "tick" && Math.floor(v.pos / BAR) + 1 === b).length;
   // (l2-l4: the interim levels, revision five's II-IV.)
-  const [l1, gift, still, way, l2, l3, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  const [l1, gift, still, way, brk, l2, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID.wind, LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  // V: the clave (the half-time beat once a bar, the tresillo's marimba)
+  // only where the cracks run land and go; it rests on the first crack,
+  // over the split voids and through the stone; no shaker (restraint).
+  assert.equal(bar(brk, "pulse", 5), 1);
+  assert.equal(bar(brk, "marimba", 5), 3);
+  assert.equal(bar(brk, "pulse", 3) + bar(brk, "marimba", 3), 0, "V rests on the first crack");
+  assert.equal(bar(brk, "marimba", 13), 0, "V rests over the split voids");
+  assert.equal(bar(brk, "marimba", 17), 0, "V rests through the stone");
+  assert.equal(bar(brk, "marimba", 21), 3, "the run down from the crown");
+  assert.equal(brk.notes.filter((v) => v.voice === "shaker").length, 0);
   // IV: the heartbeat rests while the necklace wakes and in the broken well,
   // keeps its downbeat over the cut and beats 1 and 3 in the rings; no
   // ticks, no shaker, no marimba.
@@ -399,17 +409,15 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   assert.equal(bar(gift, "pulse", 11), 0, "II rests over the long void");
   assert.equal(gift.notes.filter((v) => v.voice === "shaker" || v.voice === "marimba").length, 0);
   // L1: no drums at all. L2: heartbeat on 1 and 3 with ticks and shaker.
-  // L3: the backbeat once a bar and the tresillo marimba. L4: four on the floor.
+  // L4: four on the floor.
   assert.equal(l1.notes.filter((v) => v.voice === "pulse" || v.voice === "shaker").length, 0);
   assert.equal(bar(l2, "pulse", 5), 2);
   assert.equal(bar(l2, "shaker", 5), 0, "the shaker waits for the wind");
   assert.ok(bar(l2, "shaker", 10) >= 16);
-  assert.equal(bar(l3, "pulse", 5), 1);
-  assert.equal(bar(l3, "marimba", 5), 3);
   assert.equal(bar(l4, "pulse", 5), 4);
   assert.equal(bar(l4, "marimba", 5), 8);
   // Each level its own space (RESEARCH_LEVELS 6): 5.5 s, 5.5, 3.5, 2.5.
-  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door];
-  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 4.5, 5.5, 3.5, 2.5]);
-  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 15, 20, 20]);
+  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID.wind, LEVEL_ID.door];
+  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 4.5, 3.5, 5.5, 2.5]);
+  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 18, 15, 20]);
 });

@@ -233,7 +233,7 @@ test("A3: presses at landing, respawn, pause and level start are honoured or ign
 
 /* ---------- B. Jump, forgiveness, air resources ---------- */
 test("B5-B8: apex time, tap/hold ratio, release cut and fall per level (L1 floats on purpose)", () => {
-  const want = { 1: [0.5, 0.53], 2: [0.41, 0.44], [LEVEL_ID["still-water"]]: [0.39, 0.42], [LEVEL_ID["way-down"]]: [0.36, 0.39], [LEVEL_ID.wind]: [0.36, 0.39], [LEVEL_ID.constellation]: [0.33, 0.35], [LEVEL_ID.door]: [0.3, 0.33] };
+  const want = { 1: [0.5, 0.53], 2: [0.41, 0.44], [LEVEL_ID["still-water"]]: [0.39, 0.42], [LEVEL_ID["way-down"]]: [0.36, 0.39], [LEVEL_ID.wind]: [0.36, 0.39], [LEVEL_ID.breaking]: [0.34, 0.37], [LEVEL_ID.door]: [0.3, 0.33] };
   for (const n of IDS) {
     const held = arc(n),
       tap = arc(n, { release: 0 }),
@@ -277,7 +277,7 @@ test("B13: air resources refresh only by the documented rules", () => {
   assert.equal(jump(s), true);
   assert.equal(jump(s), false, "the super jump leaves no double");
   // Cracked stone never gives the cape back; stable stone and beacons do.
-  const c = world(LEVEL_ID.constellation, [["crack", -400, 540, 3000, "crumble"]]);
+  const c = world(LEVEL_ID.door, [["crack", -400, 540, 3000, "crumble"]]);
   c.capeCharges = 0;
   update(c, 0.05);
   assert.equal(capeReady(c), false);
@@ -409,7 +409,7 @@ test("D1: the optional techniques measurably change outcomes", () => {
     return 540 - min;
   };
   const two = Math.round((2 * 15) / 107 / TICK);
-  for (const n of [LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door]) {
+  for (const n of [LEVEL_ID.wind, LEVEL_ID.door]) {
     const sup = apex(n, [[0, "jump"], [two, "dash"], [2 * two, "jump"]]);
     const dbl = apex(n, [[0, "jump"], [2 * two, "jump"]]);
     assert.ok(sup - dbl > 60, `L${n} super ${sup.toFixed(0)} vs double ${dbl.toFixed(0)} px`);
@@ -471,7 +471,7 @@ test("E1/E2: every movement action has a sound and a visual on its own tick; the
 
 /* ---------- F. Solarum: windows, leads ---------- */
 test("F: every required action in every level has a press window of at least 120 ms (real) and a readable cue", () => {
-  const minimum = { 1: 600, 2: 330, [LEVEL_ID["still-water"]]: 315, [LEVEL_ID["way-down"]]: 290, [LEVEL_ID.wind]: 330, [LEVEL_ID.constellation]: 320, [LEVEL_ID.door]: 280 };
+  const minimum = { 1: 600, 2: 330, [LEVEL_ID["still-water"]]: 315, [LEVEL_ID["way-down"]]: 290, [LEVEL_ID.wind]: 330, [LEVEL_ID.breaking]: 240, [LEVEL_ID.door]: 280 };
   for (const n of IDS) {
     const nom = nominalRun(n);
     assert.equal(nom.status, "won");

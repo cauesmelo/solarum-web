@@ -164,17 +164,25 @@ const WAY_SECTIONS = [
   { id: "coda", from: 21, to: Infinity },
 ];
 const L1_CYCLE = [C["Bm(add9)"], C["Bm(add9)"], C["F#m7"], C.Dmaj7, C["F#m7"], C.Dmaj7, C.Gmaj7, C.Gmaj7];
-const L3_CYCLE = [C.Em9, C.A7sus4, C["Dmaj9/F#"], C["Gmaj7#11"]];
-// L3's twist (the broken well): the relative minor turns dark, Bm7 G A F#m.
-const L3_SECTIONS = [
-  { id: "wake", from: 1, to: 2, cycle: [C.Em9] },
-  { id: "cracks", from: 3, to: 7, shaker: true, glass: true, cycle: L3_CYCLE },
-  { id: "ridge", from: 8, to: 12, shaker: true, glass: true, cycle: L3_CYCLE },
-  { id: "broken", from: 13, to: 16, shaker: true, cycle: [C.Bm7, C.G, C.A, C["F#m"]] },
-  { id: "crown", from: 17, to: 19, shaker: true, glass: true, cycle: [C["Gmaj7#11"], C["Dmaj9/F#"], C.A7sus4] },
-  { id: "voids", from: 20, to: 21, shaker: true, cycle: [C.Em9, C.A7sus4] },
-  { id: "close", from: 22, to: 22, cycle: [C["Gmaj7#11"]] },
-  { id: "coda", from: 23, to: Infinity },
+// V · The Breaking Constellation: E Dorian (D major's notes, so G# stays
+// reserved), Em9 A7sus4 Dmaj9/F# Gmaj7#11; the split voids turn to the
+// relative minor, Bm7 G A F#m (RESEARCH_PROGRESSION 4.3). Restraint (the
+// bed stays at or under IV's onsets): the tresillo's marimba and the
+// half-time beat only where the cracks run land and go on the beat (bars
+// 5-8 and the run down from the crown, 21-22); the groove rests everywhere
+// else, so the dives, the shards and the songs are Diana's own. No shaker.
+const V_CYCLE = [C.Em9, C.A7sus4, C["Dmaj9/F#"], C["Gmaj7#11"]];
+const BREAKING_SECTIONS = [
+  { id: "wake", from: 1, to: 2, pulse: false, cycle: [C.Em9] },
+  { id: "first", from: 3, to: 4, pulse: false, cycle: [C["Gmaj7#11"], C["Dmaj9/F#"]] },
+  { id: "go", from: 5, to: 8, cycle: V_CYCLE },
+  { id: "ridge", from: 9, to: 11, pulse: false, cycle: V_CYCLE },
+  { id: "split", from: 12, to: 15, pulse: false, cycle: [C.Bm7, C.G, C.A, C["F#m"]] },
+  { id: "through", from: 16, to: 18, pulse: false, cycle: [C.Em9, C["Dmaj9/F#"], C.A7sus4] },
+  { id: "crown", from: 19, to: 20, pulse: false, cycle: [C["Gmaj7#11"], C["Dmaj9/F#"]] },
+  { id: "down", from: 21, to: 22, cycle: [C.A7sus4, C.Em9] },
+  { id: "close", from: 23, to: 23, cycle: [C["Gmaj7#11"]] },
+  { id: "coda", from: 24, to: Infinity },
 ];
 const L4_CYCLE = [C["Bm/F#"], C["G/F#"], C["Em/F#"], [C["F#sus4"], C["F#"]]];
 // L4's twist (the voids at 128): the pedal climbs, G/F# Em/F# then F#sus4 F#.
@@ -356,21 +364,33 @@ const PRESETS = {
       "finale-song": [71, 74, 78, 83],
     },
   },
-  constellation: {
-    bpm: 118, bars: 24, pickup: 0,
-    // call and response: half-time backbeat (beat 3), a 3+3+2 tresillo on
-    // the rim and the marimba's low root, the world calling on the grid.
-    groove: "clave", maxFlat: 20, space: { seconds: 3.5, shimmer: 0.3 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
-    sections: L3_SECTIONS,
-    chordAt: mapOf(L3_SECTIONS, C.Em9),
-    signalBars: [3, 8, 13, 17], closeFrom: 22,
+  breaking: {
+    bpm: 112, bars: 24, pickup: 0,
+    // V · The Breaking Constellation, a nocturne of call and response
+    // (RESEARCH_PROGRESSION 4.3): the cracks give no bass (they are outside
+    // the score), Diana's jumps, dives and shards answer them. Restraint:
+    // the clave plays six of its 23 bars (BREAKING_SECTIONS), no shaker.
+    groove: "clave", maxFlat: 18, space: { seconds: 3.5, shimmer: 0.3 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
+    sections: BREAKING_SECTIONS,
+    chordAt: mapOf(BREAKING_SECTIONS, C["Gmaj7#11"]),
+    // The wake, the second crack (bar 5), the split voids (bar 12) and the
+    // crown (bar 19); the theme closes from bar 22.
+    signalBars: [1, 5, 12, 19], closeFrom: 22,
     phrases: {
-      // the optional star well (bar 9): A4 B4 D5 E5 G5, climbing.
-      "well-song": [69, 71, 74, 76, 79],
-      // the hearth void (about bar 15): B4 D5 E5 | A5.
-      "flight-line": [71, 74, 76, 81],
-      // the split voids: the answer, E5 D5 B4 | A4 E4.
-      "split-song": [76, 74, 71, 69, 64],
+      // bar 2 (Em9): down the dive onto the low islet, G5 E5 D5 B4.
+      "fall-song": [79, 76, 74, 71],
+      // bars 5-6 (Em9 | A7sus4): land and go, D5 E5 | A5 B5 A5.
+      "crack-song": [74, 76, 81, 83, 81],
+      // bars 9-10 (Em9 | A7sus4): the ridge's late double, D5 E5 | A5 B5.
+      "ridge-song": [74, 76, 81, 83],
+      // bars 12-13 (Bm7 | G): the split voids' answer, F#5 E5 D5 B4 | G4.
+      "split-song": [78, 76, 74, 71, 67],
+      // bars 16-18 (Em9 | Dmaj9/F# | A7sus4): down through the stone, B5 | A5 F#5 D5 | A4.
+      "stone-song": [83, 81, 78, 74, 69],
+      // bar 20 (Dmaj9/F#): up to the crown, A4 B4 D5 F#5 A5.
+      "crown-song": [69, 71, 74, 78, 81],
+      // bars 21-22 (A7sus4 | Em9): the run down, B5 A5 E5 D5 | E5.
+      "plain-song": [83, 81, 76, 74, 76],
     },
   },
   door: {

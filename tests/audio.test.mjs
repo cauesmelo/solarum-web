@@ -627,7 +627,7 @@ test("the itch ZIP ships audio.js but not the soundboard, WAV renders or the arc
 // L3 by default: every layer of the bed (backbeat, tresillo marimba, the
 // smash's celesta) at 118 BPM, so the audio clock runs at 1/clock of the
 // simulation's, as in the game.
-function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true, level = LEVEL_ID.constellation } = {}) {
+function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true, level = LEVEL_ID.breaking } = {}) {
   let now = 0;
   const r = rig({ gentle, enabled, level, clock: () => now });
   const music = mockMusic();
@@ -670,7 +670,8 @@ function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = tr
   return { ...r, s, pauses, stats: r.engine.stats() };
 }
 test("the score plays a whole run on the audio clock: never in the past, caps and voice budget hold, the song completes", () => {
-  const run = scoreRun();
+  // The busiest score (the interim Far Door: four on the floor, the ostinato).
+  const run = scoreRun({ level: LEVEL_ID.door });
   assert.equal(run.s.status, "won");
   const sc = run.stats.score;
   assert.ok(sc.scheduled > 500, `${sc.scheduled} score notes scheduled`);

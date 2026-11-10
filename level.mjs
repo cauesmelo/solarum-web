@@ -426,9 +426,9 @@ function chapterStars() {
  * reads them from the state, so the pilots stay self-contained).
  *
  * The chapter above is the source material: L2 keeps Movement III's geometry
- * and L3 Movement II's at their original coordinates (the x lattice and every
- * solved cell hold), L4 remixes translated copies of both, and L1 re-solves
- * Movement I's ideas on its own floaty cells. */
+ * at its original coordinates (L3 kept Movement II's until V replaced it; the
+ * x lattice and every solved cell hold), L4 remixes translated copies of
+ * both, and L1 re-solves Movement I's ideas on its own floaty cells. */
 /** Grid x of sixteenth k on a route with no flights (a flight adds 3). */
 export const gx = (k) => 220 + 37.85 * k;
 const ALL_VERBS = Object.freeze({ cape: true, dive: true, glide: true });
@@ -1335,6 +1335,278 @@ const WAY_DOWN = {
   },
 };
 
+/* ---- V · The Breaking Constellation (112 BPM): cracked stone ----
+ * RESEARCH_PROGRESSION 4.5 (V), toward Saturn, look 'saturn'. Nothing to
+ * GET: the world brings cracked stone (`crumble`: it gives way 5/16 of
+ * simulation after the first touch-down and never breathes the cape), taught
+ * with the GET's steps all the same (2.2): the first crack breaks under her
+ * and a floor catches her (nothing at stake); after the beacon the second
+ * must be left before it breaks (the ↑ glyph), then land and go three times;
+ * the ridge, with the cracked chain above it (Great Star 1); the split voids
+ * (a cracked islet between two flights gives no breath: the split-song
+ * does); through the stone (a dive through a crack onto the short stone
+ * under it: waiting falls past its end), with the cracked stair above it
+ * (Great Star 3); and a confident finish: the last crack, the late double
+ * to the crown (Great Star 2 for an early second press) and three cracks
+ * down to the ring plain, no glyph. 23 bars, the door on the downbeat of
+ * bar 24 (sixteenth 368).
+ * Shared physics (1500 / 570 / 525), so IV's cells hold (scripts/arcs.mjs,
+ * dy at exactly k/16 after a grid takeoff, up < 0):
+ *   hold 4: -79.9  5: -26.0  6: +57.3        tap 3: +18.0 (a step down)
+ *   jump, dive 3 (at the top):  5: +149.3 (the warm-up's low islet, and the
+ *                               second stone under a crack)
+ *   jump, cape 2:  8: -11.5     jump, cape 3: 10: +69.9 (the split voids)
+ *   jump, jump 3:  8: -100.9    jump, jump 4:  8: -135.1 (the late double)
+ *   a crack gives way 5/16 after the touch-down; a fall from rest of 3/16
+ *   is 132.6 px (the first crack's floor)
+ *   a grounded dive through a crack falls 127 px in 1.4/16, so it is
+ *   pressed 0.4/16 early (IV's lids) and lands on the grid
+ * Steps down after the beacons are taps (18 px, 3/16): walking off them
+ * works too (the beacons' calm), the tap lands on the beat and takes the
+ * star at its top. Heights follow the main route's landings in order. */
+const V_CLOCK = 112 / 107;
+const V_SIX = 15 / 107;
+const VY = (() => {
+  const y = {};
+  let at = 0;
+  for (const [id, dy] of [
+    ["gate", 150], ["islet", 149.3], ["crack1", -26], ["floor", 132.6], ["floor2", 18],
+    ["crack2", -26], ["isle", 57.3], ["crackA", -100.9], ["crackB", -26], ["crackC", 57.3], ["ridgeGate", -26], ["ridgeGate2", 18],
+    ["ridgeStone", 57.3], ["ridgeB", -135.1], ["ridgeC", 57.3], ["splitShore", -26], ["splitShore2", 18],
+    ["splitCrack", -11.5], ["splitFar", 69.9], ["crackS1", -79.9], ["crackS2", -100.9], ["crackS3", 57.3], ["stoneShore", 18],
+    ["stoneCrack1", -26], ["under1", 127], ["stoneMid", -100.9], ["under2", 149.3], ["crackT", -100.9], ["crownGate", 18],
+    ["lastCrack", -79.9], ["crown", -135.1], ["c1", 57.3], ["c2", 57.3], ["c3", 106.1], ["c4", 57.3], ["plain", -79.9],
+  ])
+    y[id] = at = +(at + dy).toFixed(1);
+  // The chain over the ridge gate and the stair over the crown gate (upper).
+  y.chainA = +(y.ridgeGate - 100.9).toFixed(1);
+  y.chainB = +(y.chainA - 26).toFixed(1);
+  y.chainC = +(y.chainB + 57.3).toFixed(1);
+  y.stair1 = +(y.crownGate - 79.9).toFixed(1);
+  y.stair2 = +(y.stair1 - 79.9).toFixed(1);
+  return y;
+})();
+const vIsle = (id, landK, F, takeoffK, y, lead = 80, type, edge = 10) => {
+  const q = [id, gk(landK, F) - lead, y, gk(takeoffK, F) + edge - (gk(landK, F) - lead)];
+  return type ? [...q, type] : q;
+};
+/** A step down onto a beacon's stone (an 18 px tap lands on it on the beacon's
+ * half bar), from 60 px before the landing to the next takeoff. */
+const vStep = (id, landK, F, takeoffK, y, edge = 10) => [id, gk(landK, F) - 60, y, gk(takeoffK, F) + edge - (gk(landK, F) - 60)];
+const V_MAIN = [
+  ["saturn-gate", -700, VY.gate, gk(23) + 10 + 700],
+  // The warm-up: jump 23, dive from the top (26) onto the low islet on 28;
+  // without the dive the jump lands on it later (about 29.9), off the beat.
+  vIsle("low-islet", 28, 0, 32, VY.islet, 80),
+  // The first meeting: a held hop (32) onto the first crack (37); it gives
+  // way under her on 42 and the floor catches her on 45. Walking off the
+  // islet instead lands on the floor too: nothing is at stake. A tap (48)
+  // steps down onto the beacon's stone.
+  ["first-crack", gk(37) - 80, VY.crack1, gk(44) - (gk(37) - 80), "crumble"],
+  ["crack-floor", gk(32) + 10, VY.floor, gk(48) + 10 - (gk(32) + 10)],
+  vStep("crack-floor-2", 51, 0, 68, VY.floor2),
+  // The need: jump 68 onto the second crack (73) and off it (76) before it
+  // gives way (78), down onto the isle (82); then land and go: a double
+  // (85, 88) up onto crack A (93), and two sixteenths on each crack after
+  // it: 95 onto crack B (100), 102 down onto crack C (108), 110 onto the
+  // ridge gate (115), and a tap down onto the beacon's stone (120). Where
+  // she lands and goes, the stone ends 6 px before the takeoff's grid x
+  // (a later press is a walk-off and coyote) and the landing lead is
+  // 55-60 px: a press buffered to the touch-down still lands (the lip
+  // catch), so V's windows narrow on their late side.
+  vIsle("second-crack", 73, 0, 76, VY.crack2, 80, "crumble"),
+  vIsle("beat-isle", 82, 0, 85, VY.isle, 80),
+  vIsle("crack-a", 93, 0, 95, VY.crackA, 60, "crumble", -6),
+  vIsle("crack-b", 100, 0, 102, VY.crackB, 55, "crumble", -6),
+  vIsle("crack-c", 108, 0, 110, VY.crackC, 55, "crumble", -6),
+  vIsle("ridge-gate", 115, 0, 117, VY.ridgeGate, 55),
+  vStep("ridge-gate-2", 120, 0, 132, VY.ridgeGate2),
+  // The ridge: down onto a small cracked stone (138) and off it by the late
+  // double (140, 144) up 135 onto ridge B (148), down 57 (150, 156), up 26
+  // (158, 163) and a tap down onto the split beacon's stone (165, 168).
+  vIsle("ridge-stone", 138, 0, 140, VY.ridgeStone, 60, "crumble", -6),
+  vIsle("ridge-b", 148, 0, 150, VY.ridgeB, 80, undefined, -6),
+  vIsle("ridge-c", 156, 0, 158, VY.ridgeC, 55, undefined, -6),
+  vIsle("split-shore", 163, 0, 165, VY.splitShore, 55),
+  // Its edge is 6 px before the takeoff's grid x (a 30 Hz press is still on
+  // it): the flight's jump has the level's narrowest window (an early jump
+  // flies under the first stars).
+  vStep("split-shore-2", 168, 0, 180, VY.splitShore2, -6),
+  // The split voids: jump 180, cape 182 onto the cracked islet (188): no
+  // breath there; the split-song along the flight, the descent, the islet
+  // and the jump off it (191) gives the cape back (complete on 192) for the
+  // second flight (194) down onto the far shore (201). Then land and go:
+  // 204 onto crack S1 (208), a double (211, 214) up onto crack S2 (219),
+  // 221 down onto crack S3 (227) and a tap down onto the beacon's stone (229, 232).
+  vIsle("split-crack", 188, 1, 191, VY.splitCrack, 70, "crumble"),
+  vIsle("split-far", 201, 2, 204, VY.splitFar, 90),
+  vIsle("crack-s1", 208, 2, 211, VY.crackS1, 70, "crumble"),
+  vIsle("crack-s2", 219, 2, 221, VY.crackS2, 60, "crumble", -6),
+  vIsle("crack-s3", 227, 2, 229, VY.crackS3, 55, "crumble"),
+  vStep("stone-shore", 232, 2, 244, VY.stoneShore),
+  // Through the stone: a held hop (244) onto a crack (249); a dive through
+  // it (249.6) lands on the short stone 127 px under it on 251. Waiting,
+  // the crack gives way on 254 and the fall lands on 256.9, past its end.
+  ["stone-crack-1", gk(249, 2) - 70, VY.stoneCrack1, gk(254, 2) + 24 - (gk(249, 2) - 70), "crumble"],
+  vIsle("under-1", 251, 2, 255, VY.under1, 70),
+  // Up again by a double (255, 258) onto the middle stone (263); then a
+  // jump (267) and a dive from its top (270) through the short crack ahead
+  // (40 px under the middle stone: the dive breaks it on 271.3, so its
+  // shards snap onto the next eighth with the landing), onto the stone 149
+  // px under the middle one (272). Without the dive she lands on the crack
+  // (about 273.2) and walks off its end, past the stone's.
+  vIsle("stone-mid", 263, 2, 267, VY.stoneMid, 80),
+  ["stone-crack-2", gk(270.5, 2), VY.stoneMid + 40, gk(274, 2) - gk(270.5, 2), "crumble"],
+  vIsle("under-2", 272, 2, 275, VY.under2, 70),
+  // A double (275, 278) up onto crack T (283) and a tap down onto the crown
+  // gate (285, 288).
+  vIsle("crack-t", 283, 2, 285, VY.crackT, 60, "crumble"),
+  vStep("crown-gate", 288, 2, 300, VY.crownGate),
+  // The crown: up 80 onto the last crack (304), the late double (307, 311)
+  // up 135 onto the crown (315); then the run down, two sixteenths on each
+  // crack, no glyph: 317 (c1, 323), 325 (c2, 331), a double 333/336 down
+  // 106 (c3, 343), 345 (c4, 351) and up 80 onto the ring plain (353, 357).
+  vIsle("last-crack", 304, 2, 307, VY.lastCrack, 70, "crumble"),
+  vIsle("crown", 315, 2, 317, VY.crown, 70, undefined, -6),
+  vIsle("crown-c1", 323, 2, 325, VY.c1, 55, "crumble", -6),
+  vIsle("crown-c2", 331, 2, 333, VY.c2, 55, "crumble"),
+  vIsle("crown-c3", 343, 2, 345, VY.c3, 60, "crumble", -6),
+  vIsle("crown-c4", 351, 2, 353, VY.c4, 55, "crumble", -6),
+  ["ring-plain", gk(357, 2) - 60, VY.plain, gk(368, 2) + 520 - (gk(357, 2) - 60)],
+];
+const V_HIGH = [
+  // The cracked chain over the ridge gate's run (Great Star 1): off the gate
+  // by a double (116, 119), along the chain (127, 134), down onto ridge B
+  // (141, about 146.9). It starts past the reach of a long tap at 117 and
+  // ends before the ridge-song's star under it.
+  vIsle("chain-a", 124, 0, 127, VY.chainA, 60, "crumble"),
+  vIsle("chain-b", 132, 0, 134, VY.chainB, 60, "crumble"),
+  ["chain-c", gk(138.4), VY.chainC, gk(141) + 10 - gk(138.4), "crumble"],
+  // The cracked stair over the crown gate (Great Star 3): two hops up 80
+  // (291, 296), then at once down onto the last crack (300, about 306).
+  vIsle("crown-stair-1", 295, 2, 296, VY.stair1, 60, "crumble"),
+  vIsle("crown-stair-2", 300, 2, 300, VY.stair2, 60, "crumble"),
+];
+const vAt = (y0, dy) => Math.round(y0 + dy - 36);
+// A constellation star entering the pickup box on sixteenth k: running
+// (feet - 40), or at the arc's height dy (the body centre, feet - 36).
+const vRun = (k, F, y) => [gk(k, F) + 39.5, y - 40];
+const vArc = (k, F, y0, dy) => [gk(k, F) + 39.5, vAt(y0, dy)];
+const V_CHAINS = [
+  // The warm-up's jump and the dive from its top onto the low islet
+  // (complete on 30).
+  { id: "fall-song", route: "low", stars: [vArc(24, 0, VY.gate, -64.7), vArc(25, 0, VY.gate, -99.3), vArc(27, 0, VY.gate, 6.8), vRun(30, 0, VY.islet)] },
+  // Land and go: the second crack, the isle and the double up (complete on 90).
+  { id: "crack-song", route: "low", stars: [vRun(74, 0, VY.crack2), vArc(77, 0, VY.crack2, -64.7), vRun(83, 0, VY.isle), vArc(86, 0, VY.isle, -64.7), vArc(90, 0, VY.isle, -190.3)] },
+  // The ridge: the small cracked stone, its rise, the late double (146).
+  { id: "ridge-song", route: "low", stars: [vRun(139, 0, VY.ridgeStone), vArc(141, 0, VY.ridgeStone, -64.7), vArc(145, 0, VY.ridgeStone, -135.2), vArc(146, 0, VY.ridgeStone, -164.6)] },
+  // Required: two stars on the first flight's line, one on its descent,
+  // one on the cracked islet and one on the jump off it, complete on 192,
+  // two sixteenths before the second flight; the islet gives no breath.
+  { id: "split-song", route: "low", stars: [[gk(182) + 69.69 + 39.5, vAt(VY.splitShore2, -100)], [gk(182) + 2 * 69.69 + 39.5, vAt(VY.splitShore2, -100)], vArc(187, 1, VY.splitShore2, -69), vRun(189, 1, VY.splitCrack), vArc(192, 1, VY.splitCrack, -64.7)] },
+  // Through the stone: under the first crack, up the double, on the middle
+  // stone, at the top of the jump before the dive, under the second (274).
+  { id: "stone-song", route: "low", stars: [vRun(252, 2, VY.under1), vArc(256, 2, VY.under1, -64.7), vRun(264, 2, VY.stoneMid), vArc(269, 2, VY.stoneMid, -99.3), vRun(274, 2, VY.under2)] },
+  // The crown: on the last crack, the jump, the late double's rise, the crown (316).
+  { id: "crown-song", route: "low", stars: [vRun(305, 2, VY.lastCrack), vArc(308, 2, VY.lastCrack, -64.7), vArc(312, 2, VY.lastCrack, -135.2), vArc(313, 2, VY.lastCrack, -164.6), vRun(316, 2, VY.crown)] },
+  // The run down: c1, its jump, c2, its jump and the double off it (338).
+  { id: "plain-song", route: "low", stars: [vRun(324, 2, VY.c1), vArc(326, 2, VY.c1, -64.7), vRun(332, 2, VY.c2), vArc(334, 2, VY.c2, -64.7), vArc(338, 2, VY.c2, -190.3)] },
+];
+const V_GREAT = [
+  { id: "great-1", x: gk(133) + 10, y: VY.chainB - 46, line: "the cracked chain above the ridge gate: land, jump twice, then land and go" },
+  { id: "great-2", x: gk(310.5, 2), y: VY.lastCrack - 200, line: "the crown: jump twice early off the last crack" },
+  { id: "great-3", x: gk(300, 2), y: VY.stair2 - 46, line: "the cracked stair above the crown gate" },
+];
+const V_STARS = [
+  // Running stars after the beacons (the bar is full there anyway).
+  ...[[58, 0, VY.floor2], [61, 0, VY.floor2], [64, 0, VY.floor2], [122, 0, VY.ridgeGate2], [125, 0, VY.ridgeGate2], [128, 0, VY.ridgeGate2], [170, 0, VY.splitShore2], [173, 0, VY.splitShore2], [176, 0, VY.splitShore2], [236, 2, VY.stoneShore], [239, 2, VY.stoneShore], [242, 2, VY.stoneShore], [290, 2, VY.crownGate], [297, 2, VY.crownGate], [360, 2, VY.plain], [363, 2, VY.plain]].map(([k, F, y], i) => [`run-star-${i}`, gk(k, F) + 33.5, y - 40, "low"]),
+  // A star on the rise of each hop that no song crosses.
+  ...[[32, 0, VY.islet], [68, 0, VY.floor2], [95, 0, VY.crackA], [102, 0, VY.crackB], [110, 0, VY.crackC], [150, 0, VY.ridgeB], [158, 0, VY.ridgeC], [204, 2, VY.splitFar], [211, 2, VY.crackS1], [221, 2, VY.crackS2], [244, 2, VY.stoneShore], [275, 2, VY.under2], [300, 2, VY.crownGate], [317, 2, VY.crown], [345, 2, VY.c3], [353, 2, VY.c4]].map(([k, F, y], i) => [`hop-star-${i}`, gk(k + 1, F) + 33.5, vAt(y, -64.7), "low"]),
+  // The taps down onto the beacons' stones: a star at the top of each.
+  ...[[48, 0, VY.floor], [117, 0, VY.ridgeGate], [165, 0, VY.splitShore], [229, 2, VY.crackS3], [285, 2, VY.crackT]].map(([k, F, y], i) => [`tap-star-${i}`, gk(k + 1, F) + 33.5, vAt(y, -23.7), "low"]),
+];
+const VJ = (k, F, when = "g") => [gk(k, F) - 0.3, "jump", when];
+const VT = (k, F) => [gk(k, F) - 0.3, "tap", "g"];
+const VD = (k, F) => [gk(k, F) - 0.3, "dash", "a"];
+const VV = (x, when = "a") => [x - 0.3, "dive", when];
+const V_PLAN_MAIN = [
+  VJ(23, 0), VV(gk(26)), VJ(32, 0), VT(48, 0),
+  VJ(68, 0), VJ(76, 0), VJ(85, 0), VJ(88, 0, "a"), VJ(95, 0), VJ(102, 0), VJ(110, 0), VT(117, 0),
+  VJ(132, 0), VJ(140, 0), VJ(144, 0, "a"), VJ(150, 0), VJ(158, 0), VT(165, 0),
+  VJ(180, 0), VD(182, 0), VJ(191, 1), VD(194, 1),
+  VJ(204, 2), VJ(211, 2), VJ(214, 2, "a"), VJ(221, 2), VT(229, 2),
+  VJ(244, 2), VV(gk(249.6, 2), "g"), VJ(255, 2), VJ(258, 2, "a"), VJ(267, 2), VV(gk(270, 2)), VJ(275, 2), VJ(278, 2, "a"), VT(285, 2),
+  VJ(300, 2), VJ(307, 2), VJ(311, 2, "a"), VJ(317, 2), VJ(325, 2), VJ(333, 2), VJ(336, 2, "a"), VJ(345, 2), VJ(353, 2),
+];
+const BREAKING = {
+  key: "breaking",
+  title: "The Breaking Constellation",
+  look: "saturn",
+  toward: "Saturn",
+  introduces: "cracks",
+  bpm: 112,
+  clock: V_CLOCK,
+  // Cracked stone gives way 5/16 of simulation after the first touch-down.
+  physics: { crumbleAfter: 5 * V_SIX },
+  verbs: { double: true, cape: true, glide: true, dive: true, super: false },
+  gets: [],
+  capeRule: "breath",
+  view: { minWidth: 920, portraitMinWidth: 740 },
+  level: { title: "The Breaking Constellation", speed: 270, startX: 220, startY: VY.gate, finishX: gk(368, 2), finishY: VY.plain, beat: BEAT },
+  movements: [{ id: "V", x: -1000, numeral: "V", name: "The Breaking Constellation" }],
+  sections: [
+    { x: -1000, movement: "V", step: "warm", name: "V · The Breaking Constellation" },
+    { x: gk(30), movement: "V", step: "introduce", name: "V · The Breaking Constellation — the first crack" },
+    { x: gk(56), movement: "V", step: "need", name: "V · The Breaking Constellation — land and go" },
+    { x: gk(120), movement: "V", step: "develop", name: "V · The Breaking Constellation — the ridge" },
+    { x: gk(168), movement: "V", step: "twist", name: "V · The Breaking Constellation — the split voids" },
+    { x: gk(232, 2), movement: "V", step: "twist", name: "V · The Breaking Constellation — through the stone" },
+    { x: gk(288, 2), movement: "V", step: "conclude", name: "V · The Breaking Constellation — the crown" },
+    { x: gk(357, 2), movement: "V", step: "coda", name: "V · The Breaking Constellation — the ring plain" },
+  ],
+  // Beacons on half bars 4½, 8½, 11½, 15½ and 19 (at most 10.7 s real apart),
+  // each lit by the landing on its own beat.
+  checkpoints: [
+    { id: "tired", x: gk(56) - 3, y: VY.floor2, platform: "crack-floor-2", story: "Saturn's stars were old. They could hold her for a breath, no longer.", tip: "Cracked stone breaks soon after you land. Jump off it quickly." },
+    { id: "ridge", x: gk(120) - 3, y: VY.ridgeGate2, platform: "ridge-gate-2", story: "Above the ridge a chain of tired stars still glowed, too thin to trust.", tip: "Land and jump again at once: a crack holds you for half a beat." },
+    { id: "split", x: gk(168) - 3, y: VY.splitShore2, platform: "split-shore-2", story: "The broken islet would not let the cape breathe. The song would.", tip: "Take every star of the song on the first flight and the islet; it gives the cape back." },
+    { id: "through", x: gk(232, 2) - 3, y: VY.stoneShore, platform: "stone-shore", story: "Under the cracks there was older stone, and it held.", tip: "Land on the crack, then press down at once: the stone under it holds." },
+    { id: "crown", x: gk(288, 2) - 3, y: VY.crownGate, platform: "crown-gate", story: "Saturn's rings leaned close, and the last crack led up to them.", tip: "Jump onto the crack, jump again, then once more near the top." },
+  ],
+  startTip: "Jump, then press down at the top to drop onto the low islet.",
+  main: V_MAIN,
+  high: V_HIGH,
+  updrafts: [],
+  cascades: [],
+  chains: V_CHAINS,
+  great: V_GREAT,
+  moments: [],
+  decor: [],
+  prompts: [
+    { id: "p-crack", glyph: ["up"], action: "jump", x: gk(75), y: VY.crack2 - 150, from: gk(74), to: gk(77), inputX: gk(76) + 10 },
+    { id: "p-split", glyph: ["up", "then", "right"], action: "dash", x: gk(181), y: VY.splitShore2 - 170, from: gk(180) - 30, to: gk(183) + 60, inputX: gk(180) + 2 },
+    { id: "p-through", glyph: ["down"], action: "dive", x: gk(250, 2), y: VY.stoneCrack1 - 150, from: gk(249, 2) + 5, to: gk(253, 2), inputX: gk(252, 2) },
+  ],
+  stars: V_STARS,
+  routes: {
+    main: V_PLAN_MAIN,
+    // Great Stars 1-3: the cracked chain (land and go off the ridge gate by
+    // a double, along the chain, down onto ridge B), the cracked stair and
+    // the early second press off the last crack.
+    upper: [
+      ...V_PLAN_MAIN.filter(([x]) => x < gk(115)),
+      VJ(116, 0), VJ(119, 0, "a"), VJ(127, 0), VJ(134, 0), VJ(141, 0),
+      ...V_PLAN_MAIN.filter(([x]) => x > gk(146) && x < gk(288, 2)),
+      VJ(291, 2), VJ(296, 2), VJ(300, 2), VJ(307, 2), VJ(309, 2, "a"),
+      ...V_PLAN_MAIN.filter(([x]) => x > gk(316, 2)),
+    ],
+    // The other ways through the first bars: no dive in the warm-up (she
+    // lands on the islet later), then a walk-off onto the first crack's floor.
+    ability: [VJ(23, 0), ...V_PLAN_MAIN.filter(([x]) => x > gk(40))],
+    safe: V_PLAN_MAIN,
+  },
+};
+
 /**
  * Open a level at `cut` and insert a section (RESEARCH_LEVELS: content, not
  * padding). Everything at x >= cut moves by (dx, dy): platforms, wind,
@@ -1545,141 +1817,12 @@ const L2_S3 = insertSection(L2_S2, {
 });
 const L2 = L2_S3;
 
-/* ---- L3 · The Breaking Constellation (118 BPM): the cool intermediate ----
- * Movement II plus the hearth void and the split voids, at their own
- * coordinates. New: cracked stone. Shelves break 5/16 (sim) after their
- * first touch-down, on the grid; the first crack's floor moved to 129 px
- * below it so the fall lands 3/16 after the break (0.415 s vs 0.421 s), and
- * a 4/16 hop climbs 80 px from it to the second crack. The upper path ends
- * at the lid: the dive is the way on, into the well, out by a double jump
- * (second press 4/16 later, up 135 px) and a 4/16 hop onto the second tile,
- * the same touch-down as Movement II's bounce. Cracks never refill the
- * cape, so the split voids need the split-song. */
+/* Revision five's level III, The Breaking Constellation (interim until V
+ * was built), is retired: V took its cracks and floor, the ridge and its
+ * chain, the split voids, the last crack and the crown, and the cracked
+ * stair (re-solved at 112 BPM), IV its broken well. The interim Far Door
+ * below keeps its crack timing: 5/16 of simulation after the touch-down. */
 const L3_SIX = 15 / 107;
-// Half a sixteenth past the grid: the fall to the floor takes 2.6/16, so the
-// landing is on the grid and the dive and its shards snap onto the next 16th/8th.
-const L3_DIVE = 220 + 113.55 + 37.85 * 385.5;
-const L3_BASE = {
-  id: 3,
-  key: "constellation",
-  numeral: "III",
-  title: "The Breaking Constellation",
-  bpm: 118,
-  clock: 118 / 107,
-  physics: { crumbleAfter: 5 * L3_SIX },
-  verbs: ALL_VERBS,
-  view: { minWidth: 970, portraitMinWidth: 775 },
-  level: { title: "The Breaking Constellation", speed: 270, startX: gx(160), startY: 471, finishX: gx(464) + 3 * 113.55, finishY: 478, beat: BEAT },
-  movements: [{ id: "L3", x: -1000, numeral: "III", name: "The Breaking Constellation" }],
-  // The first crack comes 3.1 s after waking: the title card starts at once
-  // so it is gone before the first jump.
-  cardDelay: 0.2,
-  sections: [
-    { x: -1000, movement: "L3", step: "introduce", name: "III · The Breaking Constellation" },
-    { x: 8270, movement: "L3", step: "develop", name: "III · The Breaking Constellation — the ridge" },
-    { x: 10137.2, movement: "L3", step: "twist", name: "III · The Breaking Constellation — the well and the wave" },
-    { x: 12997.2, movement: "L3", step: "conclude", name: "III · The Breaking Constellation — the crown" },
-    { x: 14900, movement: "L3", step: "develop", name: "III · The Breaking Constellation — the split voids" },
-    { x: 17400, movement: "L3", step: "coda", name: "III · The Breaking Constellation — the far door" },
-  ],
-  checkpoints: [
-    { ...CHECKPOINTS.find((q) => q.id === "well") },
-    ...byId(CHECKPOINTS, ["hearth", "voids"]),
-  ],
-  startTip: "Cracked stone gives way soon after you land. Jump off it quickly.",
-  main: [
-    ...pick(MAIN, ["gate-2", "first-crack"]),
-    ["crack-floor", 7150, 569, 650],
-    // Movement II's well stays optional here (its lid can be run over);
-    // the dive this level requires comes later, in the broken well.
-    ...pick(MAIN, ["second-crack", "beat-isle", "ridge-a", "ridge-stone", "ridge-b", "ridge-c", "b3-isle", "well-rim-a", "lid", "well-rim-b"]),
-    ...pick(MAIN, ["tile-0", "tile-1", "tile-2", "tile-3", "tile-4", "tile-5", "cascade-end", "last-crack", "hearth", "wind-shore", "split-crack", "split-far"]),
-    ["door-rock", 17450, 478, 1000],
-  ],
-  high: [
-    ...pick(HIGH, ["chain-a", "chain-b", "chain-c", "chain-exit", "well-floor", "well-exit"]),
-    // A cracked stair off the crown: two 4/16 hops up 80 px each.
-    ["crown-stair-1", gx(370) - 40, 239, gx(372) + 10 - (gx(370) - 40), "crumble"],
-    ["crown-stair-2", gx(376) - 40, 159, gx(378) + 10 - (gx(376) - 40), "crumble"],
-  ],
-  updrafts: [],
-  cascades: CASCADES,
-  chains: [
-    ...byId(CHAINS, ["well-song"]),
-    ...byId(CHAINS, ["flight-line", "split-song"]),
-  ],
-  great: [
-    { id: "great-1", x: 9330, y: 150, line: "the cracked chain above the ridge" },
-    { id: "great-2", x: 11087.2, y: 592, line: "the star well under the first lid (an optional dive)" },
-    { id: "great-3", x: gx(380), y: 25, line: "the top of the cracked stair above the crown" },
-  ],
-  prompts: [
-    ...byId(PROMPTS, ["p-crack"]),
-    ...byId(PROMPTS, ["p-lid"]),
-    ...byId(PROMPTS, ["p-cape"]),
-  ],
-  stars: starsIn(6260, 17400).filter(([id]) => !id.startsWith("breeze")),
-  routes: {
-    main: [
-      ...CP.breaking, ...CP.ridge,
-      [10666.7, "jump", "g"], [11348.7, "jump", "g"],
-      ...CP.wave, ...CP.crown, ...CP.hearthVoid, ...CP.splitVoids,
-    ],
-    upper: [
-      ...CP.breaking,
-      [8536.6, "jump", "g"], [8608.6, "jump", "a"], [8908.6, "jump", "g"], [9238.6, "jump", "g"], [9568.6, "jump", "g"], [9935, "jump", "g"],
-      [10665.2, "jump", "g"], [10947.2, "dive", "g"], [11337.2, "jump", "g"], [11384, "jump", "a"], [11597.2, "jump", "g"],
-      ...CP.wave.slice(1), ...CP.crown,
-      [gx(366) - 0.3, "jump", "g"], [gx(372) - 0.3, "jump", "g"], [gx(378) - 0.3, "jump", "g"],
-      ...CP.hearthVoid, ...CP.splitVoids,
-    ],
-    ability: null,
-    safe: null,
-  },
-};
-L3_BASE.routes.ability = L3_BASE.routes.main;
-L3_BASE.routes.safe = L3_BASE.routes.main;
-/* L3 (1) The broken well, after the crown's late double: a flight onto a
- * long cracked lid (no refill), whose end looks out over nothing. The well
- * is 276 px deep: walking (or jumping) off the lid's end falls past the 265 px
- * death line before reaching its floor, while a dive through the lid
- * lowers the allowance (RULES.smashDrop) and lands on it. The floor gives
- * the cape back: jump, jump again 3/16 later and fly 3/16 after that, out
- * 606 px onto the far shore 13/16 later (beyond any reach from the lid's
- * end), then a hop onto a copy of the last crack and the crown's late
- * double as before. Four bars, two flights; the rest sits 28 px lower. */
-const bx = (k, flights) => 220 + 113.55 * flights + 37.85 * k;
-// Seventy sixteenths of run (64 of time and two flights), so beacons stay on half bars.
-const L3_X1 = 37.85 * 70;
-const L3_LID = { x: bx(380, 1) - 60, y: 307.5, w: 520 };
-const L3_S1 = insertSection(L3_BASE, {
-  cut: 13800,
-  dx: L3_X1,
-  dy: 28,
-  content: {
-    main: [
-      ["broken-gate", 13817.2, 319, gx(372) + 10 - 13817.2],
-      ["broken-lid", L3_LID.x, L3_LID.y, L3_LID.w, "lid"],
-      ["well-bottom", L3_LID.x, 584, bx(392, 1) + 10 - L3_LID.x],
-      ["far-shore-3", bx(405, 2) - 60, 566, bx(411, 2) + 10 - (bx(405, 2) - 60)],
-      ["last-crack-2", 13467.2 + L3_X1, 486, 300, "crumble"],
-    ],
-    checkpoints: [{ id: "broken", x: 13843.2, y: 319, platform: "broken-gate", story: "One star had fallen through the dark and left a door in it.", tip: "Land on the cracked lid, then press down: only a dive opens the well." }],
-    prompts: [{ id: "p-break", glyph: ["down"], action: "dive", x: L3_LID.x + 200, y: 220, from: L3_LID.x + 70, to: L3_LID.x + 470, inputX: bx(392, 1) - 90 }],
-    stars: [[384, 307.5], [388, 584], [390, 584]].map(([k, y], i) => [`broken-star-${i}`, bx(k, 1) + 34, y - 40, "low"]),
-    sections: [{ x: 13820, movement: "L3", step: "twist", name: "III · The Breaking Constellation — the broken well" }],
-    routes: {
-      main: [
-        [gx(372) - 0.3, "jump", "g"], [gx(374) - 0.3, "dash", "a"],
-        [L3_DIVE - 0.3, "dive", "g"],
-        [bx(392, 1) - 0.3, "jump", "g"], [bx(395, 1) - 0.3, "jump", "a"], [bx(398, 1) - 0.3, "dash", "a"],
-        [bx(411, 2) - 0.3, "jump", "g"],
-        [13545 + L3_X1, "jump", "g"], [13695.7 + L3_X1, "jump", "a"],
-      ],
-    },
-  },
-});
-const L3 = L3_S1;
 
 /* ---- L4 · The Far Door (128 BPM): agitated and tense, precise but fair ----
  * New: the super jump (a jump during a flight), taught over a stable floor
@@ -1871,7 +2014,7 @@ export const CAMPAIGN = Object.freeze(
     { stage: 2, key: "gift", title: "The Gift", toward: "Pluto", bpm: 94, introduces: "cape", look: "pluto", def: GIFT },
     { stage: 3, key: "still-water", title: "Still Water", toward: "Neptune", bpm: 100, introduces: "glide", look: "neptune", def: STILL },
     { stage: 4, key: "way-down", title: "The Way Down", toward: "Uranus", bpm: 107, introduces: "dive", look: "uranus", def: WAY_DOWN },
-    { stage: 5, key: "breaking", title: "The Breaking Constellation", toward: "Saturn", bpm: 112, introduces: "cracks", look: "saturn", def: null },
+    { stage: 5, key: "breaking", title: "The Breaking Constellation", toward: "Saturn", bpm: 112, introduces: "cracks", look: "saturn", def: BREAKING },
     { stage: 6, key: "borrowed-wind", title: "Borrowed Wind", toward: "Jupiter", bpm: 118, introduces: "wind", look: "jupiter", def: null },
     { stage: 7, key: "falling-road", title: "The Falling Road", toward: "Mars", bpm: 123, introduces: "cascade", look: "mars", def: null },
     { stage: 8, key: "far-door", title: "The Far Door", toward: "the Moon, then Earth", bpm: 128, introduces: "super", look: "moon-earth", def: null },
@@ -1882,7 +2025,6 @@ const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
  * take most of their content (VI, V and VIII). */
 const INTERIM = [
   { ...L2, look: "jupiter", toward: "Jupiter" },
-  { ...L3, look: "saturn", toward: "Saturn" },
   { ...L4, look: "moon-earth", toward: "the Moon, then Earth" },
 ];
 function register(d, i, extra) {

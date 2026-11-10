@@ -25,7 +25,8 @@ const CHALLENGE = {
   // IV: the flight over the cut islet after the down beacon.
   [LEVEL_ID["way-down"]]: { down: [220 + 37.85 * 78 + 113.55, 220 + 37.85 * 81 + 113.55] },
   [LEVEL_ID.wind]: { voids: [16000 + 37.85 * 35, 16700 + 37.85 * 35] },
-  [LEVEL_ID.constellation]: { voids: [16000 + 37.85 * 70, 16700 + 37.85 * 70], broken: [15100, 15700] },
+  // V: the first flight of the split voids after the split beacon.
+  [LEVEL_ID.breaking]: { split: [220 + 37.85 * 181, 220 + 37.85 * 184] },
   [LEVEL_ID.door]: { storm: [gx(68), gx(76) + 130] },
 };
 const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJump(s)) };
@@ -37,7 +38,7 @@ export const SLOPPY_RUNS = Object.freeze({
   [LEVEL_ID["still-water"]]: { level: LEVEL_ID["still-water"], failAt: ["still"], removeStars: ["drift-song-1"], late: [[220 + 37.85 * 156 + 113.55 * 3 - 1, 220 + 37.85 * 156 + 113.55 * 3 + 1, 10]] },
   [LEVEL_ID["way-down"]]: { level: LEVEL_ID["way-down"], failAt: ["down"], removeStars: ["warm-song-2"], late: [[220 + 37.85 * 124 + 113.55 + 94.9 - 1, 220 + 37.85 * 124 + 113.55 + 94.9 + 1, 10]] },
   [LEVEL_ID.wind]: { level: LEVEL_ID.wind, failAt: ["voids"], removeStars: ["flight-line-2"], late: [[19860, 19870, 10]] },
-  [LEVEL_ID.constellation]: { level: LEVEL_ID.constellation, failAt: ["broken"], removeStars: ["split-song-1"], late: [[8090, 8100, 12]] },
+  [LEVEL_ID.breaking]: { level: LEVEL_ID.breaking, failAt: ["split"], removeStars: ["crack-song-2"], late: [[220 + 37.85 * 85 - 1, 220 + 37.85 * 85 + 1, 10]] },
   [LEVEL_ID.door]: { level: LEVEL_ID.door, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
 });
 export const SLOPPY = SLOPPY_RUNS[LEVEL_ID.wind];
