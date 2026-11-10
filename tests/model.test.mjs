@@ -992,6 +992,48 @@ test("jump release shortens the arc; a buffered tap stays a tap", () => {
   releaseJump(s);
   assert.ok(s.player.vy > v);
 });
+test("a press just before touch-down is a ground jump even with the double in hand; releases count behind pause and respawn", () => {
+  // Falling onto stone 60 ms before touch-down with the double still there.
+  const s = fixture([{ id: "floor", x: 0, y: 540, width: 3000 }]);
+  Object.assign(s.player, { y: 520, vy: 300, grounded: false, jumps: 1 });
+  s.coyote = 0;
+  s.launched = true;
+  assert.equal(jump(s), false, "waits for the landing");
+  update(s, 0.1);
+  assert.equal(s.player.jumps, 1, "a ground jump: the double is still in hand");
+  assert.ok(s.player.vy < -500);
+  // Far above any stone it is the double jump at once.
+  const high = fixture([{ id: "floor", x: 0, y: 540, width: 3000 }]);
+  Object.assign(high.player, { y: 300, vy: 100, grounded: false, jumps: 1 });
+  high.coyote = 0;
+  assert.equal(jump(high), true);
+  assert.equal(high.player.jumps, 2);
+  // Opening the cape drops the waiting press (it never fires mid-flight).
+  const cape = fixture([{ id: "floor", x: 0, y: 540, width: 3000 }]);
+  Object.assign(cape.player, { y: 520, vy: 300, grounded: false, jumps: 1 });
+  cape.coyote = 0;
+  jump(cape);
+  assert.equal(dash(cape), true);
+  update(cape, 0.4);
+  assert.equal(cape.superJumps, 0);
+  assert.equal(cape.player.jumps, 1);
+  // A release while paused cuts the jump; a press and release while falling
+  // apart respawns as a tap.
+  const p = fixture([{ id: "floor", x: 0, y: 540, width: 3000 }]);
+  jump(p);
+  togglePause(p);
+  releaseJump(p);
+  togglePause(p);
+  assert.equal(p.player.vy, -RULES.tapCap);
+  const d = start(game());
+  Object.assign(d.player, { y: 1300, grounded: false });
+  update(d, 1 / 120);
+  assert.equal(d.status, "dead");
+  jump(d);
+  releaseJump(d);
+  while (d.status !== "running") update(d, 1 / 120);
+  assert.equal(d.player.vy, -RULES.tapCap, "the queued press respawns as a tap");
+});
 test("ascending never snaps to a platform; large time chunks still resolve thin landings", () => {
   const s = fixture([{ id: "fixture", x: 200, y: 450, width: 700 }]);
   Object.assign(s.player, { y: 480, vy: -500, grounded: false, jumps: 1 });

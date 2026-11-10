@@ -150,6 +150,8 @@ export function createGame(seed = 2021, options = {}) {
     greatBanked: [],
     respawn: null,
     queuedJump: false,
+    queuedJumpReleased: false,
+    bufferedDouble: false, // a press waiting for a predicted touch-down (jump())
     starNetUsed: false,
     assist: {
       endlessCape: !!options.endlessCape,
@@ -294,9 +296,11 @@ export function setAssist(s, name, value) {
 }
 export function jump(s) {
   // Jump pressed while falling apart is remembered and spent the moment
-  // control returns, so a hurried retry press is never swallowed.
+  // control returns, so a hurried retry press is never swallowed (released
+  // before then, it is spent as a tap, like any buffered tap).
   if (s.status === "dead" || s.status === "respawning") {
     s.queuedJump = true;
+    s.queuedJumpReleased = false;
     return false;
   }
   if (s.status !== "running") return false;
@@ -322,8 +326,27 @@ export function jump(s) {
     s.jumpBufferReleased = false;
     return false;
   }
+  // A press just before touch-down is a buffered ground jump, not the double
+  // jump (MOVEMENT_AUDIT A3/B10): falling with the double still in hand, she
+  // would land within the buffer (predicted with tick()'s own rules). On the
+  // land-and-go cells (the cascade, the ridge stone) an early press used to
+  // spend the double jump a few px above the stone and break the bounce; the
+  // ground jump is also the stronger of the two. If something intervenes (the
+  // cape opens, a held glide stretches the fall) and the buffer runs out in
+  // the air, the double jump fires then, so the press is never lost.
+  if (!p.grounded && s.coyote <= 0 && touchdownTicks(s, s.physics.jumpBuffer) < Infinity) {
+    s.jumpBuffer = s.physics.jumpBuffer;
+    s.jumpBufferReleased = false;
+    s.bufferedDouble = true;
+    return false;
+  }
   const bufferedTap = s.jumpBuffer > 0 && s.jumpBufferReleased;
-  const first = p.grounded || s.coyote > 0;
+  leap(s, p.grounded || s.coyote > 0, bufferedTap);
+  return true;
+}
+/** The jump itself: a ground (or coyote) jump when `first`, else the double. */
+function leap(s, first, bufferedTap) {
+  const p = s.player;
   p.vy = -(first ? s.physics.jump : s.physics.doubleJump);
   // A tap released before landing must keep its short arc when consumed later;
   // otherwise input forgiveness would turn that tap into an unwanted full jump.
@@ -335,16 +358,57 @@ export function jump(s) {
   s.coyote = 0;
   s.jumpBuffer = 0;
   s.jumpBufferReleased = false;
+  s.bufferedDouble = false;
   s.dashRemaining = 0;
   animate(s, "jump");
   // Apex hang only while the button is still down (a buffered tap is not).
   s.jumpHeld = !bufferedTap;
   markPrompts(s, first ? "jump" : "double-jump");
   event(s, first ? "jump" : "double-jump");
-  return true;
+}
+/** Ticks until Diana's next touch-down if nothing else is pressed, or
+ * Infinity if it is not within `limit` s of simulation: tick()'s fall, glide,
+ * apex hang, fall cap, collapses and one-way landing test, without step-ups
+ * (a step-up is never predicted, so near a lip the double jump still fires).
+ * Wind, a flight or a rise means no touch-down is predicted. */
+function touchdownTicks(s, limit) {
+  const p = s.player,
+    ph = s.physics,
+    half = RULES.playerWidth / 2;
+  if (p.grounded || p.vy < 0 || s.dashRemaining > 0) return Infinity;
+  let x = p.x,
+    y = p.y,
+    vy = p.vy,
+    t = s.time;
+  // Landing on tick k fires the buffer while k ticks have not used it up.
+  for (let k = 1; k * TICK < limit - 1e-6; k++) {
+    t += TICK;
+    x += s.speed * TICK;
+    if (!p.diving && windAt(s, x, y)) return Infinity;
+    const glide = p.gliding && vy > 0;
+    const hang = ph.apexHang && s.jumpHeld && Math.abs(vy) < ph.apexHang.below ? ph.apexHang.factor : 1;
+    vy += (glide ? ph.glideGravity : ph.gravity * hang) * TICK;
+    if (glide) vy = Math.min(ph.glideFall, vy);
+    if (ph.maxFall && !p.diving) vy = Math.min(ph.maxFall, vy);
+    const from = y;
+    y += vy * TICK;
+    for (const q of s.platforms) {
+      if (q.collapsed || (p.diving && isCracked(q))) continue;
+      if (q.crumbleAfter && q.triggeredAt !== null && t - q.triggeredAt >= q.crumbleAfter) continue;
+      if (q.collapseAt != null && t >= q.collapseAt) continue;
+      if (x + half > q.x && x - half < q.x + q.width && from <= q.y + 0.6 && y >= q.y) return k;
+    }
+  }
+  return Infinity;
 }
 export function releaseJump(s) {
-  if (s.status !== "running") return;
+  // A release while falling apart turns the queued press into a tap; one
+  // while paused still counts (the key may come up behind the pause card).
+  if (s.status === "dead" || s.status === "respawning") {
+    if (s.queuedJump) s.queuedJumpReleased = true;
+    return;
+  }
+  if (s.status !== "running" && s.status !== "paused") return;
   s.jumpHeld = false;
   if (s.jumpBuffer > 0) s.jumpBufferReleased = true;
   if (s.player.vy < -s.physics.tapCap) s.player.vy = -s.physics.tapCap;
@@ -361,6 +425,9 @@ export function dash(s) {
     s.capeCharges = 0;
     if (s.capeRule === "cooldown") s.dashCooldown = s.physics.dashCooldown;
   }
+  // The cape is a new decision: a jump pressed just before it was waiting for
+  // a touch-down the flight now postpones, so it is dropped (not fired midair).
+  if (s.bufferedDouble) ((s.bufferedDouble = false), (s.jumpBuffer = 0));
   s.dashRemaining = s.physics.dashDuration;
   s.superUsed = false;
   s.launched = true;
@@ -388,6 +455,8 @@ export function dive(s) {
   p.diving = true;
   p.gliding = false;
   s.dashRemaining = 0;
+  // A dive may smash through the stone that press was waiting for; the dive wins.
+  if (s.bufferedDouble) ((s.bufferedDouble = false), (s.jumpBuffer = 0));
   animate(s, "dive");
   markPrompts(s, "dive");
   event(s, "dive");
@@ -443,11 +512,11 @@ function triggerCascade(s, group) {
   event(s, "cascade", { group: group.id });
 }
 function updraftAt(s) {
-  const p = s.player,
-    cy = p.y - RULES.playerHeight / 2;
-  return s.updrafts.find(
-    (u) => p.x >= u.x && p.x <= u.x + u.width && cy >= u.top && cy <= u.bottom,
-  );
+  return windAt(s, s.player.x, s.player.y);
+}
+function windAt(s, x, y) {
+  const cy = y - RULES.playerHeight / 2;
+  return s.updrafts.find((u) => x >= u.x && x <= u.x + u.width && cy >= u.top && cy <= u.bottom);
 }
 function landOn(s, q, wasGrounded, hard) {
   const p = s.player;
@@ -596,10 +665,12 @@ function tickRespawn(s, dt) {
   r.t += dt;
   const out = s.physics.respawnShatter + s.physics.respawnIris;
   if (s.status === "dead" && r.t >= out) {
-    const queued = s.queuedJump;
+    const queued = s.queuedJump,
+      released = s.queuedJumpReleased;
     if (r.net) catchInStarNet(s);
     else restoreCheckpoint(s);
     s.queuedJump = queued;
+    s.queuedJumpReleased = released;
     s.status = "respawning";
     s.respawn = { ...r, t: out };
     event(s, "respawn", { source: r.net ? "net" : "beacon" });
@@ -608,8 +679,12 @@ function tickRespawn(s, dt) {
     if (r.t >= out + s.physics.respawnPop) {
       s.status = "running";
       s.respawn = null;
-      if (s.queuedJump) jump(s);
+      if (s.queuedJump) {
+        jump(s);
+        if (s.queuedJumpReleased) releaseJump(s);
+      }
       s.queuedJump = false;
+      s.queuedJumpReleased = false;
     }
   }
 }
@@ -638,6 +713,11 @@ function tick(s, dt, controls) {
   const flightDt = s.dashRemaining > 1e-9 ? Math.min(dt, s.dashRemaining) : 0;
   s.dashRemaining = s.dashRemaining - dt > 1e-9 ? s.dashRemaining - dt : 0;
   s.jumpBuffer = Math.max(0, s.jumpBuffer - dt);
+  // The predicted touch-down did not come (see jump()): the double jump now.
+  if (s.bufferedDouble && s.jumpBuffer <= 0) {
+    s.bufferedDouble = false;
+    if (!p.grounded && p.jumps < 2) leap(s, false, s.jumpBufferReleased);
+  }
   const previousY = p.y,
     wasGrounded = p.grounded;
   const advance = s.speed * dt + s.physics.dashSpeed * flightDt;
