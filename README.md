@@ -1,11 +1,36 @@
 # Solarum browser demo
 
+**Keyboard only, and a drawn interface (2026-11-10, after v1.0's release candidate).** Owner: "I like the effect you give on the white line of the black board, the hand-drawn effect. The little circles inside are too exact: can you give them the same drawing style? Disable the mouse for Solarum, I want interaction with the keyboard only."
+- **No mouse, no touch.** Every element is `pointer-events: none`, the pointer is hidden over the game, `inert.mjs` stops every pointer, mouse and touch event at the window (a click, double click, right or middle press, drag, tap or wheel does nothing and is counted in `__game.getInert()`), and no handler listens to a pointer. The one thing a click still does is the browser's own: it gives the page (or the itch.io iframe) keyboard focus, which is why the primary press is not cancelled. The touch zones, the cape and dive buttons, the swipe, the pause, sound and fullscreen buttons, the tally's "again" button and every `click` and hover handler were deleted, not kept dormant (the portrait layout stays only as a letterbox for a tall window). `mobileFriendly` stays `false`.
+- **Every screen runs by key** (the tables are data in `keymap.mjs`, pinned by `tests/keyboard-only.test.mjs`; the key hints on screen are drawn from the same names):
+
+| Screen | Keys |
+| --- | --- |
+| Title | **Space / Enter / ↑ / W** wake (again to skip her emergence) · **← / →** choose an open level (locked ones are never reached) · **C** credits · **M** sound · **F** fullscreen |
+| Credits | **Esc / C / Backspace / Enter / Space** close · ↑ ↓ Page keys scroll a short window |
+| Play | **Space / ↑ / W** jump · **→ / D** cape (hold to float) · **↓ / S** dive · **Esc / P** pause · **R** back to the last light · **Shift+R** restart the level · **M** sound · **F** fullscreen |
+| Pause card | **↑ / ↓** (or **← / →**, or Tab) move the drawn cursor over Continue, Back to last light, Restart level, Main menu, Sound, Assist, Music, Sounds · **Enter / Space** press · **Esc / P** continue (from Assist: back) · **← / →** on a slider change it by one step (5%; Page keys 10%, Home / End the ends) |
+| Assist | **↑ / ↓** move · **Enter / Space** switch the highlighted assist · **Esc** back |
+| Tally (the automatic transition) | **R** again · **Esc / P** pause · any other key skips (after the one-beat lockout) |
+| Load error | **R** (or Enter / Space) try again |
+
+  F toggles the page's fullscreen (`embed.js`; itch.io's own fullscreen button belongs to its page, and in fullscreen the browser keeps Esc for itself, so use P to pause there). Browser shortcuts (Ctrl / Cmd / Alt with a key) are never taken. Key handlers hang on the window and never depend on which element has focus, so keys keep working after a click gave the page focus and after a card closed. The pause card's cursor is also remembered apart from DOM focus (`keyTarget`), and the sliders are nudged by hand, so a click that blurred a control cannot strand the keys.
+- **A visible cursor on every card.** The control the keys act on wears a second, looser loop drawn round it by the same pen (`.is-cursor`, the browser's own focus ring is off): the pause card's buttons and sliders, the Assist toggles, the credits' Back. On the title the filled ring with Diana's sprout is the cursor, and two small chevrons beside the level name say which way another open level lies.
+- **The marks inside the panels are drawn by the same hand as the panel's wobbly line.** `ink-mark.mjs` (pure geometry, no DOM) generates each mark from a seed as the *filled outline of a pen stroke*, which is the only way to get an uneven width:
+  - a **ring** is one stroke that overshoots its own start by 5.5-13% of the loop and drifts 0.9-1.8 px off the start radius (a spiral, so the end is a second line beside the start), its radius carries harmonics 2-5 (a few percent) and it is a hair elliptic, so no ring is a circle; the width follows a pressure curve (1.6-2.7 px for a 2.4 px pen: landing blunt, a long lift);
+  - a **locked ring** is dashed with irregular dashes and gaps that add up to one loop and never touch; **links** between levels are irregular dots (dotted, the road ahead) or a tapering pen line (solid, the road done); **sprouts**, the **Earth dot**, the **pill**, **buttons**, **toggles**, **slider tracks and thumbs**, **key caps**, **arrows**, the **underline** under Credits, the breath bar's **notches**, the HUD and pause **orbit lines** (dots, a pen line clipped at Diana's progress, ringed checkpoints, home, Earth, her sprout) and the **cursor loop** are all drawn this way;
+  - a **seed** per element (`hashSeed("stop", 3)`) fixes a mark for good: the same on every frame and every load, no two alike (the level rings, sprouts and links are seeded by level number; the done-stars and star glyphs get their own small tilt);
+  - the **boil** is `phase` 0-3, a few tenths of a pixel of extra waver, stepped by the same 8 fps timer as the panel's `ink-wobble` filter, in the same places (the title and the pause card, never in play), and **never under "Less motion" / `prefers-reduced-motion`**, where the filter's seed and every mark stand still;
+  - the glue (`ink-ui.mjs`) puts one SVG behind each `data-ink` host, repaints on resize, on state (`ink.refresh`) and on the boil, and a `textContent` on a host would delete its drawing, so button labels go through `setLabel`;
+  - the frames of the cards and panels (the `ink-wobble` filter), the original star sprites (the done-stars, the three star glyphs, kept as drawn by the original artists and only tilted), the breath bar's original frame and the world art are untouched: UI only.
+- **Tests and evidence:** `npm test` 260 pass (13 geometry tests in `tests/ink-mark.test.mjs`, 14 in `tests/keyboard-only.test.mjs`; static tests that read the old touch markup were rewritten for the new contract). Root browser QA (`ONLY=Solarum`): the old touch end-to-end, mobile embed, hybrid-touch, phone-title and tap-to-skip checks were removed or rewritten; new checks drive real key events through every screen, real clicks, double clicks, right clicks, drags and taps (Playwright's mouse and touchscreen) on every control and prove they do nothing, a sandboxed iframe where a click gives focus and keys keep working, and the drawn marks at DPR 1 and 2 and under reduced motion. Screenshots and before / after contact sheets: `common/artifacts/revision-5/solarum-ink-ui/`.
+
 **v1.0 release candidate (2026-11-10).** `package.json` is 1.0.0 and the title shows `v1.0`; [CHANGELOG.md](./CHANGELOG.md) lists what players get, [ITCH_IO.md](./ITCH_IO.md) holds the itch.io export notes and the draft page copy (for the owner). Nothing is uploaded and `v1.0.0` is not tagged until the owner approves the draft. What the v1.0 round added:
-- **Credits** on the title (footer link next to the `v1.0` label): the original team (Cauê Melo, Daniel Calônico "raenkumi", Lucas Santos "LSdS", Rafael Lima "Kimoh"), the soundtrack (Amanda "meromei" and Bruno Mareto "Bu Maré", the original recording heard on the title and at the far door), the Solarum Basic font, and a note that every in-level sound is synthesised. Esc, Back or a tap outside closes it; keys never reach the game behind it. `__game.getCredits()` / `showCredits(open)` for QA.
+- **Credits** on the title (the word and its C key cap next to the `v1.0` label): the original team (Cauê Melo, Daniel Calônico "raenkumi", Lucas Santos "LSdS", Rafael Lima "Kimoh"), the soundtrack (Amanda "meromei" and Bruno Mareto "Bu Maré", the original recording heard on the title and at the far door), the Solarum Basic font, and a note that every in-level sound is synthesised. Esc, C, Backspace or Enter closes it (opened with C; keyboard only: a tap outside the card no longer closes it); keys never reach the game behind it. `__game.getCredits()` / `showCredits(open)` for QA.
 - **No more clamped-frequency warning.** The star glass's tiny bell (two octaves over a high melody note) put its 3.5x FM modulator at 24-33 kHz on levels II, VI, VII and VIII; Chrome clamped it and logged "Oscillator.frequency.setValueAtTime value ... outside nominal range" on each call. `fm()` in `audio.mjs` now folds a modulator past `OSC_MAX_HZ` (22050 Hz, Nyquist at 44.1 kHz) down by whole octaves, keeping the index; over a 30-112 midi sweep of every recipe only layers that were out of range changed (357 layers, 0 of them in range). `tests/audio-range.test.mjs` runs the main and upper routes of all eight levels through the engine and sweeps every voice over its own register.
 - **Saves:** unchanged format (`solarum.levels` version 3, with `solarum.sound`, `solarum.music`, `solarum.volume`), now pinned by `tests/release.test.mjs`: a version-1 save, a version-2 save naming retired interim levels, field-by-field sanitising, hostile values, and settings read from storage that throws.
 - **Player docs only in the ZIP:** `README.md` and `CHANGELOG.md` (and any licence file); the research, design and audit notes stay in the repository.
-- **Mobile friendly is on (landscape)**, on the strength of an emulated-phone end-to-end touch run only (see [ITCH_IO.md](./ITCH_IO.md)); the owner decides after a physical phone.
+- **Mobile friendly is off** (`itch.json`; owner, 2026-11-10: phones were never requested). Solarum is a desktop keyboard game; see the section above.
 - Root browser QA ([../common/tests/browser.mjs](../common/tests/browser.mjs), `ONLY=Solarum`): the meteor "lossless" check compares the canvas command stream instead of raster pixels (Chrome rasterises one frozen frame differently on successive draws), II's GET expects the full bar the re-solve gave it, and new data-driven checks cover every level's GET, touch play end to end and the credits.
 
 **A Signal in the Dark** is the authored first chapter of the original Solarum runner. Diana runs on her own across floating islands toward a faint signal from Earth. The original cream-on-black hand-drawn art, Diana's cape, the stars, the solitude and the far door stay at the centre.
@@ -52,18 +77,21 @@ No install or build step is needed to play; use HTTP (the game loads ES modules 
 
 Reach the far door. Stars never gate anything.
 
-| Action | Keyboard | Touch (landscape) | Touch (portrait) |
-| --- | --- | --- | --- |
-| Wake (title) | Space, Enter or ↑ (again to skip her emergence) | Tap anywhere | Tap anywhere |
-| Choose an open level (title) | ← / → or click a station | Tap a station | Tap a station |
-| Jump / jump again in the air | Space, ↑ or W (release early for a hop) | Left half of the screen | Left half of the control deck |
-| Cape flight (once per airtime) | D or → in the air | 76 px cape button, bottom right | Cape button in the deck |
-| Glide (hold the cape) | Hold D or → | Hold the cape button | Hold the cape button |
-| Super jump | Jump during a flight | Jump zone during a flight | Same |
-| Dive / smash cracked stone | S or ↓ | 64 px dive button or swipe down on the right half | Same |
-| Pause / resume | P or Esc | II button | II button |
-| Back to last light / restart level | R / Shift+R | Pause card | Pause card |
-| Main menu, Music / Sounds volume | Pause card (↑ ↓ move, ← → on a slider) | Pause card | Pause card |
+| Action | Keys |
+| --- | --- |
+| Wake (title) | Space, Enter, ↑ or W (again to skip her emergence) |
+| Choose an open level (title) | ← / → |
+| Jump / jump again in the air | Space, ↑ or W (release early for a hop) |
+| Cape flight (once per airtime) | D or → in the air |
+| Glide (hold the cape) | Hold D or → |
+| Super jump | Jump during a flight |
+| Dive / smash cracked stone | S or ↓ |
+| Pause / resume | P or Esc |
+| Back to last light / restart level | R / Shift+R |
+| Main menu, Music / Sounds volume | Pause card (↑ ↓ move, Enter / Space press, ← → on a slider) |
+| Credits, sound, fullscreen | C (title), M, F |
+
+No mouse and no touch: see the section at the top for every screen's keys.
 
 Diana runs 151.4 px per beat in every level: 222 / 237 / 270 / 298 / 323 px/s of real time at 88 / 94 / 107 / 118 / 128 BPM. The simulation always runs in 107 BPM units and a level plays it at clock = BPM / 107 (like Gentle pace), so every arc, gap and cell is the same in px and sixteenths, while coyote (0.12 s), the landing buffer (0.14 s), respawn and telegraphs stay constant in real seconds. A jump pressed while she is falling apart is kept and spent the moment she is back (released by then, it is a tap). A press just before touch-down is the ground jump on the landing tick even with the double jump still in hand. Every key, touch or click acts on the 1/120 s tick its own timestamp falls in, whatever the frame rate or a hitch ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)). Each level owns its verbs (`def.verbs`) and a GET placed in it owns one more as Diana runs through it (`def.gets`, event `get`; a beacon remembers what was owned). I starts with the jump only (no air jump until its GET) and ignores the cape and dive buttons; II starts with the double jump and gets the cape in its first bar. V–VII own every verb but the super jump; VIII starts with them and gets the super jump from the rising star on sixteenth 24.
 
@@ -106,24 +134,24 @@ RESEARCH_PROGRESSION plans eight stages along the GDD's journey, one new thing e
 
 ## UI: ink and starlight
 
-The Solarum font is used for every label (never below 16 px; its missing ✦ is replaced by the original star sprite). Colours are the original title-art tokens `--ink #0C0C0F`, `--paper #FBFBEA`, `--hill #CECEC1`, `--mute #AEAEA3`, `--dim #777771`; `--earth #6FA8DC` is the only colour and is reserved for Earth. Paper cards carry a hand-drawn ink frame (an SVG displacement filter that boils at 8 fps unless reduced motion is set).
+The Solarum font is used for every label (never below 16 px; its missing ✦ is replaced by the original star sprite). Colours are the original title-art tokens `--ink #0C0C0F`, `--paper #FBFBEA`, `--hill #CECEC1`, `--mute #AEAEA3`, `--dim #777771`; `--earth #6FA8DC` is the only colour and is reserved for Earth. Paper cards carry a hand-drawn ink frame (an SVG displacement filter that boils at 8 fps unless reduced motion is set), and every mark inside them is drawn by the same hand (`ink-mark.mjs`; see the section at the top).
 
 - **Title (revision seven):** the original logo in the sky; the original title ground (with a tinted copy as back hills) and the 18-frame sprout, framed with the soil at the same fraction of the stage for every level (60% of the height, 50% on short landscape screens, 80% of a portrait sky; the levels' start heights differ by 220 px); and **one opaque ink panel with the paper frame** standing on the ground. The user found the old see-through station cards illegible under the sky's star sprites. The panel holds, in order of importance:
-  - The **wake** button (paper on ink, a slow breath of light instead of a fading label).
-  - The **orbit line**: one numbered stop per level, built from `LEVELS` and joined by the dotted orbit (solid between finished levels), ending at Earth. Ten fit in one row at 960 px; phones get balanced rows (5 + 5 at 390 px wide). Short landscape screens put the line beside the wake button, or across the panel's first row when it is long.
-  - The **selected level's name and three Great Star slots**, shown once. Hovering or focusing a stop previews it.
-  - Under it, the key hint.
+  - The **wake** caption (a hand-drawn paper pill with a ring outside it and a second ring that breathes; a caption for the Space key, not a button).
+  - The **orbit line**: one numbered stop per level, built from `LEVELS` and joined by the orbit (irregular dots ahead, a pen line between finished levels), ending at Earth. Ten fit in one row at 960 px; a narrow window gets balanced rows. Short windows put the line beside the wake caption, or across the panel's first row when it is long.
+  - The **selected level's name and three Great Star slots**, shown once between two chevrons (another open level to the left or right).
+  - Under it, the key hint (drawn arrows and key caps), the `v1.0` label and the C key for the credits; M (sound) and F (fullscreen) hints sit in the title's corners.
 
-  Stops: open = ink with a paper ring; selected = paper with Diana's two leaves above; finished = a small star at the rim; locked = a dashed `--dim` ring and a `--mute` numeral (8.6:1 on ink, not faded), focusable for the preview ("opens after III") but not playable. ←/→ choose among open levels. The world (stars, glyphs, beacons, islands) is not drawn on the title and fades in with the run, and the shooting stars never run there, so nothing in the sky can sit over or show through the options. In portrait the panel stands on the sky's strip of ground and runs into the deck, with ♫ and fullscreen moved up to the empty HUD bar; on a phone turned sideways it goes compact. Sound is on by default and starts with the wake gesture (the choice persists with a guarded `localStorage` write); see [Sound](#sound).
+  Stops: open = ink with a paper ring; selected = paper with Diana's two leaves above; finished = a small star at the rim; locked = a dashed `--dim` ring and a `--mute` numeral (8.6:1 on ink, not faded), never reached by the keys (its name shows "opens after III" only to assistive technology). ←/→ choose among open levels. Every ring is drawn (see the section at the top). The world (stars, glyphs, beacons, islands) is not drawn on the title and fades in with the run, and the shooting stars never run there, so nothing in the sky can sit over or show through the options. Sound is on by default and starts with the wake gesture (the choice persists with a guarded `localStorage` write); see [Sound](#sound).
 - **The wake: Diana emerges from the earth** (the original trailer's beats, [ANIMATION_AUDIT.md](./ANIMATION_AUDIT.md)). The press fades the title UI and plays her emergence on the unchanged title camera:
   1. The leaves twitch (0.26 s).
   2. Her head rises out of the soil into them (0.42 s).
   3. A beat of looking (0.30 s).
   4. She hops out with soil crumbs (0.24 s).
 
-  Then the original `start` clip runs into the run, with the wake camera move and the title ground's fade, as before. **Measured: about 1.24 s from the press to `running`** (the playtest critic's capture, 2026-11-10); the start clip (0.33 s) then plays into the run, so she is at full stride about 1.55 s after the press. 0.36 s + the start clip under reduced motion. A second press skips straight to the run, and ←/→ are ignored while she wakes.
-- **The title legend** lists only the verbs owned at the selected level's start (RESEARCH_PROGRESSION U8): "↑ jump" alone on a first launch, "→ cape" from II's start on, "↓ dive" from V's; the touch variant names only the owned thumb verbs.
-- **HUD:** star count, three Great Star slots (hollow frame 0, filled frame 2, pulsing while carried), the orbit line home → Earth with beacon ticks and a two-leaf Diana marker, fullscreen and II. Since revision five, also the **breath bar** once the cape is Diana's. Nothing else.
+  Then the original `start` clip runs into the run, with the wake camera move and the title ground's fade, as before. **Measured: about 1.24 s from the press to `running`** (the playtest critic's capture, 2026-11-10); the start clip (0.33 s) then plays into the run, so she is at full stride about 1.55 s after the press. 0.36 s + the start clip under reduced motion. A second press skips straight to the run, and the level keys are ignored while she wakes.
+- **The title legend** lists only the verbs owned at the selected level's start (RESEARCH_PROGRESSION U8): "↑ jump" alone on a first launch, "→ cape" from II's start on, "↓ dive" from V's; the arrows are drawn.
+- **HUD:** star count, three Great Star slots (hollow frame 0, filled frame 2, pulsing while carried), the orbit line home → Earth with beacon ticks and a two-leaf Diana marker (drawn by hand). Since revision five, also the **breath bar** once the cape is Diana's. Nothing else.
 - **The breath bar** (RESEARCH_PROGRESSION 3.3; [ANIMATION_AUDIT.md](./ANIMATION_AUDIT.md)): the original HUD art, top-left. `DianaCooldownCircle.png`'s disc sits at the left end of `barrinha.png`'s hand-drawn frame (100 × 24 px), `recheioBarra.png` fills the frame's hole clipped to the cape's continuous `capeCharge`, three ink notches mark the quarters, and when the bar is full the disc becomes `meteoroCheio.png` (the cracked asteroid stone: the gift is ready) with one ring pulse. The star count and slots move right to make room; in portrait, where the HUD bar has no room, the bar sits in the sky's own top-left corner. It is **absent, not empty**, until the cape is owned (the eight-level model's `verbs.cape`) and whenever the state has no `capeCharge` (today's model), and it arrives with one pulse at II's GET. The cape on Diana is tinted in four steps (60 / 45 / 30 / 15% `--dim`, clear at full; 60% when spent without a bar, as before).
 - **The leaf glint** (RESEARCH_PROGRESSION 2.1, MOVEMENT_AUDIT E2): one small original star just above Diana's leaves while the double jump is in hand (owned, and not yet spent in this airtime). It bursts into the star sheet's burst frames when she spends it and pops back on landing; its height lags her by 60 ms when she falls and lands and rides her head when she rises.
 - **No-cape Diana:** whenever the state's `verbs` lack the cape (level I in the eight-level campaign) she is drawn with the archive's no-cape override clips, emergence included; at the cape's GET the caped clip fades in over them in 0.6 s. Without a `verbs` field she wears the cape, as before.
@@ -149,13 +177,13 @@ The Solarum font is used for every label (never below 16 px; its missing ✦ is 
   - **A3** only space is left; Diana's two-leaf marker slides along the line; the journey row counts up (≤ 12 integer steps).
   - **A4 = B0** the next level loads unseen at its run framing (its simulation held at bar 1); the count-in's first beat. **B2** its title card fades in and its world pushes in (1.12 → 1, easeOutQuart) with the original portal lit behind Diana's start. **B3** Diana appears in the door's light and the next level's HUD returns. **B4** bar 1: she steps out running; the door's light ebbs over one beat and the door stays as scenery.
   - **The tally**: an ink panel with the paper frame (DOM, `role="status"`, no buttons, never focused, `pointer-events: none`). Level row: "I · Waking", stars n / total, the three Great Star slots, this run's falls; journey row: the best stars of each level summed, Great Stars n / 3 × levels, every fall in the save. Falls are plain `--hill` text, never celebrated. Desktop: centred at 58% of the stage; landscape phones at 56%, ≤ 60% wide; portrait phones (and 320 × 568) in the deck, 24 px under the sky. Hint: "R again · Esc menu" (touch: a 44 px "↺ again" button; the HUD's II is the menu). The journey line also lives in the pause card.
-  - **Input:** any key (except R, P, Esc, Tab, modifiers), click or tap skips to the arrival with a 0.3 s cross-dissolve (a cut under reduced motion), after a one-beat lockout and only for presses that begin after the door; the press is consumed, and every key or pointer down at bar 1 is stale until released. R plays the finished level again (before or after the swap); Esc/P pauses and freezes the beat (the card's Restart button reads "Play I · Waking again"); blur and hidden tabs pause.
+  - **Input:** any key (except R, P, Esc, M, F, Tab, modifiers; a click or tap never skips) skips to the arrival with a 0.3 s cross-dissolve (a cut under reduced motion), after a one-beat lockout and only for presses that begin after the door; the press is consumed, and every key down at bar 1 is stale until released. R plays the finished level again (before or after the swap); Esc/P pauses and freezes the beat (the card's Restart button reads "Play I · Waking again"); blur and hidden tabs pause.
   - **Music**: the door cadence at A0, the held closing chord, the count-in on B0–B3 (also under reduced motion), the next score's bar 1 with the held chord's 1.4 s handover. A skip, R or Main menu cancel the count-in's remaining beats. (The audio squad owns `audio.mjs`; it still enters the held pad 2 s after the door, where the spec asks for A2.)
   - **The last level ends the journey**: the door blooms in Earth's blue, the camera pulls back to 0.35, the Moon sinks and Earth turns to face her (a whole blue disc), the final tally on bar 2 with "Earth, whole and blue, remembered every star." (every Great Star) or "Earth. Small, blue, and listening. She was home.", the credits (one card at a time, 1.5 bars each) on the first completion only, then the title fades in over one bar selecting the last level. Any key after the lockout goes to the title (0.6 s fade).
   - **Reduced motion** keeps the same beats, durations and count-in: no zoom, push-in, arcs or motes; the bodies sit at their end positions and cross-fade; the tally shows its final values.
 - **Diana's keyline:** where her drawn box meets a visible sign, she gets a 2 px ink keyline clipped to the discs (her cream silhouette would merge with the paper); outside discs nothing changes.
 - **Step-ups and lip catches** lift the collider up to 30 px in one tick; the drawn feet ease up over 70 ms (render only; the collider stays exact).
-- **Touch:** targets ≥ 44 px, buttons at 35% until pressed. With the breath bar, the cape button's rim fills as a paper arc with the charge and lights once when full; buttons of verbs not yet owned (the eight-level model's `verbs`) are absent. A device that reports a fine pointer but has a touchscreen gets the touch controls on its first real touch. In landscape the cape (62 px) and dive (50 px) sit low in the right corner so the lower-right lookahead stays visible; touch devices see touch hints on the title. Story lines and tips sit on ink plates so they read over cream islands. The brief's remove-lists are gone entirely: there is no canvas text at all.
+- **Touch: removed** (2026-11-10; the cape button, its rim, the dive button, the jump zone and the swipe were deleted with the rest of the pointer code). Story lines and tips sit on ink plates so they read over cream islands. The brief's remove-lists are gone entirely: there is no canvas text at all.
 
 ## Sound
 
@@ -509,7 +537,7 @@ __game.getTitle();                  // { emerging, phase, t, total, set, fallbac
 __game.setSpriteSet("nocape");      // the sprite set override: the archive's no-cape clips, in the emergence and in play
 __game.setLook("neptune");          // preview a per-level look (null: the level's own; "none": revision seven's sky)
 __game.setPlatformStyle("classic");  // "meteor" (default) or "classic" islands, drawing only; getPlatformStyle(); also ?platforms=classic
-__game.previewCape(0.62);           // the breath bar, touch rim and cape tint at a charge (null ends the preview)
+__game.previewCape(0.62);           // the breath bar and cape tint at a charge (null ends the preview)
 __game.previewGet("glide");         // a GET moment now; { approach: true, lead: 520 } places it ahead first
 __game.previewRelic("double");      // a relic in its beam 640 px ahead: it bursts, holds over Diana and shows the banner as she runs through
 __game.previewRefill("cape", { lit: true }); // a cape or leaf refill star ahead at chest height
@@ -574,15 +602,14 @@ Screenshots: `common/artifacts/revision-4/solarum-breath-bar.png`, `solarum-brea
 - the global mix rules, a whole run never over 12 bed voices, and guarded Music / Sounds storage;
 - the staged warm-up (identical graph, no context with sound off);
 - the door's held chord and the map's count-in;
-- glyph clearance and hybrid touch.
+- glyph clearance. (The hybrid-touch check, phone titles and the touch end-to-end run of earlier rounds were removed in the keyboard-only change.)
 
 The root browser QA (`cd ../common && ONLY=Solarum npm run test:browser`, the packaged ZIP in Chrome) passes **15/15**. Its new checks:
 - The title panel and its stops are opaque ink, the canvas is never on top anywhere across the panel, there is one stop per level, and locked stops use `--mute` without fading.
 - A real Space press starts the emergence (`status` still `'ready'`, phase `twitch`, `rise` at 0.5 s) and runs in 1.55 s with no main-thread long task. A second press skips it.
 - Pause: ↑/↓ walk Continue → … → Main menu → Sound → Assist → Music, and ←/→ move the slider (saved). Main menu returns to the title with the engine resumed, the score stopped, the title song wanted and progress kept.
 - The victory card holds only Continue (focused) and Retry; after IV, Continue returns to the title.
-- Phone portrait (390×844) and landscape (844×390) titles keep the panel on screen, with a 0.36 s reduced-motion emergence.
-- A fine-pointer page shows the touch controls after its first touch.
+- (Historical, removed in the keyboard-only change: phone titles and the hybrid-touch check.) Reduced motion keeps a 0.36 s emergence.
 
 Screenshots: `common/artifacts/revision-4/solarum-title*.png`, `solarum-emergence.png`, `solarum-pause-main-menu.png`, `solarum-victory.png`. The pilots, routes, glyph windows, movement audit and grid are unchanged; nothing in this revision touches the simulation.
 
@@ -656,5 +683,5 @@ Original credits: Cauê Melo, Daniel Calônico, Lucas Santos and Rafael Lima; th
 - Not built from the brief's options: separate music / effects volume, reduced audio motion, mono, audio offset and the visual beat. Built: sound on / off and Gentle music.
 - M8 (comet slipstream) is not implemented: the finale already chains two flights and a wind column, and another speed source would hurt readability.
 - The cape tint is a gradient over the trailing half of the sprite because most original sheets bake the cape into the body; it can lightly touch a trailing leg.
-- Portrait phones get a smaller sky (366 css px tall at 390 px wide, 2.05 s lookahead); landscape is recommended and the game says so once.
-- Safari / Firefox and physical touch devices are untested, including Web Audio there (Safari's MediaElementSource, ConstantSourceNode and suspend / resume behaviour in particular; without delay lines or constant sources the cues still play and only the score stays silent). Phone CPU for the score (pads, 4 s space reverb, shimmer) is unmeasured. Automated pilots read exact coordinates; they do not show where a first-time player misreads a cue.
+- A tall, narrow window letterboxes the sky (366 css px tall at 390 px wide, 2.05 s lookahead); the game is built for a landscape desktop window. Phones are out of scope.
+- Safari / Firefox are untested, including Web Audio there (Safari's MediaElementSource, ConstantSourceNode and suspend / resume behaviour in particular; without delay lines or constant sources the cues still play and only the score stays silent). Phone CPU for the score (pads, 4 s space reverb, shimmer) is unmeasured. Automated pilots read exact coordinates; they do not show where a first-time player misreads a cue.
