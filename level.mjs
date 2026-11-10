@@ -888,6 +888,9 @@ const GIFT = {
     // The crater's two hops and the plain's three: a star on each rise.
     ...[23, 31].map((k, i) => [`rim-star-${i}`, gk(k + 1) + 33.5, GY.crater - 26 * i - 64 - 36, "low"]),
     ...[252, 262, 272].map((k, i) => [`plain-star-${i}`, gk(k + 1, 8) + 33.5, GY.plain - 26 * i - 64 - 36, "low"]),
+    // Running stars where the bar is already full (after a beacon or the
+    // first fill), so they add notes but never change when it fills.
+    ...[[58, 1, GY.gift], [61, 1, GY.gift], [64, 1, GY.gift], [90, 2, GY.hearth], [93, 2, GY.hearth], [96, 2, GY.hearth], [154, 3, GY.long], [157, 3, GY.long], [160, 3, GY.long], [186, 5, GY.voidShore], [189, 5, GY.voidShore], [192, 5, GY.voidShore], [226, 7, GY.rock2], [229, 7, GY.rock2], [232, 7, GY.rock2]].map(([k, F, y], i) => [`run-star-${i}`, gk(k, F) + 33.5, y - 40, "low"]),
     // The breath lesson's hops (each at the second press's rise).
     ...[116, 128].map((k, i) => [`breath-star-${i}`, gk(k + 1, 3) + 33.5, GY.shore2 + 12 * i - 120 - 36, "low"]),
   ],
