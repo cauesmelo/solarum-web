@@ -8,6 +8,7 @@ import { CHORDS, BEAT, chordTones, rootIn, safeAtOrAbove, LAYERS } from "./score
 import { recordFrames, SLOPPY_RUNS } from "./tests/music-run.mjs";
 import { LEVELS, LEVEL_ID } from "./level.mjs";
 import { SCORES } from "./score.mjs";
+import { tuneFor } from "./tune.mjs";
 
 const $ = (id) => document.getElementById(id);
 const engine = createAudioEngine({ enabled: true, seed: (Date.now() & 0xffff) + 1 });
@@ -234,7 +235,7 @@ for (const [title, about, opts] of RUNS)
     await playBuffer(buffer);
   });
 const STEMS = [
-  ["sky", "Sky pad: the bed, never lost; only H detunes it", { kind: "main", from: 0, seconds: 20 }],
+  ["sky", "Sky: the wind bed (revision eight), never lost; H detunes its breaths", { kind: "main", from: 0, seconds: 20 }],
   ["signal", "The Signal: the motif's head every cycle, far right and nearer with progress", { kind: "main", from: 0, seconds: 20 }],
   ["pulse", "The level's groove: none in L1, heartbeat and shaker in L2, backbeat and tresillo in L3, four on the floor in L4", { kind: "main", from: 6, seconds: 12 }],
   ["steps", "Steps: every stable landing plays the root", { kind: "main", from: 0, seconds: 20 }],
@@ -262,7 +263,7 @@ async function startAB(button, renders, labels) {
     for (const s of ab.sources) s.stop();
     const was = ab.button;
     ab = null;
-    for (const id of ["ab", "ab-mix"]) $(id).setAttribute("aria-pressed", "false");
+    for (const id of ["ab", "ab-mix", "ab-sky", "ab-bed", "ab-tune"]) $(id).setAttribute("aria-pressed", "false");
     $("ab-switch").disabled = true;
     if (was === button) return;
   }
@@ -298,6 +299,30 @@ $("ab").addEventListener("click", () => startAB("ab", () => [renderRun({ kind: "
 // Revision seven (user: the background was "too full, too present, too
 // loud"): the same perfect run through the revision-six mix and the new one.
 $("ab-mix").addEventListener("click", () => startAB("ab-mix", () => [renderRun({ kind: "main", from: 0, seconds: 27, mix: "before" }), renderRun({ kind: "main", from: 0, seconds: 27 })], ["A (mix before)", "B (mix after)"]));
+// Revision eight (the owner: the constant "harmonica, flute, accordion" tone
+// must be "very soft, like the wind", and the levels need "a little
+// soundtrack"): the old sky against the wind, alone and in the whole run, and
+// revision seven against revision eight (the wind and the soundtrack).
+$("ab-sky").addEventListener("click", () => startAB("ab-sky", () => [renderRun({ kind: "main", from: 0, seconds: 27, only: ["sky"], cues: false, mix: "rev7" }), renderRun({ kind: "main", from: 0, seconds: 27, only: ["sky"], cues: false })], ["A (saw sky)", "B (wind)"]));
+$("ab-bed").addEventListener("click", () => startAB("ab-bed", () => [renderRun({ kind: "main", from: 0, seconds: 27, mix: "rev7" }), renderRun({ kind: "main", from: 0, seconds: 27, mix: { tune: null } })], ["A (old bed)", "B (wind bed)"]));
+$("ab-tune").addEventListener("click", () => startAB("ab-tune", () => [renderRun({ kind: "main", from: 0, seconds: 27, mix: "rev7" }), renderRun({ kind: "main", from: 0, seconds: 27 })], ["A (revision seven)", "B (with the soundtrack)"]));
+// Each level's soundtrack: alone from bar 3, and under Diana's notes.
+for (const d of LEVELS) {
+  const bar = (4 * 60) / d.bpm;
+  const T = tuneFor(d.key);
+  card($("tunes"), `Soundtrack ${d.numeral}: ${d.title}`, `${T.feel}, ${d.bpm} BPM: lead, bass, harp${T.kit.length ? ", kit" : ""}, alone (the wind under it)`, null, async () => {
+    log(`Rendering ${d.numeral}'s soundtrack...`);
+    const { buffer } = await renderRun({ kind: "main", from: 2 * bar, seconds: 8 * bar, level: d.id, only: ["tune", "sky"], cues: false });
+    showLoudness(`Soundtrack ${d.numeral}`, buffer);
+    await playBuffer(buffer);
+  });
+  card($("tunes"), `${d.numeral} with Diana`, `The same bars as the game plays them: the soundtrack, the wind, Diana's notes and bodies`, null, async () => {
+    log(`Rendering ${d.numeral} with Diana...`);
+    const { buffer } = await renderRun({ kind: "main", from: 2 * bar, seconds: 8 * bar, level: d.id });
+    showLoudness(`${d.numeral} with Diana`, buffer);
+    await playBuffer(buffer);
+  });
+}
 $("ab-switch").addEventListener("click", () => {
   if (!ab) return;
   ab.side = 1 - ab.side;
