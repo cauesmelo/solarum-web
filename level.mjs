@@ -663,7 +663,7 @@ const WAKING = {
     { x: gx(224), movement: "I", step: "set-piece", name: "I · Waking — the brightest star" },
     { x: gx(240), movement: "I", step: "conclude", name: "I · Waking — down to the crater" },
   ],
-  // Beacons on half bars 4½, 9, 12½ and 15½ (≤ 13.6 s real apart).
+  // Beacons on half bars 4½, 9½, 12½ and 15½ (≤ 13.6 s real apart).
   checkpoints: [
     { id: "lookout", x: gx(56) - 3, y: WY.lookout, platform: "lookout", story: "From the highest point, every star was going the same way.", tip: "Hold the jump for the high stones. Or walk on: the floor is safe." },
     { id: "first-star", x: gx(136) - 3, y: WY.field, platform: "glint-field", story: "One star had come down gently, as if it meant to stay.", tip: "Jump, then jump again near the top to reach farther." },
@@ -858,7 +858,7 @@ const GIFT = {
     { x: gk(190, 5), movement: "II", step: "conclude", name: "II · The Gift — Pluto's steps" },
     { x: gk(248, 8), movement: "II", step: "coda", name: "II · The Gift — the heart plain" },
   ],
-  // Beacons on half bars 4½, 6½, 10, 12½ and 15 (≤ 10.2 s real apart).
+  // Beacons on half bars 4½, 6½, 10½, 12½ and 15 (≤ 13.3 s real apart).
   checkpoints: [
     { id: "gift", x: gk(56, 1) - 3, y: GY.gift, platform: "gift-stone", story: "Gather the falling stars, and it will carry you there.", tip: "Jump, then press the cape near the top of the jump." },
     { id: "void", x: gk(88, 2) - 3, y: GY.hearth, platform: "hearth-2", story: "The same dark again. This time she knew how wide it was.", tip: "Jump at the edge, then press the cape near the top." },
