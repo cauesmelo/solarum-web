@@ -11,15 +11,18 @@ import assert from "node:assert/strict";
 import { LEVELS } from "../level.mjs";
 import { proxyStats } from "../scripts/human-proxy.mjs";
 
-/** Mean falls per run, at most (index = level - 1). */
+/** Mean falls per run, at most (index = level - 1). Round 8 (2026-11-10)
+ * tightened IV-VIII after the hot spots were fixed: the measured 10-seed
+ * means are first-timer 0 / 0.4 / 0.1 / 0.1 / 1.0 / 1.3 / 0.9 / 3.6, casual
+ * 0 / 0 / 0.1 / 0 / 0.2 / 0.1 / 0.2 / 1.0 and expert clean except VIII's 0.1. */
 const BANDS = {
-  "first-timer": [1, 1.5, 2, 2.5, 3.5, 4.5, 6, 8],
-  casual: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5],
-  expert: [0, 0, 0, 0, 0.5, 0, 0.5, 0.5],
+  "first-timer": [1, 1, 1, 0.5, 1.5, 2, 1.5, 4.5],
+  casual: [0.25, 0.25, 0.5, 0.25, 0.5, 0.5, 0.5, 1.5],
+  expert: [0, 0, 0, 0, 0, 0.1, 0, 0.25],
 };
 const SEEDS = 10;
 
-test("human proxies: every level is won by all three, within each one's falls band; the expert is clean in I-IV and VI", (t) => {
+test("human proxies: every level is won by all three, within each one's falls band; the expert is clean in I-V and VII", (t) => {
   const rows = [];
   for (const d of LEVELS)
     for (const proxy of Object.keys(BANDS)) {
@@ -28,9 +31,10 @@ test("human proxies: every level is won by all three, within each one's falls ba
       assert.equal(r.won, SEEDS, `${d.numeral} ${proxy} wins every run`);
       const band = BANDS[proxy][d.id - 1];
       assert.ok(r.mean <= band + 1e-9, `${d.numeral} ${proxy}: ${r.mean.toFixed(2)} falls a run (band ${band})`);
-      // No spot of the first half of the campaign takes a first-timer three
-      // times in a row (later levels: recorded, see MOVEMENT_AUDIT).
-      if (proxy === "first-timer" && d.id <= 3) assert.ok(r.worstSpot <= 2, `${d.numeral}: ${r.worstSpot} falls in a row at one spot`);
+      // No spot takes a first-timer three times in a row in I-V and VII; VI
+      // and VIII (the wind's cracks, the last climb and the gauntlet) are
+      // recorded at 3 (MOVEMENT_AUDIT has the 20- and 60-seed numbers).
+      if (proxy === "first-timer") assert.ok(r.worstSpot <= (d.id === 6 || d.id === 8 ? 3 : 2), `${d.numeral}: ${r.worstSpot} falls in a row at one spot`);
     }
   for (const row of rows) t.diagnostic(row);
 });

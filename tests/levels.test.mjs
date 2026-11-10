@@ -483,7 +483,7 @@ const LADDER = [
   { narrow: [160, Infinity], median: 270, inputs: [2.5, 3.0], peak: 5, gap: 10 },
   { narrow: [120, 200], median: 240, inputs: [2.8, 3.5], peak: 6, gap: 9.5 },
 ];
-test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon gaps in each stage's band; median and lower-quartile windows never widen and inputs never thin out", () => {
+test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon gaps in each stage's band; windows narrow in I-III and again from VII, inputs never thin out", () => {
   const rows = BUILT.map((d) => {
     const nom = nominalRun(d.id);
     const ms = nom.plan
@@ -510,15 +510,37 @@ test("L3: the difficulty ladder: windows, inputs per bar, peak bar and beacon ga
     assert.ok(r.gap <= want.gap, where);
     if (i === 0) return;
     const p = rows[i - 1];
-    // (The narrowest window no longer has to fall every stage, see LADDER;
-    // I-III still do, and the lower quartile may rise by at most 30 ms, the
-    // slack of one hop's window against the next stage's.)
+    // (Round 8: the narrowest window no longer has to fall every stage, see
+    // LADDER. I-III keep every window rule; IV-VI carry the tail rule's +165
+    // ms of late press on their land-and-go stones, so their median windows
+    // sit at 640-700 ms and only rise-and-fall by the proxies' falls; from VI
+    // on the median and lower-quartile windows fall every stage again, and
+    // VIII's (which has no tails) are the campaign's narrowest.)
     if (i < 3) assert.ok(r.narrow <= p.narrow, `${where}: the narrowest window never widens (${p.narrow.toFixed(0)} before)`);
-    assert.ok(r.median <= p.median, `${where}: median windows never widen (${p.median.toFixed(0)} before)`);
-    assert.ok(r.quarter <= p.quarter + 30, `${where}: lower-quartile windows never widen by more than 30 ms (${p.quarter.toFixed(0)} before)`);
+    if (i < 3 || i >= 6) assert.ok(r.median <= p.median, `${where}: median windows never widen (${p.median.toFixed(0)} before)`);
+    if (i < 3 || i >= 6) assert.ok(r.quarter <= p.quarter + 30, `${where}: lower-quartile windows never widen by more than 30 ms (${p.quarter.toFixed(0)} before)`);
     assert.ok(r.inputs >= p.inputs - 1e-9, `${where}: inputs never thin out (${p.inputs.toFixed(2)} before)`);
     assert.ok(r.d.bpm > p.d.bpm, where);
   });
+});
+
+/* ---------- the tail rule (round 8) ---------- */
+test("tail rule: from IV to VII no stone ends within 44 px of the main route's last ground takeoff on it (cascade tiles, lids and stones before a falling road excepted)", () => {
+  for (const d of BUILT.filter((q) => q.id >= 4 && q.id <= 7)) {
+    const takeoffs = d.routes.main.filter(([, a, w]) => (a === "jump" || a === "tap") && w === "g").map(([x]) => x);
+    let checked = 0;
+    for (const [id, x, , width, type] of d.main) {
+      if (type === "cascade" || type === "lid") continue;
+      const t = takeoffs.filter((tx) => tx >= x && tx <= x + width + 12).at(-1);
+      if (t == null) continue;
+      const after = d.main.filter((p) => p[1] > x + 1).sort((m, p) => m[1] - p[1])[0];
+      if (after?.[4] === "cascade") continue;
+      checked++;
+      const room = after ? after[1] - 8 - (x + width) : Infinity;
+      assert.ok(x + width >= t + 44 || room < 1, `${d.numeral} ${id}: ends ${(x + width - t).toFixed(0)} px after the takeoff`);
+    }
+    assert.ok(checked >= 8, `${d.numeral}: ${checked} stones checked`);
+  }
 });
 
 /* ---------- the save ---------- */

@@ -113,7 +113,19 @@ export function playAsHuman(n, proxy = "first-timer", seed = 1, { route = "main"
   const P = typeof proxy === "string" ? PROXIES[proxy] : proxy;
   const c = d.clock;
   const view = viewGeometry(width ?? Math.max(VIEW.minWidth, d.view?.minWidth ?? 0));
-  const { steps } = learnRoute(n, route);
+  const mainRoute = learnRoute(n, route);
+  let steps = mainRoute.steps;
+  // The low line (round 8): a person who lands on a stone the main route never
+  // uses but the level's safe line does (the catch under VIII's star road)
+  // takes the safe line from there instead of pressing on as if she had made
+  // the jump. Only in the main route's runs, once per attempt.
+  const safeRoute = route === "main" && levelDef(n).routes.safe ? learnRoute(n, "safe") : null;
+  const lands = (r) => new Set(r.nom.steps.map((q) => q.land).filter(Boolean));
+  const mainLands = lands(mainRoute);
+  const safeLands = safeRoute ? lands(safeRoute) : new Set();
+  let onSafe = false,
+    lastLandId = null,
+    seenEvent = 0;
   const rand = rng(seed * 7919 + n * 104729 + Math.round(P.sigma));
   const gauss = () => {
     let u = 0,
@@ -182,6 +194,9 @@ export function playAsHuman(n, proxy = "first-timer", seed = 1, { route = "main"
       if (i < 0 || attempt !== falls.length) {
         // A new attempt from the beacon: find the route's place again.
         attempt = falls.length;
+        steps = mainRoute.steps;
+        onSafe = false;
+        lastLandId = null;
         i = steps.findIndex((q) => q && q.x >= p.x - 1);
         if (i < 0) i = steps.length;
         noise = [];
@@ -191,6 +206,21 @@ export function playAsHuman(n, proxy = "first-timer", seed = 1, { route = "main"
       }
       if (p.grounded && !wasGrounded) lastLand = s.time;
       wasGrounded = p.grounded;
+      for (const e of s.events)
+        if (e.serial > seenEvent) {
+          seenEvent = e.serial;
+          if (e.name === "land") lastLandId = e.platform;
+        }
+      if (safeRoute && !onSafe && p.grounded && lastLandId && !mainLands.has(lastLandId) && safeLands.has(lastLandId)) {
+        onSafe = true;
+        steps = safeRoute.steps;
+        i = steps.findIndex((q) => q && q.x >= p.x - 1);
+        if (i < 0) i = steps.length;
+        noise = [];
+        commit = [];
+        lastFired = null;
+        entered.clear();
+      }
       for (const q of steps) if (q?.target && !entered.has(q.target.id) && p.x + view.lookahead >= q.target.x) entered.set(q.target.id, s.time);
       // Fire every key event due before the next tick.
       for (let guard = 0; guard < 6; guard++) {

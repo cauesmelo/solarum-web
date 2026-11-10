@@ -2374,8 +2374,8 @@ const E_MAIN = [
   // Develop: land and go, a double (79, 83) down onto the wind gate (89);
   // jump into the column (92), the rise-song on its rise, the cape at its
   // top (98) and the super jump (100): down on the wind shore (108).
-  eIsle("wind-gate", 89, 92, EY.windGate, SF.storm, 100),
-  eIsle("wind-shore", 108, 109, EY.windShore, SF.wind, 80),
+  eIsle("wind-gate", 89, 92, EY.windGate, SF.storm, 80),
+  eIsle("wind-shore", 108, 109, EY.windShore, SF.wind, 150),
   ["wind-shore-2", ex(112, 3) - 60, EY.windShore2, ex(123, 3) + 10 - (ex(112, 3) - 60)],
   eIsle("wind-shore-3", 126, 128, EY.windShore3, SF.wind, 60, undefined, 30),
   // Develop: a tap (123) onto the wind shore's third stone and a hop (128)
@@ -2395,7 +2395,7 @@ const E_MAIN = [
   // and super jump across the long void (12/16, 37 px down) onto the
   // gauntlet shore (199); the launch-song on the crack and the jump's rise.
   eIsle("launch-crack", 185, 187, EY.crack, SF.casc, 90, "crumble", -6),
-  eIsle("gauntlet-shore", 199, 201, EY.gShore, SF.launch, 120, undefined, -6),
+  eIsle("gauntlet-shore", 199, 201, EY.gShore, SF.launch, 80, undefined, -6),
   // The dive stair: a jump and a dive at its top (201/204, 207/210) land
   // 149 px down 5/16 later, on stable stones (a dive smashes cracks); a
   // double (213, 217) up onto the road shore (221), a tap onto the gate.
@@ -2643,8 +2643,41 @@ const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 /** The interim levels (none since VIII replaced revision six's Far Door;
  * kept so a stage that is rebuilt later can play an old level meanwhile). */
 const INTERIM = [];
-function register(d, i, extra) {
+/** The tail rule (human proxies, revision five round 8): a late land-and-go
+ * press is the first-timer's commonest miss, and a small stone that ends
+ * under the route's takeoff leaves only the coyote time (about 130 ms) for
+ * it. From IV on, a stone is never shorter than `tail` px past the main
+ * route's last ground takeoff on it (45 px = 165 ms more of late press at
+ * 270 px/s), so the late window is about 300 ms. Not for cascade tiles (a
+ * beat schedule) or lids (the dive breaks them), and never into the next
+ * stone: dives and doubles that must not land on a stone keep the tail they
+ * were solved with (`noTail`); nor a stone in front of a falling road. */
+const TAIL = 45;
+function withTails(d) {
+  // (VIII keeps the tails it was solved with: its late-press rescue is at its
+  // 35% ceiling and its windows are the campaign's narrowest.)
+  if (d.id < 4 || d.id > 7 || !d.main) return d;
+  const takeoffs = (d.routes.main ?? []).filter(([, a, w]) => (a === "jump" || a === "tap") && w === "g").map(([x]) => x);
+  const noTail = new Set(d.noTail ?? []);
+  const main = d.main.map((q) => {
+    const [id, x, y, width, type, extra] = q;
+    if (type === "cascade" || type === "lid" || noTail.has(id)) return q;
+    const end = x + width;
+    const t = takeoffs.filter((tx) => tx >= x && tx <= end + 12).at(-1);
+    if (t == null || end >= t + TAIL) return q;
+    const after = d.main.filter((p) => p[1] > x + 1).sort((m, p) => m[1] - p[1])[0];
+    // (A stone in front of a falling road keeps its tail: the road's beat is
+    // the clock the takeoff has to meet.)
+    if (after?.[4] === "cascade") return q;
+    const next = after ? after[1] : Infinity;
+    const newEnd = Math.min(t + TAIL, next - 8);
+    return newEnd > end ? [id, x, y, newEnd - x, ...(type !== undefined || extra !== undefined ? [type, extra] : [])] : q;
+  });
+  return { ...d, main };
+}
+function register(d0, i, extra) {
   const numeral = ROMAN[i];
+  const d = withTails({ ...d0, id: i + 1 });
   return Object.freeze({
     ...d,
     ...extra,
