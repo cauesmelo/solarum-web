@@ -2156,8 +2156,14 @@ function drawScriptedFront(p, alive) {
   for (const m of S.list) {
     const t = sinceSim(m.at);
     if (m.kind === "helper") {
-      // A GET target is handled by its approach (drawMoments).
-      if ((state.def.gets ?? []).some((g) => g.id === m.target)) continue;
+      // A GET target is handled by its approach (drawMoments); a helper cued
+      // on the GET itself (VIII's helper-leap) is the GET's own moment, the
+      // helper that runs ahead and leaps.
+      const get = (state.def.gets ?? []).find((g) => g.id === m.target);
+      if (get) {
+        if (t >= 0 && t < barSeconds() && momentFor(get.verb)) shownScripted.add(m.id);
+        continue;
+      }
       const column = state.updrafts.find((u) => u.id === m.target);
       if (column) {
         const r = rideAt(t, (column.bottom - column.top) * 0.85);
