@@ -1695,9 +1695,19 @@ export function createAudioEngine(options = {}) {
     return b;
   }
 
+  /* Generated sample data, in the exact order build() draws it from one
+   * seeded rng, so a warm-up (prepare) and a cold build make identical
+   * buffers. Each step is a few ms; prepare() runs them in separate tasks. */
+  const pre = { r: null, room: null, noise: {}, space: null };
+  const PREP = [
+    () => (pre.r ??= mulberry32(seed ^ 0x5eed), pre.room ??= reverbImpulse(ctx.sampleRate, 2.4, pre.r)),
+    ...["white", "pink", "brown"].map((color) => () => (pre.noise[color] ??= noiseSamples(ctx.sampleRate, 3, color, pre.r))),
+    () => (pre.space ??= reverbImpulse(ctx.sampleRate, Math.min(options.spaceSeconds ?? 9, scoreOf(level).space.seconds), pre.r, { predelay: 0.03, fadeIn: 0.12 })),
+  ];
   function build() {
+    for (const step of PREP) step();
     const sr = ctx.sampleRate,
-      r = mulberry32(seed ^ 0x5eed);
+      r = pre.r;
     const sfx = node("Gain");
     sfx.gain.value = SFX_LEVEL;
     // Gentle glue: catches stacked cues, never pumps a single one.
@@ -1721,7 +1731,7 @@ export function createAudioEngine(options = {}) {
     const verbIn = node("Gain");
     const verb = node("Convolver");
     verb.normalize = false;
-    verb.buffer = makeBuffer(reverbImpulse(sr, 2.4, r));
+    verb.buffer = makeBuffer(pre.room);
     buffers.impulse = true;
     const verbTone = node("BiquadFilter");
     verbTone.type = "lowpass";
@@ -1758,7 +1768,7 @@ export function createAudioEngine(options = {}) {
     }
     last.connect(ctx.destination);
     for (const color of ["white", "pink", "brown"]) {
-      buffers[color] = makeBuffer([noiseSamples(sr, 3, color, r)]);
+      buffers[color] = makeBuffer([pre.noise[color]]);
     }
     graph = { sfx, comp, master, output, verbIn, music: musicGain, musicTone, musicVol, out: last };
     // A browser without delay lines or constant sources still gets every cue;
@@ -1896,7 +1906,7 @@ export function createAudioEngine(options = {}) {
     space.normalize = false;
     // Each level has its own space (5.5 s floating to 2.5 s close, RESEARCH_LEVELS 6).
     const spaceSeconds = (n) => Math.min(options.spaceSeconds ?? 9, scoreOf(n).space.seconds);
-    space.buffer = makeBuffer(reverbImpulse(sr, spaceSeconds(level), r, { predelay: 0.03, fadeIn: 0.12 }));
+    space.buffer = makeBuffer(pre.space);
     buffers.space = true;
     const spaceOut = node("Gain");
     spaceOut.gain.value = 1.1; // +5 dB on the first mix: more space, more float
@@ -1951,6 +1961,45 @@ export function createAudioEngine(options = {}) {
     } catch {
       musicEl.volume = Math.min(1, musicLevel * OUTPUT_GAIN * vol.music);
     }
+  }
+  /** Warm-up at load (game.js, sound on): create the context, which starts
+   * suspended without a gesture, and build the whole graph one step per
+   * task, so the wake press only has to resume it. Creating an AudioContext
+   * takes 60-350 ms on the main thread on some machines; done at the press
+   * it stalled the first frames of the wake (playtest critic). Nothing plays
+   * and the soundtrack is not routed until unlock() inside a gesture. */
+  let preparing = null;
+  function prepare({ step = (fn) => setTimeout(fn, 0) } = {}) {
+    if (!enabled || offline || graph || preparing) return preparing ?? Promise.resolve(!!graph);
+    preparing = new Promise((resolve) => {
+      let i = 0;
+      const tick = () => {
+        if (graph && i <= PREP.length) return resolve(true); // unlock() finished it meanwhile
+        try {
+          if (i === 0) {
+            const AC = options.AudioContext ?? globalThis.AudioContext ?? globalThis.webkitAudioContext;
+            if (!AC) return resolve(false);
+            try {
+              ctx ??= new AC({ latencyHint: "interactive" });
+            } catch {
+              ctx ??= new AC();
+            }
+          } else if (i <= PREP.length) PREP[i - 1]();
+          else if (!graph) build();
+          else {
+            // The wake cue's kalimba strings, so the pop computes none.
+            for (const L of CUES.wake.build(mulberry32(1), {}).layers) if (L.kind === "pluck") pluckBuffer(L);
+            return resolve(true);
+          }
+        } catch {
+          return resolve(false);
+        }
+        i++;
+        step(tick);
+      };
+      step(tick);
+    });
+    return preparing;
   }
   function unlock() {
     if (!enabled && !offline) return false;
@@ -2916,6 +2965,7 @@ export function createAudioEngine(options = {}) {
 
   return {
     unlock,
+    prepare,
     play,
     duck,
     /** The player's Music and Sounds settings (0-1 each), applied over 80 ms. */

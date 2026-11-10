@@ -283,10 +283,37 @@ test("the game reads the default through the guarded setting and starts audio on
   assert.match(js, /createAudioEngine\(\{ enabled: sound\.on, gentle: sound\.gentle/);
   assert.match(js, /gentle: readGentleSetting\(\(\) => window\.localStorage\)/, "Gentle music is read through guarded storage too");
   assert.doesNotMatch(js, /new \(window\.AudioContext/, "only audio.mjs creates the context");
-  // unlock() runs from wake() and the sound toggle, never at load.
+  // unlock() (resume, route the soundtrack) runs from the wake press and the
+  // sound toggle, never at load; load may only warm up a suspended graph.
   const load = js.slice(js.indexOf("async function load()"));
   assert.doesNotMatch(load.slice(0, load.indexOf("resize();\nload();")), /unlockAudio\(\)|audio\.unlock\(\)/);
   assert.match(js.slice(js.indexOf("function wake()"), js.indexOf("function doJump()")), /unlockAudio\(\);/);
+  assert.match(js.slice(js.indexOf("function pressWake()"), js.indexOf("function doJump()")), /unlockAudio\(\); \/\/ inside the gesture/);
+  assert.match(load, /if \(sound\.on\) setTimeout\(\(\) => audio\.prepare\(\), 400\);/);
+});
+test("prepare() warms a suspended context and the whole graph step by step; unlock() then only resumes", async () => {
+  const steps = [];
+  const r = rig();
+  const done = r.engine.prepare({ step: (fn) => steps.push(fn) });
+  while (steps.length) steps.shift()();
+  assert.equal(await done, true);
+  assert.equal(r.made(), 1);
+  const ctx = r.ctx();
+  ctx.state = "suspended"; // as a browser leaves a context made without a gesture
+  const nodes = r.engine.stats().nodes;
+  assert.ok(nodes > 40, `${nodes} nodes prepared`);
+  assert.deepEqual(r.engine.stats().decoded.filter((n) => ["impulse", "space", "white", "pink", "brown"].includes(n)).sort(), ["brown", "impulse", "pink", "space", "white"]);
+  assert.equal(r.engine.unlock(), true);
+  assert.equal(r.made(), 1, "unlock reuses the warm context");
+  assert.equal(r.engine.stats().nodes, nodes + 0, "and builds nothing new");
+  // Identical buffers either way (one seeded rng, same order).
+  const cold = rig();
+  cold.engine.unlock();
+  assert.equal(cold.engine.stats().nodes, nodes);
+  // Sound off: no warm-up at all.
+  const off = rig({ enabled: false });
+  assert.equal(await off.engine.prepare({ step: (fn) => fn() }), false);
+  assert.equal(off.made(), 0);
 });
 
 /* ---------- coverage ---------- */

@@ -214,7 +214,8 @@ function resize() {
     $("turn-hint").hidden = false;
     setTimeout(() => ($("turn-hint").hidden = true), 4000);
   }
-  $("title-ui").style.setProperty("--title-soil", String(titleSoil()));
+  soilFraction = titleSoil();
+  $("title-ui").style.setProperty("--title-soil", String(soilFraction));
   layoutStations();
   camera.snap = true;
   if (ready) draw();
@@ -228,6 +229,8 @@ function titleSoil() {
   if (layout === "portrait") return root.clientHeight < 700 ? 0.72 : 0.8;
   return canvas.clientHeight && canvas.clientHeight < 460 ? 0.5 : 0.6;
 }
+// (Cached on resize: reading layout sizes every frame forced a reflow.)
+let soilFraction = 0.6;
 new ResizeObserver(resize).observe(root);
 
 /* ---------- drawing helpers ---------- */
@@ -1192,7 +1195,7 @@ function updateCamera(dt) {
     screenX = W / 2 + (view.playerScreenX - W / 2) * e;
   }
   let targetX = p.x - screenX,
-    targetY = state.status === "ready" ? WORLD().startY - titleSoil() * H : cameraTargetY(state.anchorY, state.fallTime);
+    targetY = state.status === "ready" ? WORLD().startY - soilFraction * H : cameraTargetY(state.anchorY, state.fallTime);
   if (state.status === "dead" && state.respawn) {
     // Rewind: the view rides the star shards back to the last light.
     const r = state.respawn,
@@ -2168,7 +2171,7 @@ window.__game = {
   getTitle: () => {
     const e = emergence ? emergenceAt(clock - emergence.at, { reduced }) : null;
     const set = emergence?.set ?? (manifest ? dianaSet() : null);
-    return { emerging: !!emergence, phase: e?.phase ?? null, t: e?.t ?? null, total: emergenceSeconds(reduced), set: set?.name ?? null, fallback: !!set?.fallback, body: set?.body ?? null, soil: titleSoil(), stops: $("stations")?.querySelectorAll(".stop").length ?? 0 };
+    return { emerging: !!emergence, phase: e?.phase ?? null, t: e?.t ?? null, total: emergenceSeconds(reduced), set: set?.name ?? null, fallback: !!set?.fallback, body: set?.body ?? null, soil: soilFraction, stops: $("stations")?.querySelectorAll(".stop").length ?? 0 };
   },
   setSpriteSet: (name) => ((spriteSetOverride = name || null), dianaSet()),
   restart: restartChapter,
@@ -2272,6 +2275,10 @@ async function load() {
     resize();
     sync();
     draw();
+    // Warm the sound up while the title rests: a suspended context and the
+    // whole graph, one step per task. The wake press then only resumes it
+    // (creating a context there stalled the first frames by 80-350 ms).
+    if (sound.on) setTimeout(() => audio.prepare(), 400);
   } catch (error) {
     $("start").hidden = true;
     $("title-keys").hidden = true;
