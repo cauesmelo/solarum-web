@@ -442,12 +442,16 @@ test("D2: the expert line scores at least 15% more than the main route, and the 
 });
 
 /* ---------- E. Feedback ---------- */
-test("E1/E2: every movement action has a sound and a visual on its own tick; the cape's state is drawn on Diana", async () => {
+test("E1/E2: every movement action has a sound and a visual on its own tick; the cape and the double jump are drawn on Diana", async () => {
   const audio = await read("audio.mjs"),
     js = await read("game.js");
   for (const name of ["jump", "double-jump", "super-jump", "dash", "dive", "land", "lip-catch", "smash"]) assert.match(audio, new RegExp(`case "${name}": return \\[\\{ cue`), name);
   for (const name of ["jump", "double-jump", "super-jump", "land", "smash"]) assert.match(js, new RegExp(`case "${name}":`), name);
-  assert.match(js, /const spent = !capeReady\(state\)/, "a spent cape tints Diana");
+  // The cape is the meter (hud.mjs capeTint: 60% when spent, four steps with
+  // the breath bar) and the double jump has its leaf glint (doubleInHand):
+  // E2's double-jump WARN is closed by a lasting cue (tests/hud.test.mjs).
+  assert.match(js, /tint \+= \(capeTint\(state, set\.name, meterNow\(\)\) - tint\)/, "a spent cape tints Diana");
+  assert.match(js, /const inHand = doubleInHand\(state\)/, "the leaf glint shows the double jump in hand");
   for (const n of IDS) {
     const s = world(n, [["floor", -400, 540, 3000]]);
     const serial = s.eventSerial;

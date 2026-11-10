@@ -55,9 +55,19 @@
         </div>
       </div>
 
-      <!-- In-run HUD: stars, Great Star slots, orbit line home → Earth, pause. -->
+      <!-- In-run HUD: the cape's breath bar (once the cape is hers), stars,
+           Great Star slots, orbit line home → Earth, pause. -->
       <div class="hud" id="hud">
         <div class="hud-stars">
+          <!-- The original HUD art: DianaCooldownCircle at the left end of
+               barrinha, recheioBarra clipped to the charge, meteoroCheio
+               when full. Absent (hidden) until the cape is owned. -->
+          <span class="breath" id="breath" role="meter" aria-label="Cape" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+            <span class="breath-track"><span class="breath-window" id="breath-window"><span class="breath-fill"></span></span></span>
+            <span class="breath-frame" aria-hidden="true"></span>
+            <span class="breath-notches" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="breath-disc" id="breath-disc" aria-hidden="true"></span>
+          </span>
           <i class="star-icon" aria-hidden="true"></i>
           <span id="stars" class="count" aria-label="Stars">0</span>
           <span class="great-slots" id="great-slots" role="img" aria-label="Great Fallen Stars: 0 of 3">

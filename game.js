@@ -15,7 +15,7 @@ import {
   RULES,
 } from "./model.mjs";
 import { LEVELS, CARD, checkpointIndex, shownPrompts } from "./level.mjs";
-import { characterLayers, frameForClip, footFor } from "./animation.mjs";
+import { characterLayers, frameForClip, footFor, clipFor } from "./animation.mjs";
 import {
   VIEW,
   outlineY,
@@ -29,6 +29,9 @@ import {
 import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetting, writeGentleSetting, readVolumes, writeVolumes } from "./audio.mjs";
 import { createFrameClock } from "./frame-clock.mjs";
 import { emergenceAt, emergenceSeconds, resolveSet } from "./emergence.mjs";
+import { owns, spriteSetName, capeMeter, capeTint, doubleInHand } from "./hud.mjs";
+import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, earthBox, ringsCrop } from "./backdrop.mjs";
+import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt } from "./moments.mjs";
 
 /* Renderer, input and UI. All gameplay rules live in model.mjs / level.mjs;
  * this file only draws the simulation, forwards input and plays sound. */
@@ -85,7 +88,11 @@ let manifest = null,
   // (emergence.mjs). null on the plain title and once she runs.
   emergence = null,
   // A QA / next-phase override of the level's sprite set ("cape" | "nocape").
-  spriteSetOverride = null;
+  spriteSetOverride = null,
+  // QA previews on builds whose levels do not carry the progression fields
+  // yet: a look id for the sky, and a cape charge (0-1) for the breath bar.
+  lookOverride = null,
+  capePreview = null;
 const held = { glide: false };
 const camera = { x: 0, y: 0, snap: true };
 const fx = []; // short-lived particles in world space
@@ -97,6 +104,10 @@ const ui = {
   orbitBrightUntil: 0,
   beaconLitAt: {},
   victoryShown: false,
+  breathShown: undefined,
+  breath: null,
+  breathFull: null,
+  verbs: undefined,
   stars: -1,
   great: "",
   cape: null,
@@ -272,10 +283,12 @@ const off = document.createElement("canvas"),
   offCtx = off.getContext("2d");
 off.width = 480;
 off.height = 400;
-/** M1: the cape is the meter. A spent cape is tinted --dim at 60% with an
- * offscreen source-atop pass. Body and cape share one sheet in most original
- * clips, so the tint is a gradient across the trailing (left) half where the
- * cape is drawn, fading out before Diana's face and chest. */
+/** M1: the cape is the meter. A spent cape is tinted --dim with an
+ * offscreen source-atop pass; `tint` is the share of --dim (0-0.6: four
+ * steps with the breath bar, hud.mjs capeTint). Body and cape share one
+ * sheet in most original clips, so the tint is a gradient across the
+ * trailing (left) half where the cape is drawn, fading out before Diana's
+ * face and chest. */
 function drawDiana(name, age, x, feet, alpha = 1, tint = 0) {
   ctx.save();
   ctx.globalAlpha *= alpha;
@@ -291,8 +304,8 @@ function drawDiana(name, age, x, feet, alpha = 1, tint = 0) {
   drawDianaLayers(offCtx, name, age, 120, 170);
   offCtx.globalCompositeOperation = "source-atop";
   const g = offCtx.createLinearGradient(120 - 44, 0, 120 + 10, 0);
-  g.addColorStop(0, `rgba(119,119,113,${0.6 * tint})`);
-  g.addColorStop(0.62, `rgba(119,119,113,${0.6 * tint})`);
+  g.addColorStop(0, `rgba(119,119,113,${tint})`);
+  g.addColorStop(0.62, `rgba(119,119,113,${tint})`);
   g.addColorStop(1, "rgba(119,119,113,0)");
   offCtx.fillStyle = g;
   offCtx.fillRect(0, 0, 240, 200);
@@ -334,32 +347,19 @@ const dust = Array.from({ length: 90 }, (_, i) => ({
 let cadent = null,
   nextCadent = 3,
   saturnRings = null;
-function ringsOnly(img) {
-  const c = document.createElement("canvas"),
-    limb = Math.round(img.width * 0.565); // the planet body starts here
-  c.width = limb;
-  c.height = img.height;
-  const g = c.getContext("2d");
-  g.drawImage(img, 0, 0, limb, img.height, 0, 0, limb, img.height);
-  g.globalCompositeOperation = "destination-in";
-  const fade = g.createLinearGradient(0, 0, limb, 0);
-  fade.addColorStop(0, "rgba(0,0,0,0)");
-  fade.addColorStop(0.25, "rgba(0,0,0,1)");
-  fade.addColorStop(0.7, "rgba(0,0,0,1)");
-  fade.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = fade;
-  g.fillRect(0, 0, limb, img.height);
-  return c;
-}
+const makeCanvas = (w, h) => Object.assign(document.createElement("canvas"), { width: w, height: h });
+const ringsOnly = (img) => ringsCrop(img, makeCanvas); // the planet body starts at 56.5%
 /** Why she runs: a tiny Earth glint far ahead with the signal pulsing out of
  * it. It sits in the sky beyond the course and grows a little with progress. */
 function drawSignal() {
   if (state.status === "ready") return;
   const progress = progressOf(state.player.x),
-    x = W * 0.86,
-    y = 128 - progress * 10,
-    r = 2.4 + progress * 2.6,
     t = reduced ? 0.4 : (clock % 2.4) / 2.4;
+  // The last look draws Earth itself (a growing crescent); the signal pulses from it.
+  const earth = earthBox(currentLook(), { W, H, progress });
+  const x = earth ? earth.x : W * 0.86,
+    y = earth ? earth.y : 128 - progress * 10,
+    r = earth ? earth.r : 2.4 + progress * 2.6;
   ctx.save();
   ctx.strokeStyle = PAPER;
   ctx.lineWidth = 1.4;
@@ -367,6 +367,7 @@ function drawSignal() {
   ctx.beginPath();
   ctx.arc(x, y, r + 4 + t * 26, 0, Math.PI * 2);
   ctx.stroke();
+  if (earth) return ctx.restore();
   ctx.globalAlpha = 0.9;
   ctx.fillStyle = EARTH;
   ctx.beginPath();
@@ -376,25 +377,71 @@ function drawSignal() {
 }
 
 /* ---------- world ---------- */
+/** The level's look (backdrop.mjs): a QA override, else `def.look`; null is
+ * revision seven's sky. */
+const currentLook = () => lookOf(state.def, lookOverride);
+let backdrop = null;
+/** What the backdrop needs this frame: the view, the level's progress and
+ * the camera's travel since the start (for a small parallax). */
+function backdropView() {
+  return {
+    W,
+    H,
+    clock,
+    progress: state.status === "ready" ? 0 : progressOf(state.player.x),
+    driftX: camera.x - (WORLD().startX - W / 2),
+    driftY: camera.y - (WORLD().startY - 0.6 * H),
+  };
+}
 function drawSky() {
   ctx.fillStyle = INK;
   ctx.fillRect(0, 0, W, H);
-  for (const d of dust) {
+  const look = currentLook(),
+    density = skyDensity(look);
+  for (const [i, d] of dust.entries()) {
+    // Pluto's emptiness keeps half the dust; the Moon's sky has more.
+    if (density.dust < 1 && i % Math.round(1 / density.dust) !== 0) continue;
     let sx = (d.x * W * 1.4 - camera.x * 0.015) % (W * 1.4);
     if (sx < 0) sx += W * 1.4;
     ctx.fillStyle = `rgba(251,251,234,${d.a})`;
     ctx.beginPath();
     ctx.arc(sx, d.y, d.r, 0, Math.PI * 2);
     ctx.fill();
+    if (density.dust > 1 && i < dust.length * (density.dust - 1)) {
+      ctx.beginPath();
+      ctx.arc((sx + W * 0.37) % (W * 1.4), (d.y + 170) % 580 + 20, d.r * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   // Original twinkling background stars (bg-stars sheet, 4-frame groups).
-  for (const s of sky) {
-    let sx = (s.x * (W + 200) - camera.x * s.depth) % (W + 200);
-    if (sx < 0) sx += W + 200;
-    const f = s.group + (reduced ? 2 : Math.floor(clock * 3 + s.phase) % 4);
-    sprite("background", f, sx - 100, s.y - camera.y * 0.05, s.size * 1.6, 0.8);
-  }
-  if (images.saturn) {
+  // A look scales their number (Pluto 0.5, the Moon 1.6: a second, offset
+  // pass) and Neptune's far stars wobble at 0.3 Hz, as if seen through water.
+  const passes = density.stars > 1 ? 2 : 1;
+  for (let pass = 0; pass < passes; pass++)
+    for (const [i, s] of sky.entries()) {
+      if (pass === 0 && density.stars < 1 && i % Math.round(1 / density.stars) !== 0) continue;
+      if (pass === 1 && i >= sky.length * (density.stars - 1)) break;
+      const ox = pass ? 0.43 : 0,
+        oy = pass ? 233 : 0;
+      let sx = ((s.x + ox) * (W + 200) - camera.x * s.depth) % (W + 200);
+      if (sx < 0) sx += W + 200;
+      const f = s.group + (reduced ? 2 : Math.floor(clock * 3 + s.phase) % 4);
+      const wob = density.wobble && !reduced ? Math.sin(Math.PI * 2 * density.wobble * clock + s.phase * 1.7) * 2.2 : 0;
+      sprite("background", f, sx - 100, ((s.y + oy - 30) % 520) + 30 - camera.y * 0.05 + wob, s.size * 1.6, 0.8);
+    }
+  // The level's body ahead and its sky accent (backdrop.mjs), behind the
+  // world. Like the world, they are not drawn on the title (nothing may sit
+  // near its options) and fade in with the run.
+  const lookAlpha = state.status === "ready" ? 0 : Math.min(1, Math.max(clock - wakeAt, state.time / (state.clock ?? 1)) / 0.8);
+  if (look && lookAlpha > 0) {
+    backdrop ??= createBackdrop({ makeCanvas, images, sprite, reduced });
+    const view = backdropView();
+    ctx.save();
+    ctx.globalAlpha = lookAlpha;
+    backdrop.drawBody(ctx, look, view);
+    backdrop.drawAccent(ctx, look, view);
+    ctx.restore();
+  } else if (!look && images.saturn) {
     // Only the ring strokes of the original Saturn art, faded at both ends:
     // the planet's hard limb read as a rendering artifact at the screen edge.
     saturnRings ??= ringsOnly(images.saturn);
@@ -404,7 +451,8 @@ function drawSky() {
     ctx.drawImage(saturnRings, W * 0.08 - ((camera.x * 0.003) % 30), (H - saturnRings.height * scale) / 2, saturnRings.width * scale, saturnRings.height * scale);
     ctx.restore();
   }
-  // Original shooting-star clips (cadent1/2), never under reduced motion.
+  // Original shooting-star clips (cadent1/2), never under reduced motion;
+  // home's sky (level I) is a shower: they come about twice as often.
   if (!reduced && state.status !== "ready") {
     if (!cadent && clock > nextCadent) {
       const big = hash(clock) > 0.5;
@@ -420,7 +468,7 @@ function drawSky() {
         age = clock - cadent.at;
       if (age > clip.duration) {
         cadent = null;
-        nextCadent = clock + 4 + hash(clock) * 6;
+        nextCadent = clock + cadentGap(look, hash(clock));
       } else {
         const f = frameForClip(manifest, cadent.clip, age);
         sprite(f.sheet, f.frame, cadent.x, cadent.y, 0.5, 0.75);
@@ -1023,10 +1071,22 @@ function puff(kind, x, y, n, spread = 40, opts = {}) {
 
 /* ---------- Diana, death and respawn ---------- */
 let tint = 0;
+/** The breath bar's reading (hud.mjs), or QA's preview charge. */
+function meterNow() {
+  if (capePreview != null) return { charge: capePreview, full: capePreview >= 1 };
+  return capeMeter(state);
+}
+/** The model's animation state drawn with the current sprite set: the
+ * no-cape override clips while the cape is not hers (animation.mjs). */
+function setAnim(anim, set) {
+  return { name: clipFor(manifest, anim.name, set), age: anim.age };
+}
 function drawPlayer() {
   const p = { ...state.player, ...viewPos() };
-  const spent = !capeReady(state) && state.dashRemaining <= 0.08;
-  tint += ((spent ? 1 : 0) - tint) * 0.25;
+  const set = dianaSet();
+  // The cape as the meter: four steps with the breath bar, 60% when spent
+  // without one (hud.mjs capeTint), nothing while she flies or has no cape.
+  tint += (capeTint(state, set.name, meterNow()) - tint) * 0.25;
   if (state.status === "ready") {
     if (emergence) return drawEmergence(p);
     // Title: Diana is still the two leaves in the soil (the original sprout).
@@ -1049,10 +1109,21 @@ function drawPlayer() {
       return;
     }
   }
-  const anim = state.animation;
+  const anim = setAnim(state.animation, set.name);
+  const dash = clipFor(manifest, "dash", set.name);
   if (state.dashRemaining > 0 && !reduced)
-    for (let i = 3; i >= 1; i--) drawDiana("dash", anim.age, p.x - i * 22, p.y + footFor(manifest, "dash", anim.age), 0.07 + (3 - i) * 0.03);
-  drawDiana(anim.name, anim.age, p.x, p.y + footFor(manifest, anim.name, anim.age), 1, tint);
+    for (let i = 3; i >= 1; i--) drawDiana(dash, anim.age, p.x - i * 22, p.y + footFor(manifest, dash, anim.age), 0.07 + (3 - i) * 0.03);
+  const settle = momentFor("cape");
+  if (settle && set.name === "cape") {
+    // II's GET: the cape settles on her. The caped clip fades in over the
+    // no-cape one (same pose, pivot and body lines), so her body stays
+    // opaque and only the cape appears.
+    const u = settleAt(clock - settle.at).cape,
+      bare = setAnim(state.animation, "nocape");
+    drawDiana(bare.name, bare.age, p.x, p.y + footFor(manifest, bare.name, bare.age));
+    drawDiana(anim.name, anim.age, p.x, p.y + footFor(manifest, anim.name, anim.age), u, tint);
+  } else drawDiana(anim.name, anim.age, p.x, p.y + footFor(manifest, anim.name, anim.age), 1, tint);
+  drawLeafGlint(p);
   // A Great Star taken but not yet banked circles Diana until she lands.
   for (const [i, id] of state.greatPending.entries()) {
     const a = clock * 4 + i * 2;
@@ -1072,12 +1143,214 @@ function drawShards() {
     sprite("star", 2, sx, sy, 0.13, 1 - t * 0.3, a + t * 4);
   }
 }
+/* ---------- the leaf glint: the double jump in hand ----------
+ * RESEARCH_PROGRESSION 2.1 and MOVEMENT_AUDIT E2: one small original star
+ * just above Diana's leaves while the double jump is hers and unspent in
+ * this airtime (hud.mjs doubleInHand). Its height lags her body by 60 ms (a
+ * history of where she was drawn, in real time), bursts into the star sheet's burst
+ * frames when she spends it and pops back on landing. */
+const glint = { shown: false, since: -9, trail: [], x: 0, y: 0 };
+const GLINT_LAG = 0.06;
+function laggedFeet(t) {
+  const tr = glint.trail;
+  let i = tr.length - 1;
+  while (i > 0 && tr[i - 1].t > t) i--;
+  const b = tr[i],
+    a = tr[i - 1];
+  if (!a || b.t <= t) return b;
+  const u = (t - a.t) / Math.max(1e-6, b.t - a.t);
+  return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+}
+function drawLeafGlint(p) {
+  const tr = glint.trail,
+    last = tr.at(-1);
+  // A teleport (respawn, Back to last light) starts the history afresh.
+  if (last && (Math.abs(last.x - p.x) > 120 || Math.abs(last.y - p.y) > 120)) tr.length = 0;
+  tr.push({ t: clock, x: p.x, y: p.y });
+  while (tr.length > 2 && tr[1].t < clock - 0.25) tr.shift();
+  // While the GET's star rises into place, the rising star is the glint.
+  const inHand = doubleInHand(state) && !momentFor("double");
+  if (inHand && !glint.shown) glint.since = clock;
+  glint.shown = inHand;
+  if (!inHand) return;
+  // Only the height lags: she runs at a constant speed, so a lag in x would
+  // just park the star 16-19 px behind her head instead of over it. Rising,
+  // it rides her head (a 60 ms lag of a 635 px/s jump would sink it 38 px
+  // into her leaves); falling and landing, it trails above and settles.
+  const at = laggedFeet(clock - GLINT_LAG),
+    pop = reduced ? 1 : Math.min(1, (clock - glint.since) / 0.12);
+  glint.x = p.x + ANCHORS.glint.dx;
+  glint.y = Math.min(at.y, p.y) + ANCHORS.glint.dy;
+  const frame = reduced ? 2 : 2 + (Math.floor(clock * 4) % 2);
+  sprite("star", frame, glint.x, glint.y, 0.085 * (0.6 + 0.4 * pop), 0.95 * pop);
+}
+
+/* ---------- the GET moments (RESEARCH_PROGRESSION 2.1, moments.mjs) ----------
+ * A `get` event (the eight-level model) or QA's previewGet starts one. They
+ * are drawn over the simulation and never change it. */
+const moments = [];
+// Real seconds per bar at the level's tempo (and Gentle pace).
+const barSeconds = () => 240 / ((state.def.bpm ?? 107) * pace);
+function momentFor(verb) {
+  return moments.find((m) => m.verb === verb && clock < m.until) ?? null;
+}
+function startMoment(verb) {
+  for (let i = moments.length - 1; i >= 0; i--) if (moments[i].verb === verb) moments.splice(i, 1);
+  const bar = barSeconds(),
+    m = { verb, at: clock, bar, until: clock + momentSeconds(verb, bar) };
+  moments.push(m);
+  const p = state.player;
+  if (verb === "cape" && !reduced) {
+    // The gift settles: a burst at the cape's tip, sparks along her back.
+    fx.push({ kind: "follow-burst", dx: -34, dy: -48, life: 1, span: 0.45, vx: 0, vy: 0, scale: 0.3 });
+    puff("spark", p.x - 22, p.y - 52, 7, 40);
+  }
+  if (verb === "dive") {
+    // The necklace shows what it woke for: light glints out of the next
+    // lid ahead (the stone she can now open), if one is in view.
+    const lid = state.platforms.find((q) => q.type === "lid" && !q.collapsed && q.x + q.width > p.x && q.x < p.x + W);
+    if (lid) fx.push({ kind: "burst", x: lid.x + lid.width / 2, y: lid.y + 6, vx: 0, vy: 0, life: 1, span: 0.9, scale: 0.34 });
+  }
+  // The touch button of the new verb fades in with one pulse.
+  const button = { cape: "touch-cape", dive: "touch-dive" }[verb];
+  if (button) pulseClass($(button), "arrive", 900);
+  if (verb === "cape") pulseClass($("breath"), "arrive", 900);
+  return m;
+}
+/** Restart a one-shot CSS animation class (and drop it afterwards). */
+function pulseClass(node, cls, ms) {
+  if (!node) return;
+  node.classList.remove(cls);
+  void node.offsetWidth;
+  node.classList.add(cls);
+  clearTimeout(node[`_${cls}`]);
+  node[`_${cls}`] = setTimeout(() => node.classList.remove(cls), ms);
+}
+/** The helper: the original star with a tail-star streak and a breathing
+ * halo. `angle` is its direction of travel (the streak trails behind it). */
+function drawHelper(x, y, alpha, angle) {
+  if (alpha <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  if (images.tailStar) {
+    // tail-star.png's head is at (520, 200) of 555 x 251 and it travels at
+    // about 0.37 rad (down-right): turn it onto the helper's own heading.
+    const k = 0.15;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle - 0.37);
+    ctx.globalAlpha *= 0.55;
+    ctx.drawImage(images.tailStar, -520 * k, -200 * k, 555 * k, 251 * k);
+    ctx.restore();
+  }
+  const pulse = reduced ? 0.5 : (Math.sin(clock * 5) + 1) / 2;
+  ctx.strokeStyle = PAPER;
+  ctx.lineWidth = 1.4;
+  ctx.globalAlpha *= 0.35 + pulse * 0.25;
+  ctx.beginPath();
+  ctx.arc(x, y, 9 + pulse * 3, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+  sprite("star", 2, x, y, 0.13, alpha, reduced ? 0 : Math.sin(clock * 1.7) * 0.3);
+}
+/** GETs still ahead: the level's (`def.gets`, not yet taken) and QA's
+ * previews (renderer-only, fired here when Diana reaches them). */
+let previewGets = [];
+function pendingGets() {
+  const taken = state.gotten ?? [];
+  return [...(state.def.gets ?? []).filter((g) => !taken.includes(g.id)), ...previewGets];
+}
+/** The run line under a GET: the stone top at its x closest to Diana. */
+function runLineAt(x) {
+  let best = null;
+  for (const q of state.platforms)
+    if (!q.collapsed && x >= q.x && x <= q.x + q.width && (best == null || Math.abs(q.y - state.player.y) < Math.abs(best - state.player.y))) best = q.y;
+  return best ?? state.player.y;
+}
+function drawMoments() {
+  if (state.status === "ready") return;
+  const p = { ...state.player, ...viewPos() },
+    alive = state.status !== "dead";
+  // Before each GET: what Diana runs toward.
+  for (const g of pendingGets()) {
+    const d = g.x - p.x;
+    if (d > W * 1.6 || d < -40) continue;
+    const y = runLineAt(g.x);
+    if (g.verb === "glide" || g.verb === "super") {
+      const a = helperApproach(g.verb, d, clock);
+      if (a) drawHelper(g.x + a.x, y + a.y, a.alpha, g.verb === "super" && d < 160 ? -1.2 : Math.atan2(0.2, -0.35));
+    } else if (g.verb === "double") {
+      // The first star that landed softly rests on the run line, circling.
+      const a = reduced ? 0 : clock * 2.2;
+      sprite("star", 2, g.x + Math.cos(a) * 6, y - 16 + Math.sin(a) * 3, 0.16, 0.95);
+    }
+  }
+  // QA previews fire once Diana runs through them.
+  for (const g of previewGets) if (p.x >= g.x) startMoment(g.verb);
+  previewGets = previewGets.filter((g) => p.x < g.x);
+  for (let i = moments.length - 1; i >= 0; i--) {
+    const m = moments[i],
+      t = clock - m.at;
+    if (clock >= m.until) {
+      moments.splice(i, 1);
+      continue;
+    }
+    if (!alive) continue;
+    if (m.verb === "double") {
+      const r = riseAt(t);
+      sprite("star", 2, p.x + r.dx, p.y + r.dy, r.scale, r.alpha);
+    } else if (m.verb === "glide" || m.verb === "super") {
+      const h = helperAfter(t, m.bar);
+      drawHelper(p.x + h.dx, p.y + h.dy, h.alpha, h.trail);
+      if (m.verb === "glide") drawRipple(p, rippleAt(t, m.bar));
+    } else if (m.verb === "dive") {
+      const n = necklaceAt(t, m.bar),
+        cx = p.x + ANCHORS.chest.dx,
+        cy = p.y + ANCHORS.chest.dy;
+      ctx.save();
+      ctx.strokeStyle = PAPER;
+      ctx.lineWidth = 2;
+      for (const ring of reduced ? n.rings.slice(0, 1) : n.rings) {
+        ctx.globalAlpha = ring.alpha * n.fade;
+        ctx.beginPath();
+        ctx.arc(cx, cy, reduced ? 18 : ring.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+      sprite("star", 2, cx, cy, 0.07 + 0.03 * n.glint, n.fade);
+    }
+  }
+}
+/** III's GET: the cape ripples on each beat of one bar (three short ink-on-
+ * paper strokes of light along its trailing edge). */
+function drawRipple(p, amount) {
+  if (amount <= 0.01 || reduced) return;
+  const x = p.x + ANCHORS.cape.dx,
+    y = p.y + ANCHORS.cape.dy;
+  ctx.save();
+  ctx.strokeStyle = PAPER;
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "round";
+  ctx.globalAlpha = 0.85 * amount;
+  for (let k = 0; k < 3; k++) {
+    const yy = y + k * 9,
+      w = 14 + k * 4;
+    ctx.beginPath();
+    ctx.moveTo(x - w, yy);
+    ctx.quadraticCurveTo(x - w / 2, yy - 5 * amount, x, yy);
+    ctx.quadraticCurveTo(x + w / 3, yy + 3 * amount, x + w / 2, yy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /* ---------- the wake: Diana emerges from the earth ---------- */
 let wokeFromEarth = false;
-/** The level's sprite set (a level that starts without the cape names
- * `sprites: "nocape"`), resolved against the manifest (emergence.mjs). */
+/** The sprite set Diana is drawn with (hud.mjs spriteSetName: the no-cape
+ * clips while the state's verbs lack the cape, or a level's `sprites`),
+ * resolved against the manifest (emergence.mjs). */
 function dianaSet() {
-  return resolveSet(manifest, spriteSetOverride ?? state.def.sprites ?? "cape");
+  return resolveSet(manifest, spriteSetName(state, spriteSetOverride));
 }
 /** Drawn in the world layer before the title ground, which then hides
  * everything under the soil along its own contour. */
@@ -1269,6 +1542,7 @@ function draw() {
     ctx.restore();
   }
   drawPlayer();
+  drawMoments();
   drawFx(dt, (q) => q.kind !== "crumb");
   ctx.restore();
   if (state.status === "ready") titleGround(1);
@@ -1363,6 +1637,15 @@ function sync() {
     ui.cape = ready;
     $("touch-cape").classList.toggle("spent", !ready);
   }
+  syncBreath();
+  // Owned verbs (eight-level model): the touch cape and dive are absent
+  // until theirs; without the field every control shows, as before.
+  const verbs = state.verbs ? Object.keys(state.verbs).filter((k) => state.verbs[k]).join(" ") : null;
+  if (verbs !== ui.verbs) {
+    ui.verbs = verbs;
+    if (verbs == null) delete root.dataset.verbs;
+    else root.dataset.verbs = verbs;
+  }
   const live = state.status !== "ready";
   const age = (q) => (q && live ? state.time - q.at : -1);
   // Card: 300 ms in, 1600 ms hold, 500 ms out, measured on the simulation clock.
@@ -1381,6 +1664,41 @@ function sync() {
     t = age(ui.tip);
   $("story").classList.toggle("show", s >= 0 && s < CARD.storySeconds);
   $("tip").classList.toggle("show", t >= 0 && t < CARD.tipSeconds);
+}
+/** The breath bar (RESEARCH_PROGRESSION 3.3): the original disc, frame and
+ * fill, top-left, only once the cape is hers. The fill is the continuous
+ * charge; three ink notches mark the quarters; full turns the disc into the
+ * asteroid stone with one ring pulse. The touch cape's rim follows it. */
+function syncBreath() {
+  const m = state.status === "ready" ? null : meterNow(),
+    bar = $("breath"),
+    cape = $("touch-cape");
+  if (!!m !== ui.breathShown) {
+    ui.breathShown = !!m;
+    bar.hidden = !m;
+    // Absent, not empty: the star count and slots move back left.
+    if (m) root.dataset.breath = "";
+    else delete root.dataset.breath;
+    ui.breath = ui.breathFull = null;
+  }
+  if (!m) return;
+  const charge = Math.round(m.charge * 1000) / 1000;
+  if (charge !== ui.breath) {
+    ui.breath = charge;
+    bar.style.setProperty("--charge", String(charge));
+    cape.style.setProperty("--charge", String(charge));
+    bar.setAttribute("aria-valuenow", String(Math.floor(charge * 4 + 1e-9) * 25));
+  }
+  if (m.full !== ui.breathFull) {
+    const was = ui.breathFull;
+    ui.breathFull = m.full;
+    bar.classList.toggle("full", m.full);
+    cape.classList.toggle("full", m.full);
+    if (m.full && was === false) {
+      pulseClass(bar, "pulse", 800);
+      pulseClass(cape, "lit", 700);
+    }
+  }
 }
 function showStory(text) {
   $("story").textContent = text;
@@ -1465,6 +1783,8 @@ function processEvents(quiet = false) {
       case "double-jump":
         if (loud) {
           puff("spark", e.x - 6, e.y - 8, 5, 34);
+          // The leaf glint is spent: it bursts where it was drawn.
+          if (glint.shown) fx.push({ kind: "burst", x: glint.x, y: glint.y, vx: 0, vy: 0, life: 1, span: 0.32, scale: 0.13 });
         }
         break;
       case "super-jump":
@@ -1510,9 +1830,15 @@ function processEvents(quiet = false) {
         }
         break;
       case "refill":
+      case "wind-refund":
         if (loud) {
           fx.push({ kind: "follow-burst", dx: -34, dy: -48, life: 1, span: 0.4, vx: 0, vy: 0, scale: 0.24 });
         }
+        break;
+      case "get":
+        // A new verb (the eight-level model): its wordless moment.
+        if (loud) startMoment(e.verb);
+        ui.verbs = undefined;
         break;
       case "great-star":
         if (loud) {
@@ -1663,9 +1989,15 @@ function restartChapter() {
   audio.play("ui-select");
   showMovement(state.def.movements[0].id, state.time + (state.def.cardDelay ?? CARD.wakeDelay));
 }
+function clearMoments() {
+  moments.length = 0;
+  previewGets = [];
+  glint.trail.length = 0;
+}
 function afterReset() {
   hideCards();
   clearWords();
+  clearMoments();
   held.glide = false;
   fx.length = 0;
   // Silence the last run first (a restart never carries the last fall's
@@ -1713,6 +2045,7 @@ function startLevel(n, { wake: wakeNow = true, force = true, fromMap = false } =
   audio.clearMoments();
   audio.fadeOutMusic(0.6);
   loadLevel(level);
+  clearMoments();
   lastSerial = state.eventSerial;
   fx.length = 0;
   camera.snap = true;
@@ -1916,6 +2249,7 @@ function toTitle() {
   syncLevelMap();
   hideCards();
   clearWords();
+  clearMoments();
   lastSerial = state.eventSerial;
   fx.length = 0;
   camera.snap = true;
@@ -2204,7 +2538,51 @@ window.__game = {
     const set = emergence?.set ?? (manifest ? dianaSet() : null);
     return { emerging: !!emergence, phase: e?.phase ?? null, t: e?.t ?? null, total: emergenceSeconds(reduced), set: set?.name ?? null, fallback: !!set?.fallback, body: set?.body ?? null, soil: soilFraction, stops: $("stations")?.querySelectorAll(".stop").length ?? 0 };
   },
+  // (Since the no-cape sheets are extracted, "nocape" draws them in play too.)
   setSpriteSet: (name) => ((spriteSetOverride = name || null), dianaSet()),
+  // Per-level looks (backdrop.mjs): setLook("neptune") previews a look on a
+  // level that names none; setLook(null) returns to the level's own (or to
+  // revision seven's sky when it has none).
+  setLook: (id) => ((lookOverride = id || null), currentLook()),
+  // The breath bar on a model without `capeCharge`: previewCape(0.6) shows
+  // that charge (bar, touch rim and the cape's tint); previewCape(null) ends it.
+  previewCape: (charge) => {
+    capePreview = charge == null ? null : Math.max(0, Math.min(1, Number(charge)));
+    sync();
+    if (ready) draw();
+    return window.__game.getHud().breath;
+  },
+  // A GET moment without the eight-level model: now, at Diana, or with
+  // { approach: true } placed `lead` px ahead so its helper / landed star
+  // is drawn first and the moment fires as she runs through it.
+  previewGet: (verb, { approach = false, lead = 520 } = {}) => {
+    if (approach) previewGets.push({ id: `preview-${verb}`, verb, x: state.player.x + lead, preview: true });
+    else startMoment(verb);
+    return { verb, bar: barSeconds(), seconds: momentSeconds(verb, barSeconds()), pending: previewGets.length };
+  },
+  // What the HUD and Diana show: { breath: { shown, charge, full, disc,
+  // window, fill }, glint, set, fallback, look, moments, verbs }.
+  getHud: () => {
+    const bar = $("breath"),
+      track = bar.querySelector(".breath-track").getBoundingClientRect(),
+      fill = $("breath-window").getBoundingClientRect(),
+      set = manifest ? dianaSet() : null;
+    return {
+      breath: { shown: !bar.hidden, charge: ui.breath, full: bar.classList.contains("full"), disc: getComputedStyle($("breath-disc")).backgroundImage.includes("meteor") ? "meteor" : "disc", window: track.width, fill: fill.width },
+      rim: { charge: Number(getComputedStyle($("touch-cape")).getPropertyValue("--charge")) || 0, full: $("touch-cape").classList.contains("full") },
+      tint: Math.round(tint * 1000) / 1000,
+      glint: { shown: glint.shown, inHand: doubleInHand(state), x: glint.x, y: glint.y },
+      set: set?.name ?? null,
+      fallback: !!set?.fallback,
+      clip: manifest ? clipFor(manifest, state.animation.name, set?.name) : null,
+      look: currentLook(),
+      body: currentLook() ? bodyBox(currentLook(), backdropView()) : null,
+      moments: moments.filter((m) => clock < m.until).map((m) => m.verb),
+      pending: pendingGets().map((g) => g.verb),
+      verbs: root.dataset.verbs ?? null,
+      owns: { double: owns(state, "double"), cape: owns(state, "cape"), dive: owns(state, "dive") },
+    };
+  },
   restart: restartChapter,
   retry: backToLight,
   toTitle,
@@ -2266,9 +2644,12 @@ async function load() {
       if (!r.ok) throw new Error(`manifest ${r.status}`);
       return r.json();
     });
+    // The HUD's own art (the breath bar) is drawn by style.css: only warmed
+    // here, so the bar never appears before its images.
+    for (const v of Object.values(manifest)) if (v?.hud && v.file) new Image().src = v.file;
     await Promise.all(
       Object.entries(manifest)
-        .filter(([, v]) => v.file?.endsWith(".png"))
+        .filter(([, v]) => v.file?.endsWith(".png") && !v.hud)
         .map(async ([name, data]) => {
           const img = new Image();
           img.src = data.file;

@@ -625,6 +625,132 @@ button:disabled {
   font-size: 26px;
   min-width: 2ch;
 }
+/* ---------- the breath bar (RESEARCH_PROGRESSION 3.3) ----------
+ * The original HUD art, unchanged PNGs cropped by background-position:
+ * barrinha.png's frame is 390 x 94 source px at (25, 77) of 442 x 250, drawn
+ * 100 x 24 (k = 100 / 390); its hole is source x 54-386, y 108-141, so the
+ * track sits 7 px in and 7.5 px down and runs 86 x 9.4 px, a pixel under
+ * the frame's inner ink line on each side. recheioBarra.png's fill is
+ * 822 x 102 source px at (129, 453) of 1080 x 1080, stretched onto the
+ * track. The disc (DianaCooldownCircle, then meteoroCheio when full) covers
+ * the frame's left cap. --charge (0-1) is set by game.js. */
+.breath {
+  --charge: 0;
+  position: relative;
+  flex: none;
+  width: 118px;
+  height: 34px;
+  margin-right: 2px;
+}
+.breath-frame,
+.breath-track,
+.breath-disc,
+.breath-notches {
+  position: absolute;
+  pointer-events: none;
+}
+.breath-frame {
+  left: 16px;
+  top: 5px;
+  width: 100px;
+  height: 24px;
+  background: url("./assets/breathFrame.png") no-repeat;
+  background-size: 113.33px 64.1px;
+  background-position: -6.41px -19.74px;
+}
+.breath-track {
+  left: 23px;
+  top: 12.5px;
+  width: 86px;
+  height: 9.4px;
+  background: var(--ink);
+}
+.breath-window {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(86px * var(--charge));
+  overflow: hidden;
+}
+.breath-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 86px;
+  height: 100%;
+  background: url("./assets/breathFill.png") no-repeat;
+  background-size: 112.99px 99.53px;
+  background-position: -13.5px -41.75px;
+}
+/* Three ink notches at the quarters, nicking the frame's paper rim. */
+.breath-notches i {
+  position: absolute;
+  top: 9px;
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--ink);
+}
+.breath-notches i:nth-child(1) {
+  left: calc(23px + 21.5px - 1px);
+}
+.breath-notches i:nth-child(2) {
+  left: calc(23px + 43px - 1px);
+}
+.breath-notches i:nth-child(3) {
+  left: calc(23px + 64.5px - 1px);
+}
+.breath-disc {
+  left: 0;
+  top: 2px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: url("./assets/breathDisc.png") center / 100% 100% no-repeat;
+}
+/* Full: the gift is ready. The disc becomes the cracked asteroid stone. */
+.breath.full .breath-disc {
+  background-image: url("./assets/meteor.png");
+}
+.breath-disc::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--paper);
+  opacity: 0;
+}
+.breath.pulse .breath-disc::after {
+  animation: breath-ring 0.7s ease-out 1;
+}
+@keyframes breath-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+/* At the GET the bar arrives with one pulse (empty, then it breathes in). */
+.breath.arrive {
+  animation: arrive-bar 0.9s ease-out 1;
+}
+@keyframes arrive-bar {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  to {
+    transform: scale(1);
+  }
+}
 .orbit {
   flex: none;
   width: 264px;
@@ -868,6 +994,58 @@ button:disabled {
 .cape-btn.spent {
   background: var(--dim);
 }
+/* The cape's rim fills as a paper arc with the breath bar's charge and
+ * lights once when full (only while the bar is shown: data-breath). */
+.cape-btn::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: conic-gradient(var(--paper) calc(var(--charge, 0) * 1turn), rgba(119, 119, 113, 0.55) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 4px));
+  pointer-events: none;
+  display: none;
+}
+.solarum[data-breath] .cape-btn::before {
+  display: block;
+}
+.cape-btn.lit {
+  animation: rim-light 0.7s ease-out 1;
+}
+@keyframes rim-light {
+  from {
+    opacity: 1;
+    box-shadow: 0 0 0 2px var(--ink), 0 0 14px 4px rgba(251, 251, 234, 0.7);
+  }
+  to {
+    box-shadow: 0 0 0 2px var(--ink);
+  }
+}
+/* Verbs not yet owned (eight-level model): their touch buttons are absent,
+ * and fade in with one pulse at the GET. Without data-verbs both show. */
+.solarum[data-verbs]:not([data-verbs~="cape"]) .cape-btn,
+.solarum[data-verbs]:not([data-verbs~="dive"]) .dive-btn {
+  display: none;
+}
+.cape-btn.arrive,
+.dive-btn.arrive {
+  animation: arrive-btn 0.9s ease-out 1;
+}
+@keyframes arrive-btn {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  to {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+}
 .turn-hint {
   position: absolute;
   left: 0;
@@ -886,6 +1064,14 @@ button:disabled {
   height: var(--stage-top);
   padding-right: 120px;
   background: var(--ink);
+}
+/* Portrait: the HUD bar has no room for the breath bar beside the stars
+ * (the slots would run under fullscreen at 390 px), so it sits in the
+ * sky's own top-left corner, as in landscape. */
+.solarum[data-layout="portrait"] .breath {
+  position: absolute;
+  left: 12px;
+  top: calc(100% + 6px);
 }
 .solarum[data-layout="portrait"] .hud .orbit {
   position: absolute;
