@@ -1414,7 +1414,7 @@ function drawMoments() {
     const d = g.x - p.x;
     if (d > W * 1.6 || d < -40) continue;
     const y = runLineAt(g.x);
-    if (g.verb === "glide" || g.verb === "super") {
+    if (g.verb === "glide" && !g.relic) {
       const a = helperApproach(g.verb, d, clock);
       // A scripted helper moment aimed at this GET (III's helper-drift)
       // decides when the helper appears: it fades in from that moment.
@@ -1422,17 +1422,15 @@ function drawMoments() {
       const gate = cue ? Math.max(0, Math.min(1, sinceSim(cue.at) / 0.4)) : 1;
       if (cue && gate > 0) shownScripted.add(cue.id);
       if (a) drawHelper(g.x + a.x, y + a.y, a.alpha * gate, g.verb === "super" && d < 160 ? -1.2 : Math.atan2(0.2, -0.35));
-    } else if (g.verb === "double") {
-      // The first star that landed softly rests on the run line, circling
-      // (from its scripted fall's landing, when one is aimed at the GET).
-      const landed = S.targets.get(g.id);
-      if (landed != null && state.time < landed) continue;
-      const a = reduced ? 0 : clock * 2.2;
-      sprite("star", 2, g.x + Math.cos(a) * 6, y - 16 + Math.sin(a) * 3, 0.16, 0.95);
     }
+    // (The other relics, I's leaf relic among them, are drawn by drawRelics.)
   }
   // QA previews fire once Diana runs through them.
-  for (const g of previewGets) if (p.x >= g.x) startMoment(g.verb, { get: g });
+  for (const g of previewGets)
+    if (p.x >= g.x) {
+      startMoment(g.verb, { get: g });
+      if (g.relic) relicPickup(g.verb, { x: g.x, y: relicY(g) });
+    }
   previewGets = previewGets.filter((g) => p.x < g.x);
   for (let i = moments.length - 1; i >= 0; i--) {
     const m = moments[i],
@@ -1450,6 +1448,10 @@ function drawMoments() {
     else if (m.verb === "cape" && m.eye) drawEyeLight(m, t, p);
   }
   drawScriptedFront(p, alive);
+  if (alive) {
+    drawRelicHolds(p);
+    drawRefillFx(p);
+  }
 }
 /** III after the GET: the helper loops round Diana, then (with a helper
  * decor at the GET) drifts down its slope of air ahead of her; without one
@@ -1512,6 +1514,319 @@ function drawRipple(p, amount) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/* ---------- relics, refill stars and the unlock banner (RESEARCH_REFILLS) ----------
+ * Every ability now comes from a relic on the run line, seen 2.5 s ahead
+ * in a soft beam of light; taking it bursts it, holds it over Diana for one
+ * beat with a ring burst (animation only: the simulation and the score never
+ * stop), and a short banner names the ability and its control. Refill stars
+ * are small copies of the relic that gave their verb: the cape star is the
+ * asteroid stone, the leaf star rests between Diana's two leaves. All of it
+ * is drawn from existing sprites and the palette tokens, and read
+ * defensively: main's model has `def.gets` and the `get` event; the eight-
+ * level model adds `relics`/`refills` (or `refillStars`) and the `relic` and
+ * `refill-star` events. QA previews draw the art without either. */
+const RELIC_ART = Object.freeze({
+  double: { name: "Double jump", key: ["up", "W"], line: "again in the air", touch: "tap again in the air", say: "Double jump. Press up again in the air." },
+  cape: { name: "Cape flight", key: ["right", "D"], line: "in the air", touch: "the cape button, in the air", say: "Cape flight. Press right in the air." },
+  glide: { name: "Float", key: ["hold-right", "D"], line: "hold", touch: "hold the cape button", say: "Float. Hold right." },
+  dive: { name: "Dive", key: ["down", "S"], line: "", touch: "the dive button", say: "Dive. Press down." },
+  super: { name: "Super jump", key: ["up", "W"], line: "during a flight", touch: "tap during a flight", say: "Super jump. Press up during a flight." },
+});
+let previewRefills = [];
+const relicHolds = []; // { verb, at (clock), beat, from: {x, y} }: the one-beat hold over Diana
+const refillFx = []; // { kind, at, x, y }: a leaf star flying to her head, a cape star's ring
+const refillWake = new Map(), // id -> clock when it lit (the 0.25 s wake ring)
+  refillState = new Map(); // id -> lit last frame (a star seen lit at first does not pulse)
+/** The relics still ahead: the state's list, else the level's GETs, plus QA previews. */
+function relicsAhead() {
+  const taken = state.gotten ?? [];
+  const list = Array.isArray(state.relics) ? state.relics.filter((r) => !r.taken) : (state.def.gets ?? []).filter((g) => !taken.includes(g.id));
+  return [...list, ...previewGets.filter((g) => g.relic)];
+}
+const relicY = (g) => g.y ?? runLineAt(g.x) - 40;
+/** The refill stars in this world: { id, kind, x, y, lit, taken }. */
+function refillsOf() {
+  const s = state;
+  let list = [];
+  if (Array.isArray(s.refills)) list = s.refills;
+  else if (Array.isArray(s.refillStars)) list = s.refillStars.map((q) => ({ ...q, lit: refillLitHere(q) }));
+  return [...list, ...previewRefills];
+}
+/** The lit rule (RESEARCH_REFILLS 1.1), mirrored for a raw model state: a
+ * cape star is lit while the cape is owned and the bar is not full, a leaf
+ * star while the double is owned, Diana airborne with no air jump left. */
+function refillLitHere(q) {
+  if (q.preview) return q.lit;
+  if (q.taken || state.status !== "running") return false;
+  if (q.kind === "cape") return owns(state, "cape") && !state.assist.endlessCape && !capeReady(state);
+  const p = state.player;
+  return owns(state, "double") && !p.grounded && (state.coyote ?? 0) <= 0 && !doubleInHand(state);
+}
+/** The soft paper beam (40 px at 25%) from the relic to the view's top, and
+ * three tiny stars circling it once per bar. Static under reduced motion. */
+function drawBeam(x, y, alpha = 1) {
+  const top = camera.y + HUD_BAND,
+    g = ctx.createLinearGradient(0, top, 0, y);
+  g.addColorStop(0, "rgba(251,251,234,0)");
+  g.addColorStop(0.35, `rgba(251,251,234,${0.25 * alpha})`);
+  g.addColorStop(1, `rgba(251,251,234,${0.25 * alpha})`);
+  ctx.save();
+  ctx.fillStyle = g;
+  ctx.fillRect(x - 20, top, 40, Math.max(0, y - top));
+  const bar = barSeconds();
+  for (let k = 0; k < 3; k++) {
+    const a = (reduced ? 0 : (clock / bar) * Math.PI * 2) + (k * Math.PI * 2) / 3;
+    sprite("star", 2, x + Math.cos(a) * 30, y + Math.sin(a) * 12, 0.08, 0.9 * alpha);
+  }
+  ctx.restore();
+}
+/** One relic's art at (x, y): the verb's own object (RESEARCH_REFILLS 2.1). */
+function drawRelicArt(verb, x, y, alpha = 1, k = 1) {
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  if (verb === "double") {
+    // The leaf relic: a resting star cradled by Diana's two leaves (sprout.png at 60 px).
+    sprite("sprout", 0, x, y + 8 * k, 0.3 * k);
+    sprite("star", 2, x, y - 6 * k + (reduced ? 0 : Math.sin(clock * 2.2) * 2), 0.36 * 0.45 * k);
+  } else if (verb === "cape") {
+    // The gift: the asteroid stone at 64 px with the cape fluttering over it.
+    if (images.meteor) {
+      const s = (64 * k) / images.meteor.width;
+      ctx.drawImage(images.meteor, x - (images.meteor.width * s) / 2, y - (images.meteor.height * s) / 2, images.meteor.width * s, images.meteor.height * s);
+    }
+    sprite("dash", reduced ? 0 : Math.floor(clock * 6) % 2, x + 4 * k, y - 4 * k, 0.16 * k);
+  } else if (verb === "glide") {
+    // The helper, perched and circling in place.
+    const a = reduced ? 0 : clock * 2.4;
+    drawHelper(x + Math.cos(a) * 8 * k, y + Math.sin(a) * 4 * k, 1, a + Math.PI / 2);
+  } else if (verb === "dive") {
+    // The necklace: a paper ring with a small star inside, on a V of thread.
+    ctx.strokeStyle = PAPER;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x - 16 * k, y - 22 * k);
+    ctx.lineTo(x, y - 9 * k);
+    ctx.lineTo(x + 16 * k, y - 22 * k);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 9 * k, 0, Math.PI * 2);
+    ctx.stroke();
+    sprite("star", 2, x, y, 0.1 * k);
+  } else if (verb === "super") {
+    // The rising star: the only upward tail in the game.
+    streak(x, y + 4 * k, -Math.PI / 2, 0.16 * k, 0.8);
+    sprite("star", 2, x, y, 0.36 * 0.45 * k, 1, reduced ? 0 : Math.sin(clock * 1.5) * 0.15);
+  }
+  ctx.restore();
+}
+/** Before the pickup: each relic in its beam, ahead on the run line. */
+function drawRelics() {
+  const landing = scriptedOf().targets;
+  for (const g of relicsAhead()) {
+    if (g.x < camera.x - 80 || g.x > camera.x + W * 1.6) continue;
+    // (I's leaf relic is the first star that falls softly: it shows once landed.)
+    if (landing.get(g.id) != null && state.time < landing.get(g.id)) continue;
+    const y = relicY(g);
+    drawBeam(g.x, y);
+    // III's helper keeps its own approach (it drifts down the slope of air
+    // and waits at the lip); every other relic waits on the run line.
+    if (g.verb !== "glide" || g.relic) drawRelicArt(g.verb, g.x, y);
+  }
+}
+/** The pickup: the star burst, the beam collapsing into Diana (150 ms), a
+ * ring burst and the relic held over her head for one beat. */
+function relicPickup(verb, at = { x: state.player.x, y: state.player.y - 40 }, { loud = true } = {}) {
+  relicHolds.splice(0, relicHolds.length, { verb, at: clock, beat: beatSeconds(), from: { ...at } });
+  if (loud) {
+    fx.push({ kind: "burst", x: at.x, y: at.y, vx: 0, vy: 0, life: 1, span: 0.45, scale: 0.36 });
+    showBanner(verb);
+  }
+}
+function drawRelicHolds(p) {
+  for (let i = relicHolds.length - 1; i >= 0; i--) {
+    const h = relicHolds[i],
+      t = clock - h.at,
+      total = h.beat + 0.25;
+    if (t > total || t < 0) {
+      relicHolds.splice(i, 1);
+      continue;
+    }
+    const head = { x: p.x, y: p.y - 112 };
+    // The beam collapses into her within 150 ms.
+    const c = Math.min(1, t / 0.15);
+    if (c < 1 && !reduced) {
+      ctx.save();
+      ctx.fillStyle = `rgba(251,251,234,${0.25 * (1 - c)})`;
+      ctx.fillRect(h.from.x - 20 * (1 - c), camera.y + HUD_BAND, 40 * (1 - c), Math.max(0, p.y - camera.y - HUD_BAND));
+      ctx.restore();
+    }
+    // Two paper rings out of the relic (the beacon's ring language).
+    if (!reduced)
+      for (const [delay, max] of [[0, 120], [0.12, 80]]) {
+        const u = (t - delay) / 0.6;
+        if (u < 0 || u > 1) continue;
+        ctx.save();
+        ctx.strokeStyle = PAPER;
+        ctx.globalAlpha = 0.6 * (1 - u);
+        ctx.lineWidth = 2 - u;
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, 18 + (max - 18) * (1 - (1 - u) ** 3), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    const rise = reduced ? 1 : Math.min(1, t / 0.15),
+      x = h.from.x + (head.x - h.from.x) * rise,
+      y = h.from.y + (head.y - h.from.y) * rise,
+      fade = t > h.beat ? 1 - (t - h.beat) / 0.25 : 1;
+    drawRelicArt(h.verb, x, y, Math.max(0, fade), 1 + 0.25 * (reduced ? 1 : Math.min(1, t / 0.15)));
+  }
+}
+/** The cape star (the asteroid stone, a tenth of a turn per bar) and the
+ * leaf star (between two leaves): lit at full, dormant at 40% without glow;
+ * the instant one lights, one paper ring pulses (0.25 s). */
+function drawRefills() {
+  const bar = barSeconds();
+  for (const q of refillsOf()) {
+    if (q.taken || q.x < camera.x - 60 || q.x > camera.x + W + 60) continue;
+    const lit = !!q.lit,
+      was = refillState.get(q.id);
+    refillState.set(q.id, lit);
+    if (lit && was === false) refillWake.set(q.id, clock);
+    const a = lit ? 1 : 0.4,
+      bob = reduced ? 0 : Math.sin(clock * 2 + q.x) * 3;
+    ctx.save();
+    ctx.globalAlpha = a;
+    if (q.kind === "cape") {
+      if (lit) {
+        const g = ctx.createRadialGradient(q.x, q.y + bob, 4, q.x, q.y + bob, 30);
+        g.addColorStop(0, "rgba(251,251,234,0.22)");
+        g.addColorStop(1, "rgba(251,251,234,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(q.x - 30, q.y + bob - 30, 60, 60);
+      }
+      if (images.meteor) {
+        const s = 34 / images.meteor.width,
+          turn = reduced ? 0 : ((clock / bar) * Math.PI * 2) / 10;
+        ctx.save();
+        ctx.translate(q.x, q.y + bob);
+        ctx.rotate(turn);
+        ctx.drawImage(images.meteor, -17, -17, images.meteor.width * s, images.meteor.height * s);
+        ctx.restore();
+      }
+      sprite("star", 2, q.x, q.y + bob, 0.12);
+    } else {
+      if (lit) {
+        const g = ctx.createRadialGradient(q.x, q.y + bob, 4, q.x, q.y + bob, 28);
+        g.addColorStop(0, "rgba(251,251,234,0.2)");
+        g.addColorStop(1, "rgba(251,251,234,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(q.x - 28, q.y + bob - 28, 56, 56);
+      }
+      sprite("sprout", 0, q.x, q.y + bob + 6, 34 / 200);
+      sprite("star", 2, q.x, q.y + bob - 4, 0.14);
+    }
+    ctx.restore();
+    const w = refillWake.get(q.id);
+    if (lit && w != null && clock - w < 0.25 && !reduced) {
+      const u = (clock - w) / 0.25;
+      ctx.save();
+      ctx.strokeStyle = PAPER;
+      ctx.globalAlpha = 0.7 * (1 - u);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(q.x, q.y + bob, 16 + 22 * u, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  // Previews fire once Diana runs through them (renderer only).
+  const p = state.player;
+  for (const q of previewRefills) if (!q.taken && p.x >= q.x - 44) ((q.taken = true), q.lit && refillPickup({ kind: q.kind, x: q.x, y: q.y }));
+}
+/** A refill star taken: the cape star becomes the stone with its ring; the
+ * leaf star lifts off its leaves and flies to her head in 120 ms, where it
+ * becomes the glint, and the leaves fade over 0.3 s. */
+function refillPickup(e) {
+  refillFx.push({ kind: e.kind, at: clock, x: e.x, y: e.y });
+  if (e.kind === "cape") pulseClass($("breath"), "pulse", 800);
+}
+function drawRefillFx(p) {
+  for (let i = refillFx.length - 1; i >= 0; i--) {
+    const r = refillFx[i],
+      t = clock - r.at;
+    if (t > 0.45) {
+      refillFx.splice(i, 1);
+      continue;
+    }
+    if (r.kind === "leaf") {
+      if (t < 0.3) sprite("sprout", 0, r.x, r.y + 6, 34 / 200, 1 - t / 0.3);
+      const u = Math.min(1, t / 0.12),
+        hx = p.x + ANCHORS.glint.dx,
+        hy = p.y + ANCHORS.glint.dy;
+      if (u < 1) sprite("star", 2, r.x + (hx - r.x) * u, r.y - 4 + (hy - r.y + 4) * u, 0.14 + (0.085 - 0.14) * u);
+      else if (t < 0.2) fx.push({ kind: "burst", x: hx, y: hy, vx: 0, vy: 0, life: 1, span: 0.25, scale: 0.12 });
+    } else {
+      const u = t / 0.45;
+      ctx.save();
+      ctx.strokeStyle = PAPER;
+      ctx.globalAlpha = 0.6 * (1 - u);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, 18 + 40 * u, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      if (t < 0.25) sprite("star", 4 + Math.min(3, Math.floor((t / 0.25) * 4)), r.x, r.y, 0.24);
+    }
+  }
+}
+/* The banner (RESEARCH_REFILLS 2.1): an ink plate at the top centre, under
+ * the HUD band, at most 64 px tall: the ability's name (28 px) and its
+ * control drawn with the signs' own discs (18 px). 0.15 s in, 2 s, 0.3 s
+ * out (2.45 s real), non-blocking; the first time a save takes the relic,
+ * else its name only for 1.2 s. A beacon's story line waits until it is gone. */
+const BANNER = Object.freeze({ fadeIn: 0.15, hold: 2, fadeOut: 0.3, replay: 1.2 });
+let banner = null; // { verb, at, seconds, full }
+function discSvg(kind) {
+  const dir = kind.replace("hold-", ""),
+    rot = { up: 0, right: 90, down: 180, left: -90 }[dir] ?? 0,
+    hold = kind.startsWith("hold-") ? '<g class="hold"><circle cx="-6" cy="25" r="1.8"/><circle cx="0" cy="25" r="1.8"/><circle cx="6" cy="25" r="1.8"/></g>' : "";
+  return `<svg class="disc" viewBox="-14 -14 28 ${hold ? 42 : 28}" aria-hidden="true"><circle r="11"/><path transform="rotate(${rot})" d="M0 6 L0 -5 M-4.6 -1 L0 -6 L4.6 -1"/>${hold}</svg>`;
+}
+function showBanner(verb) {
+  const art = RELIC_ART[verb];
+  if (!art) return;
+  const full = !(progress.relics ?? []).includes(verb);
+  if (full) {
+    progress.relics = [...(progress.relics ?? []), verb];
+    writeProgress();
+  }
+  const touch = coarse || root.classList.contains("touch");
+  $("banner-name").textContent = art.name;
+  const control = $("banner-control");
+  control.hidden = !full;
+  control.innerHTML = touch ? "" : `${discSvg(art.key[0])}<span class="or">${art.key[1]}</span>`;
+  control.append(document.createTextNode(touch ? art.touch : art.line ? ` ${art.line}` : ""));
+  banner = { verb, at: clock, full, seconds: full ? BANNER.fadeIn + BANNER.hold + BANNER.fadeOut : BANNER.replay };
+  $("banner").hidden = false;
+  announce(full ? art.say : `${art.name}.`);
+}
+function syncBanner() {
+  const el = $("banner");
+  if (!banner) return;
+  const t = clock - banner.at;
+  if (t >= banner.seconds || t < 0) {
+    banner = null;
+    el.hidden = true;
+    el.style.opacity = "0";
+    if (ui.storyWaiting) (showStory(ui.storyWaiting), (ui.storyWaiting = null));
+    return;
+  }
+  const out = banner.full ? BANNER.fadeOut : 0.25;
+  const a = reduced ? 1 : Math.min(1, t / BANNER.fadeIn, (banner.seconds - t) / out);
+  el.style.opacity = a.toFixed(3);
 }
 
 /* ---------- II's asteroid eye (RESEARCH_PROGRESSION 2.1, GDD) ----------
@@ -2059,7 +2374,33 @@ function viewPos() {
   const p = state.player,
     a = state.status === "running" ? state.alpha ?? 1 : 1;
   if (p.px == null || Math.abs(p.x - p.px) > 60 || Math.abs(p.y - p.py) > 60) return { x: p.x, y: p.y };
-  return { x: p.px + (p.x - p.px) * a, y: p.py + (p.y - p.py) * a };
+  return { x: p.px + (p.x - p.px) * a, y: p.py + (p.y - p.py) * a + stepEase.offset };
+}
+/* A step-up or lip catch lifts the collider up to 30 px in one tick (half
+ * her height): drawn as is, she pops. The drawn feet ease up over 70 ms
+ * instead (easeOutQuad) while the collider stays exact: render only, like
+ * the feet-anchored drawing, and gone before the next input can matter. */
+const STEP_EASE = 0.07;
+const stepEase = { dy: 0, at: -9, offset: 0, lastY: null, lastX: null };
+function stepEaseFrame() {
+  const p = state.player;
+  const t = clock - stepEase.at;
+  stepEase.offset = 0;
+  if (state.status !== "running" || reduced) {
+    stepEase.lastY = null;
+    return;
+  }
+  const y = p.y,
+    rise = stepEase.lastY == null ? 0 : stepEase.lastY - y;
+  // Grounded now, 4-34 px higher than last frame and not a teleport.
+  if (p.grounded && rise > 4 && rise <= 34 && Math.abs(p.x - stepEase.lastX) < 60) {
+    stepEase.dy = rise + (t < STEP_EASE ? stepEase.dy * (1 - t / STEP_EASE) ** 2 : 0);
+    stepEase.at = clock;
+  }
+  const u = (clock - stepEase.at) / STEP_EASE;
+  if (u < 1) stepEase.offset = stepEase.dy * (1 - u) ** 2;
+  stepEase.lastY = y;
+  stepEase.lastX = p.x;
 }
 function updateCamera(dt) {
   const p = viewPos(),
@@ -2163,6 +2504,8 @@ function draw() {
     drawScriptedBack();
     drawConstellations();
     drawStars();
+    drawRefills();
+    drawRelics();
     // The finished level's door blooms (§3.2), Earth's blue at the last one.
     if (f && !trans.swapped) {
       drawDoorLight(trans.opening, f.light, trans.door.earth ? "earth" : "paper");
@@ -2302,6 +2645,7 @@ function sync() {
   const s = age(ui.story),
     t = age(ui.tip);
   $("story").classList.toggle("show", s >= 0 && s < CARD.storySeconds);
+  syncBanner();
   $("tip").classList.toggle("show", t >= 0 && t < CARD.tipSeconds);
 }
 /** The breath bar (RESEARCH_PROGRESSION 3.3): the original disc, frame and
@@ -2437,8 +2781,16 @@ function processEvents(quiet = false) {
       case "get":
         // A new verb (the eight-level model): its wordless moment, timed on
         // the simulation clock from the event (a quiet QA step still shows it).
-        startMoment(e.verb, { sim: e.time, loud, get: (state.def.gets ?? []).find((g) => g.id === e.id) ?? null });
+        {
+          const g = (state.def.gets ?? []).find((q) => q.id === e.id) ?? null;
+          startMoment(e.verb, { sim: e.time, loud, get: g });
+          // The relic bursts and is held over her for a beat; the banner names it.
+          relicPickup(e.verb, g ? { x: g.x, y: relicY(g) } : undefined, { loud });
+        }
         ui.verbs = undefined;
+        break;
+      case "refill-star":
+        if (loud) refillPickup(e);
         break;
       case "great-star":
         if (loud) {
@@ -2458,7 +2810,9 @@ function processEvents(quiet = false) {
         ui.orbitDirty = true;
         if (loud) {
           ui.beaconLitAt[e.id] = state.time; // simulation time, like the words
-          showStory(mark.story);
+          // A beacon's story line waits while an unlock banner is up.
+          if (banner) ui.storyWaiting = mark.story;
+          else showStory(mark.story);
           announce("A light to return to.");
         }
         break;
@@ -2616,6 +2970,11 @@ function restartChapter() {
 function clearMoments() {
   moments.length = 0;
   previewGets = [];
+  previewRefills = [];
+  relicHolds.length = 0;
+  refillFx.length = 0;
+  refillState.clear();
+  refillWake.clear();
   glint.trail.length = 0;
   scriptedPrev = state.time;
 }
@@ -2692,7 +3051,19 @@ function startLevel(n, { wake: wakeNow = true, force = true, fromMap = false } =
  * level's name and Great Star slots are shown once, below the line. */
 const LEAVES = '<svg class="leaves" viewBox="-11 -14 22 14" aria-hidden="true"><path d="M0 0 C-7 -2 -9 -9 -6 -13 C-1 -11 1 -5 0 0Z"/><path d="M0 0 C5 -1 9 -6 9 -11 C4 -11 0 -6 0 0Z"/></svg>';
 let preview = null; // a level hovered or focused on the title
+/** The title's legend lists only the verbs owned at the selected level's
+ * start (RESEARCH_PROGRESSION U8): a first launch shows "↑ jump" alone. */
+function syncLegend() {
+  const d = LEVELS[state.level - 1],
+    has = (v) => !d?.verbs || !!d.verbs[v];
+  const touch = coarse || root.classList.contains("touch");
+  const thumb = ["cape", "dive"].filter(has);
+  $("title-keys").textContent = touch
+    ? `tap left to jump${thumb.length ? ` · right thumb: ${thumb.join(", ")}` : ""}`
+    : ["↑ jump", has("cape") && "→ cape", has("dive") && "↓ dive"].filter(Boolean).join(" · ");
+}
 function syncLevelMap() {
+  syncLegend();
   const list = $("stations");
   if (!list) return;
   for (const li of list.querySelectorAll("li[data-level]")) {
@@ -3624,7 +3995,7 @@ window.addEventListener(
   (e) => {
     if (e.pointerType !== "touch" || root.classList.contains("touch")) return;
     root.classList.add("touch");
-    if (state.status === "ready" && !coarse) $("title-keys").textContent = "tap left to jump · right thumb: cape, dive";
+    if (state.status === "ready" && !coarse) syncLegend();
   },
   true,
 );
@@ -3727,6 +4098,7 @@ function frame(now) {
     scriptedCues();
     stepTransition(real);
     warmAhead();
+    stepEaseFrame();
     syncAudio();
     updateCamera(real);
     sync();
@@ -3773,6 +4145,32 @@ window.__game = {
     if (approach) previewGets.push({ id: `preview-${verb}`, verb, x: state.player.x + lead, preview: true });
     else startMoment(verb);
     return { verb, bar: barSeconds(), seconds: momentSeconds(verb, barSeconds()), pending: previewGets.length };
+  },
+  // Relics without the eight-level model: previewRelic("double") places the
+  // verb's relic `lead` px ahead (its beam and art); it bursts, holds over
+  // Diana and shows the banner as she runs through it. previewRefill("cape" |
+  // "leaf", { lit }) places a refill star at her chest height.
+  previewRelic: (verb, { lead = 640 } = {}) => {
+    const x = state.player.x + lead;
+    previewGets.push({ id: `relic-${verb}`, verb, x, y: runLineAt(x) - 40, preview: true, relic: true });
+    return { verb, x, beam: true };
+  },
+  previewRefill: (kind = "cape", { lit = true, lead = 420, dy = -36 } = {}) => {
+    const x = state.player.x + lead,
+      q = { id: `refill-${kind}-${previewRefills.length}`, kind, x, y: state.player.y + dy, lit, taken: false, preview: true };
+    previewRefills.push(q);
+    return { ...q };
+  },
+  showBanner: (verb) => (showBanner(verb), banner && { ...banner }),
+  getRelics: () => {
+    const b = $("banner").getBoundingClientRect();
+    return {
+      ahead: relicsAhead().map((g) => ({ id: g.id, verb: g.verb, x: g.x, y: relicY(g) })),
+      holds: relicHolds.map((h) => ({ verb: h.verb, age: clock - h.at, beat: h.beat })),
+      refills: refillsOf().map((q) => ({ id: q.id, kind: q.kind, x: q.x, y: q.y, lit: !!q.lit, taken: !!q.taken, alpha: q.lit ? 1 : 0.4 })),
+      banner: banner ? { verb: banner.verb, full: banner.full, age: clock - banner.at, seconds: banner.seconds, opacity: Number($("banner").style.opacity), name: $("banner-name").textContent, control: $("banner-control").hidden ? "" : $("banner-control").textContent, rect: { x: b.x, y: b.y, w: b.width, h: b.height } } : null,
+      seen: [...(progress.relics ?? [])],
+    };
   },
   // A look's own layer (body and accent) alone, on a transparent canvas the
   // size of the view at this moment: the alpha it puts in the 56 px HUD
@@ -4030,7 +4428,7 @@ async function load() {
     window.__game.ready = true;
     $("start").disabled = false;
     $("start-label").textContent = coarse ? "Tap to wake" : "Press space or tap to wake";
-    if (coarse) $("title-keys").textContent = "tap left to jump · right thumb: cape, dive";
+    syncLegend();
     setSound(sound.on);
     setGentleMusic(sound.gentle);
     setVolumes(sound.volumes);
