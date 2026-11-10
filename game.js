@@ -97,7 +97,7 @@ const sound = {
 const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, spaceSeconds: coarse ? 4 : 5.5 });
 sound.music.preload = "none";
 sound.music.loop = true;
-audio.attachMusic(sound.music, { level: 0.22 });
+audio.attachMusic(sound.music); // level: MUSIC_LEVEL, matched to the score
 function unlockAudio() {
   audio.unlock(); // guarded: a missing device never blocks play
 }
@@ -1505,6 +1505,16 @@ window.addEventListener("keydown", (e) => {
   if (["KeyP", "Escape"].includes(e.code)) pause();
   if (e.code === "KeyR") e.shiftKey ? restartChapter() : backToLight();
 });
+// The title song after a blocked autoplay: the first gesture that is not the
+// wake itself (the sound or fullscreen button, Tab, a click beside the logo)
+// starts it; the wake fades it out under the sky anyway.
+function titleSong(e) {
+  if (state.status !== "ready" || !sound.on || audio.stats().soundtrackPlaying) return;
+  const wakes = e.type === "keydown" ? ["Space", "Enter", "ArrowUp", "KeyW"].includes(e.code) : !!e.target?.closest?.("#start");
+  if (!wakes) audio.playMusic({ fromStart: true, fadeIn: 0.8 });
+}
+window.addEventListener("pointerdown", titleSong, true);
+window.addEventListener("keydown", titleSong, true);
 // The browser can suspend audio on its own (device change, iOS interruption);
 // any gesture outside a pause brings it back.
 window.addEventListener("pointerdown", () => audio.nudge(), true);
@@ -1719,6 +1729,8 @@ async function load() {
     // Effects are synthesised (audio.mjs); the original WAVs in manifest.sfx
     // are archive-only. Only the soundtrack streams, after the wake gesture.
     sound.music.src = manifest.music.file;
+    // Buffer it now: the door must not wait for a download.
+    sound.music.preload = "auto";
     hudOrbit = buildOrbit($("orbit"), 264, 44, false);
     pauseOrbit = buildOrbit($("pause-orbit"), 360, 80, true);
     ready = true;
@@ -1728,6 +1740,10 @@ async function load() {
     if (coarse) $("title-keys").textContent = "tap left to jump · right thumb: cape, dive";
     setSound(sound.on);
     setGentleMusic(sound.gentle);
+    // The title song: where the browser allows it (itch's click-to-play
+    // iframe does) it starts now, on the plain element (no AudioContext
+    // before a gesture); otherwise the first gesture that does not wake starts it.
+    if (sound.on) audio.playMusic({ fromStart: true });
     resize();
     sync();
     draw();

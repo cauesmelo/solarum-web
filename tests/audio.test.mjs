@@ -211,7 +211,9 @@ function rig(options = {}) {
       last = this;
     }
   }
-  const engine = createAudioEngine({ AudioContext: AC, seed: 3, ...options });
+  // pauseFade 0: the strict mock has no timers, so pausing suspends at once
+  // (the fade itself is tested separately).
+  const engine = createAudioEngine({ AudioContext: AC, seed: 3, pauseFade: 0, ...options });
   return { engine, ctx: () => last, made: () => made };
 }
 // Representative payloads, as model.mjs emits them.
@@ -674,4 +676,26 @@ test("with sound off the score keeps its place without any context or node; Gent
   assert.equal(gentle.stats.score.gentle, true);
   assert.equal(gentle.stats.score.detuneCents, 0);
   assert.equal(gentle.stats.score.H, 1);
+});
+
+test("pausing fades out over 15 ms before suspending and fades back in after resuming (no click)", async () => {
+  const { engine, ctx } = rig({ pauseFade: 0.015 });
+  const music = mockMusic();
+  engine.attachMusic(music);
+  engine.unlock();
+  engine.playMusic();
+  engine.setPaused(true);
+  assert.equal(engine.play("star"), null, "nothing new starts once paused");
+  assert.equal(ctx().state, "running", "still fading");
+  await new Promise((r) => setTimeout(r, 40));
+  assert.equal(ctx().state, "suspended");
+  assert.equal(music.paused, true);
+  engine.setPaused(false);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(ctx().state, "running");
+  // Resuming quickly cancels a pending suspend.
+  engine.setPaused(true);
+  engine.setPaused(false);
+  await new Promise((r) => setTimeout(r, 40));
+  assert.equal(ctx().state, "running");
 });

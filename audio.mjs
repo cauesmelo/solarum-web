@@ -469,8 +469,10 @@ export const CUES = {
         gain: 0.41,
         send: 0.03,
         layers: [
-          thump(130 * (1 + spread(rng, 0.05)), 75, 0.06, { env: env.perc(0.002, 0.09), gain: 0.34 }),
-          noise({ color: "brown", filter: { type: "lowpass", freq: 520, q: 0.5 }, env: env.perc(0.002, 0.05), gain: 0.3 }),
+          // Pitched above the felt bass (D2-B2, 73-123 Hz) so a landing's
+          // body never masks the note it plays.
+          thump(190 * (1 + spread(rng, 0.05)), 125, 0.06, { env: env.perc(0.002, 0.08), gain: 0.3 }),
+          noise({ color: "brown", filter: { type: "lowpass", freq: 620, q: 0.5 }, highpass: 140, env: env.perc(0.002, 0.05), gain: 0.34 }),
         ],
       }),
   },
@@ -484,11 +486,11 @@ export const CUES = {
     maxTail: 1.2,
     build: (rng) =>
       voice({
-        gain: 0.37,
+        gain: 0.185, // 6 dB under its first mix (audio critic: it masked the score)
         send: 0.06,
         layers: [
-          thump(120 * (1 + spread(rng, 0.05)), 52, 0.12, { env: env.perc(0.002, 0.2), gain: 0.5 }),
-          noise({ color: "brown", filter: { type: "lowpass", freq: 700, q: 0.5 }, env: env.perc(0.002, 0.09), gain: 0.4 }),
+          thump(170 * (1 + spread(rng, 0.05)), 100, 0.12, { env: env.perc(0.002, 0.18), gain: 0.5 }),
+          noise({ color: "brown", filter: { type: "lowpass", freq: 800, q: 0.5 }, highpass: 130, env: env.perc(0.002, 0.09), gain: 0.4 }),
           crackle({ dur: 0.12, from: 220, to: 60, rise: [1, 0.2], band: 1400, q: 0.8, gain: 0.12, seed: rng() * 1e9 }),
         ],
       }),
@@ -949,13 +951,15 @@ export const VOICES = {
         dur = n.dur ?? 4 * BEAT,
         e = swellEnv(1.6, dur, 2.8);
       const layers = [];
+      // Wide: each tone's two saws sit at independent places across the field
+      // and the second starts 7-15 ms later, so the sides decorrelate.
       midis.forEach((m, i) => {
-        const pan = midis.length > 1 ? -0.5 + i / (midis.length - 1) : 0;
-        layers.push(tone(m, { wave: "sawtooth", cents: 6, detuneBus: 1, env: e, gain: 0.028, pan }));
-        layers.push(tone(m, { wave: "sawtooth", cents: -6, detuneBus: -1, env: e, gain: 0.028, pan: -pan }));
+        const u = midis.length > 1 ? i / (midis.length - 1) : 0.5;
+        layers.push(tone(m, { wave: "sawtooth", cents: 6, detuneBus: 1, env: e, gain: 0.028, pan: -0.9 + 1.2 * u }));
+        layers.push(tone(m, { wave: "sawtooth", cents: -6, detuneBus: -1, env: e, gain: 0.028, pan: 0.9 - 1.0 * u, at: 0.007 + 0.008 * u }));
       });
       layers.push(tone(midis[0] - 12, { wave: "triangle", detuneBus: 1, env: e, gain: 0.06 }));
-      return voice({ gain: 0.8 * (n.gain ?? 1), send: 0.55, bed: true, hold: "pad", filter: { type: "lowpass", freq: 900, q: 0.4, lfo: { rate: 0.07, depth: 300 } }, autopan: { rate: 0.05, depth: 0.3 }, layers });
+      return voice({ gain: 0.8 * (n.gain ?? 1), send: 0.55, bed: true, hold: "pad", filter: { type: "lowpass", freq: 900, q: 0.4, lfo: { rate: 0.07, depth: 300 } }, autopan: { rate: 0.05, depth: 0.15 }, layers });
     },
   },
   choir: {
@@ -1351,10 +1355,18 @@ export function safetyCurve(n = 2049) {
 const LOOKAHEAD = 0.006; // s; starting a hair ahead keeps attacks whole
 const MAX_VOICES = 20;
 const SFX_LEVEL = 1; // calibrated against the soundtrack (README, "Sound")
-export const MUSIC_LEVEL = 0.22;
+export const MUSIC_LEVEL = 0.32; // the title / door soundtrack, matched to the score
 /** The score's output level, calibrated by offline renders to sit where the
  * soundtrack sat under the cues (README, "Sound"). */
 export const SCORE_LEVEL = 0.55;
+/** Everything was calibrated quiet (the old in-level mp3 sat at -29 LUFS);
+ * the audio critic measured -27.5 LUFS against the soundtrack's own -15. The
+ * whole mix now gains 7.7 dB into a fast limiter (whose built-in make-up
+ * adds about 1.5 dB) and the safety clipper after it: with the louder space
+ * return that puts a perfect run near the brief's -16 LUFS (measured offline,
+ * README "The mix"). The soundtrack's level rose 3.3 dB to match. */
+export const OUTPUT_GAIN = 10 ** (7.7 / 20);
+const PAUSE_FADE = 0.015; // s of fade before suspending and after resuming
 /** Audio seconds of score scheduled ahead of the present (brief 5.2). The rAF
  * loop schedules every frame; a hidden tab pauses the game, so no timer
  * fallback is needed (nothing moves while the simulation is frozen). */
@@ -1367,6 +1379,10 @@ const WOW_RATE = 0.45; // Hz
  * pitch by 2 pi f D (as a ratio), and 1 cent is 1/1731 of that ratio. */
 const WOW_PER_CENT = 1 / (1731 * 2 * Math.PI * WOW_RATE);
 const MP3_FIRST_BEAT = 0.449; // s into assets/soundtrack.mp3 (RESEARCH_MUSIC 1)
+/** Bar 26 of the soundtrack, where its full section begins (RESEARCH_MUSIC 1:
+ * bars 26-68 are the loud part), on a downbeat: first beat + 25 bars. */
+const MP3_FULL_SECTION = MP3_FIRST_BEAT + 25 * 4 * (60 / 107);
+const DOOR_BOOST = 1.4; // +3 dB: the full section then matches the door's bloom
 /** The bed sounds this much after its grid point: Diana's own notes arrive a
  * frame after their event (0-17 ms), so a slightly late bed centres them on
  * the beat instead of trailing it (audio critic, finding 7). */
@@ -1406,7 +1422,8 @@ export function createAudioEngine(options = {}) {
     peakVoices = 0,
     peakMusic = 0,
     darkened = false,
-    doorTimer = null;
+    doorTimer = null,
+    pauseTimer = null;
   const rng = mulberry32(seed),
     voices = [],
     music = [],
@@ -1457,6 +1474,16 @@ export function createAudioEngine(options = {}) {
     comp.attack.value = 0.004;
     comp.release.value = 0.25;
     const master = node("Gain");
+    const output = node("Gain");
+    output.gain.value = OUTPUT_GAIN;
+    const limiter = node("DynamicsCompressor");
+    limiter.threshold.value = -3;
+    limiter.knee.value = 1;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.002;
+    limiter.release.value = 0.12;
+    master.connect(output);
+    output.connect(limiter);
     const verbIn = node("Gain");
     const verb = node("Convolver");
     verb.normalize = false;
@@ -1482,19 +1509,19 @@ export function createAudioEngine(options = {}) {
     verbOut.connect(master);
     musicGain.connect(musicTone);
     musicTone.connect(master);
-    let last = master;
+    let last = limiter;
     if (safety) {
       const shaper = node("WaveShaper");
       shaper.curve = safetyCurve();
       shaper.oversample = "none";
-      master.connect(shaper);
+      limiter.connect(shaper);
       last = shaper;
     }
     last.connect(ctx.destination);
     for (const color of ["white", "pink", "brown"]) {
       buffers[color] = makeBuffer([noiseSamples(sr, 3, color, r)]);
     }
-    graph = { sfx, comp, master, verbIn, music: musicGain, musicTone, out: last };
+    graph = { sfx, comp, master, output, verbIn, music: musicGain, musicTone, out: last };
     // A browser without delay lines or constant sources still gets every cue;
     // only the score stays silent.
     try {
@@ -1560,7 +1587,14 @@ export function createAudioEngine(options = {}) {
     scoreIn.connect(tape);
     tape.connect(tapeTone);
     tapeTone.connect(tapeGain);
-    tapeGain.connect(scoreOut);
+    // A little air: +3.5 dB around 3.8 kHz (the score was measured dark).
+    const presence = node("BiquadFilter");
+    presence.type = "peaking";
+    presence.frequency.value = 3800;
+    presence.Q.value = 0.7;
+    presence.gain.value = 3.5;
+    tapeGain.connect(presence);
+    presence.connect(scoreOut);
     scoreOut.connect(graph.master);
     const playerIn = node("Gain");
     playerIn.connect(scoreIn);
@@ -1591,7 +1625,7 @@ export function createAudioEngine(options = {}) {
     space.buffer = makeBuffer(reverbImpulse(sr, options.spaceSeconds ?? 5.5, r, { predelay: 0.03, fadeIn: 0.12 }));
     buffers.space = true;
     const spaceOut = node("Gain");
-    spaceOut.gain.value = 0.62;
+    spaceOut.gain.value = 1.1; // +5 dB on the first mix: more space, more float
     spaceIn.connect(space);
     space.connect(spaceOut);
     spaceOut.connect(scoreIn);
@@ -1640,7 +1674,7 @@ export function createAudioEngine(options = {}) {
       musicRouted = true;
       musicEl.volume = 1; // the level now lives in the music gain (and works on iOS)
     } catch {
-      musicEl.volume = musicLevel;
+      musicEl.volume = Math.min(1, musicLevel * OUTPUT_GAIN);
     }
   }
   function unlock() {
@@ -2118,8 +2152,10 @@ export function createAudioEngine(options = {}) {
         // frame re-anchor the grid by an odd 60-70 ms (audio critic).
         sc.anchorPending = true;
         restoreTape(0);
-        // The title song gives way to the sky over 1.5 s.
+        // The title song gives way to the sky over 1.5 s; a title song the
+        // browser blocked is forgotten, so a later resume never starts it.
         if (musicEl && !musicEl.paused) fadeOutMusic(1.5);
+        else musicWanted = false;
       } else if (fx.kind === "restart") {
         // Control has returned (or a retry): the score re-enters on the
         // beacon's bar at this very moment.
@@ -2132,9 +2168,10 @@ export function createAudioEngine(options = {}) {
       else if (fx.kind === "door") door(fx);
     }
   }
-  /** The far door: the score's sustain blooms out, then the original
-   * recording begins on a downbeat two bars later (its first beat falls
-   * 0.449 s into the file): the title song, finished by the player. */
+  /** The far door: the score's sustain blooms out while, one bar later and
+   * on a downbeat, the original recording fades in at its full section
+   * (bar 26 of the file, where it is as loud as the score; its intro sat
+   * 9 dB under and left a hole): the title song, finished by the player. */
   function door(fx) {
     try {
       for (const v of music) if (v.hold) fadeOut(v, 4, t() + 0.5);
@@ -2144,16 +2181,16 @@ export function createAudioEngine(options = {}) {
     }
     if (offline || !musicEl) return;
     clearTimeout(doorTimer);
-    const wait = (2 * BAR * SIXTEENTH) / sc.scale - MP3_FIRST_BEAT;
+    const wait = (BAR * SIXTEENTH) / sc.scale;
     doorTimer = setTimeout(() => {
       doorTimer = null;
       musicWanted = true;
       try {
-        musicEl.currentTime = 0;
+        musicEl.currentTime = MP3_FULL_SECTION;
       } catch {
-        /* not seekable yet */
+        /* not seekable yet: it starts from the top */
       }
-      playMusic({ fadeIn: 0.4 });
+      playMusic({ fadeIn: 2, level: musicLevel * DOOR_BOOST });
     }, Math.max(0, wait) * 1000);
   }
   function applyTuning(now) {
@@ -2296,7 +2333,7 @@ export function createAudioEngine(options = {}) {
       /* ignore */
     }
   }
-  function playMusic({ fadeIn = 0, fromStart = false } = {}) {
+  function playMusic({ fadeIn = 0, fromStart = false, level = musicLevel } = {}) {
     musicWanted = true;
     if (!enabled || paused || !musicEl) return;
     try {
@@ -2304,8 +2341,8 @@ export function createAudioEngine(options = {}) {
       if (musicRouted && graph) {
         const g = graph.music.gain;
         g.cancelScheduledValues(t());
-        g.setValueAtTime(fadeIn ? Z : musicLevel, t());
-        if (fadeIn) g.linearRampToValueAtTime(musicLevel, t() + fadeIn);
+        g.setValueAtTime(fadeIn ? Z : level, t());
+        if (fadeIn) g.linearRampToValueAtTime(level, t() + fadeIn);
         duckState = { until: -1, target: 1 };
       }
       musicEl.play()?.catch?.(() => {});
@@ -2488,7 +2525,9 @@ export function createAudioEngine(options = {}) {
       musicEl = el;
       musicLevel = level ?? MUSIC_LEVEL;
       try {
-        if (!musicRouted) el.volume = musicLevel;
+        // Unrouted (before the first gesture) the element plays on its own at
+        // the level it will have through the graph.
+        if (!musicRouted) el.volume = Math.min(1, musicLevel * OUTPUT_GAIN);
       } catch {
         /* ignore */
       }
@@ -2591,14 +2630,39 @@ export function createAudioEngine(options = {}) {
       p = !!p;
       if (p === paused) return;
       paused = p;
+      clearTimeout(pauseTimer);
+      // A 15 ms fade on each side, so pausing never clicks. Nothing new can
+      // start once `paused` is set; the context suspends after the fade.
+      const fade = options.pauseFade ?? PAUSE_FADE;
+      const ramp = (to) => {
+        if (!graph || offline) return;
+        const g = graph.output.gain,
+          now = ctx.currentTime;
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(g.value, now);
+        g.linearRampToValueAtTime(to, now + fade);
+      };
       try {
         if (p) {
-          musicEl?.pause();
-          if (ctx && !offline) ctx.suspend?.()?.catch?.(() => {});
+          if (ctx && !offline && fade > 0) {
+            ramp(0);
+            pauseTimer = setTimeout(() => {
+              if (!paused) return;
+              musicEl?.pause();
+              ctx.suspend?.()?.catch?.(() => {});
+            }, fade * 1000 + 5);
+          } else {
+            musicEl?.pause();
+            if (ctx && !offline) ctx.suspend?.()?.catch?.(() => {});
+          }
         } else if (enabled) {
           if (ctx && !offline) {
             resumingUntil = wallNow() + 400;
-            ctx.resume?.()?.catch?.(() => {});
+            const back = ctx.resume?.();
+            if (fade > 0) {
+              if (graph) graph.output.gain.setValueAtTime(0, ctx.currentTime);
+              (back?.then ? back : Promise.resolve()).then(() => !paused && ramp(OUTPUT_GAIN)).catch?.(() => {});
+            }
           }
           sc.lastAudio = null;
           if (musicWanted && musicEl) musicEl.play()?.catch?.(() => {});
