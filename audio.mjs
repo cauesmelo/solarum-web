@@ -2810,6 +2810,13 @@ export function createAudioEngine(options = {}) {
       const v = renderMusic({ layer: "stars", ...note, voice: name, t: 0 }, { at: t() + LOOKAHEAD });
       return v ? { end: v.end } : null;
     },
+    /** Soundboard: hear the bed at tuning value H right now (dev only). */
+    auditionTuning(H) {
+      conductor.tuning.force(H);
+      sc.mix = null;
+      if (ctx && score) applyTuning(t());
+      return conductor.tuning.mix();
+    },
     conductor,
     get context() {
       return ctx;

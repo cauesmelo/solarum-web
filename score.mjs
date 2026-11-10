@@ -322,6 +322,10 @@ export function createTuning({ gentle = false } = {}) {
     get errors() {
       return errors;
     },
+    /** Dev auditions (soundboard): set H directly (Gentle still wins). */
+    force(v) {
+      return set(v);
+    },
     /** kind: respawn (info.fallsHere), chain-break, loose-note, on-grid-note,
      * stable-landing, constellation, clean-bar, beacon, restart. */
     apply(kind, info = {}) {

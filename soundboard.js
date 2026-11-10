@@ -135,6 +135,51 @@ function frames(kind) {
 async function renderRun({ kind = "main", from = 0, seconds = 20, only = null, cues = true, safety = true } = {}) {
   return renderRunOffline({ frames: frames(kind), from, seconds, only, cues, safety, gentle: kind === "gentle", seed: 3 });
 }
+/** ITU-R BS.1770-4 integrated loudness (K-weighting at 48 kHz, 400 ms blocks,
+ * absolute and relative gates) and true sample peak of a rendered buffer. */
+function loudness(buffer) {
+  const sr = buffer.sampleRate;
+  const stages = [
+    [1.53512485958697, -2.69169618940638, 1.19839281085285, -1.69065929318241, 0.73248077421585],
+    [1, -2, 1, -1.99004745483398, 0.99007225036621],
+  ];
+  let peak = 0;
+  const weighted = Array.from({ length: buffer.numberOfChannels }, (_, c) => {
+    let x = buffer.getChannelData(c);
+    for (const v of x) peak = Math.max(peak, Math.abs(v));
+    for (const [b0, b1, b2, a1, a2] of stages) {
+      const y = new Float32Array(x.length);
+      let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+      for (let i = 0; i < x.length; i++) {
+        const v = b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+        (x2 = x1), (x1 = x[i]), (y2 = y1), (y1 = v), (y[i] = v);
+      }
+      x = y;
+    }
+    return x;
+  });
+  const block = Math.round(0.4 * sr),
+    hop = Math.round(0.1 * sr),
+    z = [];
+  for (let s = 0; s + block <= weighted[0].length; s += hop) {
+    let sum = 0;
+    for (const c of weighted) {
+      let m = 0;
+      for (let i = s; i < s + block; i++) m += c[i] * c[i];
+      sum += m / block;
+    }
+    z.push(sum);
+  }
+  const L = (p) => -0.691 + 10 * Math.log10(p);
+  const abs = z.filter((p) => L(p) > -70);
+  const rel = abs.length ? L(abs.reduce((a, b) => a + b, 0) / abs.length) - 10 : 0;
+  const gated = abs.filter((p) => L(p) > rel);
+  return { lufs: gated.length ? L(gated.reduce((a, b) => a + b, 0) / gated.length) : -Infinity, peak };
+}
+function showLoudness(title, buffer) {
+  const { lufs, peak } = loudness(buffer);
+  $("loudness").textContent = `${title}: ${lufs.toFixed(1)} LUFS, peak ${peak.toFixed(3)} (${(20 * Math.log10(peak)).toFixed(1)} dBFS)`;
+}
 async function playBuffer(buffer) {
   ready();
   const ctx = engine.context;
@@ -161,6 +206,7 @@ for (const [title, about, opts] of RUNS)
     const t0 = performance.now();
     const { buffer } = await renderRun(opts);
     log(`${title} (${opts.seconds} s, rendered in ${((performance.now() - t0) / 1000).toFixed(1)} s)`);
+    showLoudness(title, buffer);
     await playBuffer(buffer);
   });
 const STEMS = [
@@ -179,8 +225,76 @@ for (const [layer, about, opts] of STEMS)
     log(`Rendering the ${layer} stem...`);
     const { buffer } = await renderRun({ ...opts, only: [layer], cues: false });
     log(`${layer} stem`);
+    showLoudness(`${layer} stem`, buffer);
     await playBuffer(buffer);
   });
+
+/* ---------- A/B: perfect and sloppy, sample-locked, switch while playing ---------- */
+let ab = null;
+$("ab").addEventListener("click", async () => {
+  ready();
+  if (ab) {
+    for (const s of ab.sources) s.stop();
+    ab = null;
+    $("ab").setAttribute("aria-pressed", "false");
+    $("ab-switch").disabled = true;
+    return;
+  }
+  log("Rendering A (perfect) and B (sloppy)...");
+  const [a, b] = await Promise.all([renderRun({ kind: "main", from: 0, seconds: 27 }), renderRun({ kind: "sloppy", from: 0, seconds: 27 })]);
+  const ctx = engine.context,
+    at = ctx.currentTime + 0.1;
+  const gains = [1, 0].map((v) => {
+    const g = ctx.createGain();
+    g.gain.value = v;
+    g.connect(ctx.destination);
+    return g;
+  });
+  const sources = [a.buffer, b.buffer].map((buf, i) => {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(gains[i]);
+    src.start(at);
+    return src;
+  });
+  ab = { sources, gains, side: 0 };
+  sources[0].onended = () => ab && ab.sources[0] === sources[0] && $("ab").click();
+  $("ab").setAttribute("aria-pressed", "true");
+  $("ab-switch").disabled = false;
+  $("ab-switch").textContent = "Now: A (perfect)";
+  const la = loudness(a.buffer),
+    lb = loudness(b.buffer);
+  $("loudness").textContent = `A ${la.lufs.toFixed(1)} LUFS · B ${lb.lufs.toFixed(1)} LUFS`;
+  log("A/B playing: switch at any time (the sloppy run falls at the leap, so B drifts later after it)");
+});
+$("ab-switch").addEventListener("click", () => {
+  if (!ab) return;
+  ab.side = 1 - ab.side;
+  const now = engine.context.currentTime;
+  ab.gains.forEach((g, i) => {
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(g.gain.value, now);
+    g.gain.linearRampToValueAtTime(i === ab.side ? 1 : 0, now + 0.03);
+  });
+  $("ab-switch").textContent = ab.side ? "Now: B (sloppy)" : "Now: A (perfect)";
+});
+
+/* ---------- tuning value H: the bed against Diana's in-tune voice ---------- */
+function setTuning() {
+  ready();
+  const m = engine.auditionTuning(Number($("tuning").value));
+  $("tuning-out").textContent = `${m.H.toFixed(2)} · ${m.flatCents.toFixed(1)} ¢ flat, ${m.totalCents.toFixed(1)} ¢ max`;
+}
+$("tuning").addEventListener("input", setTuning);
+$("hear-h").addEventListener("click", () => {
+  setTuning();
+  // A bed chord (follows H) under a player note on its root (always in tune).
+  const c = chord();
+  engine.voice("pad", sampleNote("pad", c));
+  setTimeout(() => engine.voice("harmonica", { midi: rootIn(c, 74), dur: 2.2 }), 900);
+  setTimeout(() => engine.voice("glass", { midi: chordTones(c, 74, 90)[1] }), 2000);
+  log(`Bed at H ${Number($("tuning").value).toFixed(2)} over ${c.name}, with Diana's in-tune notes on top`);
+});
 
 /* ---------- body cue buttons ---------- */
 const groups = $("groups");
@@ -353,5 +467,7 @@ window.__soundboard = {
   },
   play: fire,
   voice: (name, chordName = "D") => engine.voice(name, sampleNote(name, CHORDS[chordName])),
+  tuning: (H) => engine.auditionTuning(H),
+  loudness: async (opts) => loudness((await renderRun(opts)).buffer),
   stats: () => engine.stats(),
 };

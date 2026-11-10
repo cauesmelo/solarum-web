@@ -159,10 +159,17 @@
         <button id="stop" class="ghost" type="button">Stop</button>
         <label>Chord <select id="chord"></select></label>
         <label><input id="earth" type="checkbox" /> Earth is blue (door)</label>
+        <label>Tuning H <input id="tuning" type="range" min="0.4" max="1" step="0.05" value="1" /> <output id="tuning-out">1.00 · 0 ¢</output></label>
+        <button id="hear-h" class="ghost" type="button">Hear H</button>
         <span class="meter" aria-live="off"><i><b id="meter-bar"></b></i><span id="meter-text">-inf dBFS</span></span>
         <span id="log" aria-live="polite"></span>
       </div>
       <h2>Runs: perfect, sloppy, Gentle</h2>
+      <div class="bar" role="group" aria-label="A/B">
+        <button id="ab" class="ghost" type="button" aria-pressed="false">A/B: perfect vs sloppy, bars 1-12</button>
+        <button id="ab-switch" class="ghost" type="button" disabled>Now: A (perfect)</button>
+        <span id="loudness" aria-live="polite">Loudness: render something</span>
+      </div>
       <div class="grid" id="runs"></div>
       <h2>Stems of the score</h2>
       <div class="grid" id="stems"></div>
