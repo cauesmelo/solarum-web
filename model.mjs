@@ -80,6 +80,7 @@ export const RULES = Object.freeze({
 const CRACKED = new Set(["crumble", "lid", "cascade"]);
 /** One beat of simulation time (the simulation always runs at 107 BPM). */
 const BEAT_SIM = 60 / 107;
+const SIXTEENTH_SIM = BEAT_SIM / 4;
 const DURATIONS = {
   start: 1 / 3,
   jump: 5 / 12,
@@ -588,6 +589,10 @@ function landOn(s, q, wasGrounded, hard) {
   s.anchorY = q.y;
   s.fallTime = 0;
   s.launched = false;
+  // The hang belongs to the jump that set it: a key still down after a
+  // touch-down must not slow the next walk-off (level I's lookout and crown
+  // edges drop onto the grid in exactly 2.67/16 and 2/16).
+  s.jumpHeld = false;
   if (!wasGrounded) {
     s.dashRemaining = 0; // touching down closes the cape
     animate(s, hard ? "hardLanding" : "softLanding");
@@ -901,6 +906,13 @@ function tick(s, dt, controls) {
   if (movement.id !== s.movement.id) {
     s.movement = movement;
     event(s, "movement", { id: movement.id });
+  }
+  // Scripted moments (level.mjs `moments`, in sixteenths of simulation time
+  // from the wake): a star landing ahead, the brightest star's flash, the
+  // crash. They follow the clock, so a respawn replays those after its beacon.
+  for (const m of s.def.moments ?? []) {
+    const at = m.k * SIXTEENTH_SIM;
+    if (s.time - dt < at - 1e-9 && s.time >= at - 1e-9) event(s, "moment", { id: m.id, kind: m.kind, target: m.target ?? null });
   }
   // GETs (RESEARCH_PROGRESSION 2.2): running through one owns its verb.
   for (const g of s.def.gets ?? []) {

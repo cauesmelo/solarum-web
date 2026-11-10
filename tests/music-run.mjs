@@ -18,7 +18,7 @@ import { createConductor, LAYERS } from "../score.mjs";
 export const CRACKED = new Set(LEVELS.flatMap((d) => createLevel(d).platforms.filter((q) => q.type).map((q) => q.id)));
 /** Where each beacon's challenge is (x range of the first airborne press to block). */
 const CHALLENGE = {
-  1: { drift: [gx(84), gx(96)] },
+  1: { "first-star": [gx(152), gx(165)] },
   2: { voids: [16000 + 37.85 * 35, 16700 + 37.85 * 35] },
   3: { voids: [16000 + 37.85 * 70, 16700 + 37.85 * 70], broken: [15100, 15700] },
   4: { storm: [gx(68), gx(76) + 130] },
@@ -27,7 +27,7 @@ const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJu
 /** A sloppy run of each level: one fall, one broken constellation and a few
  * grounded jumps pressed late (still on the island). */
 export const SLOPPY_RUNS = Object.freeze({
-  1: { level: 1, failAt: ["drift"], removeStars: ["first-song-2"], late: [[gx(36) - 1, gx(36) + 1, 14], [gx(124) - 1, gx(124) + 1, 12]] },
+  1: { level: 1, failAt: ["first-star"], removeStars: ["first-song-2"], late: [[gx(34) - 1, gx(34) + 1, 14], [gx(168) - 1, gx(168) + 1, 12]] },
   2: { level: 2, failAt: ["voids"], removeStars: ["flight-line-2"], late: [[19860, 19870, 10]] },
   3: { level: 3, failAt: ["broken"], removeStars: ["split-song-1"], late: [[8090, 8100, 12]] },
   4: { level: 4, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
