@@ -698,8 +698,8 @@ const WAKING = {
     { id: "plume", kind: "plume", x: gx(330), y: WY.rim, from: 240 },
   ],
   prompts: [
-    { id: "p-jump", glyph: ["up"], action: "jump", x: gx(24) - 30, y: WY.home - 110, from: gx(24) - 20, to: gx(24) + 40, inputX: gx(24) + 20 },
-    { id: "p-tap", glyph: ["tap-up"], action: "jump", x: gx(88), y: WY.floor - 110, from: gx(89), to: gx(90) + 30, inputX: gx(90) + 10 },
+    { id: "p-jump", glyph: ["up"], action: "jump", x: gx(24) - 30, y: WY.home - 150, from: gx(24) - 20, to: gx(24) + 40, inputX: gx(24) + 20 },
+    { id: "p-tap", glyph: ["tap-up"], action: "jump", x: gx(88) + 120, y: WY.floor - 135, from: gx(89), to: gx(90) + 30, inputX: gx(90) + 10 },
     // ↑ ↑: [from, inputX] is the first jump's window; `to` ends the second's.
     { id: "p-key", glyph: ["up", "up"], action: "double-jump", x: gx(125), y: WY.field - 300, from: gx(124) - 30, to: gx(130), inputX: gx(124) + 14, optional: true, route: "main" },
     { id: "p-leap", glyph: ["up", "up"], action: "double-jump", x: gx(153), y: WY.field - 250, from: gx(152) - 30, to: gx(160), inputX: gx(152) + 14 },
@@ -886,7 +886,7 @@ const GIFT = {
     // ↑ · →: [from, inputX] is the jump's window; `to` ends the cape's.
     { id: "p-first-flight", glyph: ["up", "then", "right"], action: "dash", x: gk(40) + 20, y: GY.rim - 170, from: gk(40) - 30, to: gk(43) + 60, inputX: gk(40) + 14, optional: true, route: "main" },
     { id: "p-cape", glyph: ["up", "then", "right"], action: "dash", x: gk(69, 1), y: GY.gift - 170, from: gk(68, 1) - 30, to: gk(71, 1) + 60, inputX: gk(68, 1) + 14 },
-    { id: "p-refill", glyph: ["right"], action: "dash", x: gk(172, 4), y: GY.long - 200, from: gk(171, 4), to: gk(175, 4), inputX: gk(173, 4) + 10 },
+    { id: "p-refill", glyph: ["right"], action: "dash", x: gk(172, 4) + 48, y: GY.long - 175, from: gk(171, 4), to: gk(175, 4), inputX: gk(173, 4) + 10 },
   ],
   stars: [
     // The crater's two hops and the plain's three: a star on each rise.
@@ -1298,8 +1298,8 @@ const WAY_DOWN = {
   moments: [{ id: "necklace-wake", kind: "necklace", k: 44, target: "necklace" }],
   decor: [{ id: "glint-stone", kind: "glint", x: wk(44, 1), y: DY.lid }],
   prompts: [
-    { id: "p-break", glyph: ["down"], action: "dive", x: wk(52, 1), y: DY.lid - 150, from: wk(48, 1), to: wk(58, 1), inputX: wk(56, 1), optional: true, route: "main" },
-    { id: "p-cut", glyph: ["down"], action: "dive", x: wk(80, 1), y: DY.floor - 200, from: wk(79, 1) + 2 * 69.69, to: wk(83, 1, 1), inputX: wk(79, 1) + 3.4 * 69.69 },
+    { id: "p-break", glyph: ["down"], action: "dive", x: wk(52, 1), y: DY.lid - 145, from: wk(48, 1), to: wk(58, 1), inputX: wk(56, 1), optional: true, route: "main" },
+    { id: "p-cut", glyph: ["down"], action: "dive", x: wk(80, 1), y: DY.floor - 255, from: wk(79, 1) + 2 * 69.69, to: wk(83, 1, 1), inputX: wk(79, 1) + 3.4 * 69.69 },
   ],
   stars: [
     // The star row the safe dive drops her onto.
@@ -1585,8 +1585,8 @@ const BREAKING = {
   decor: [],
   prompts: [
     { id: "p-crack", glyph: ["up"], action: "jump", x: gk(75), y: VY.crack2 - 150, from: gk(74), to: gk(77), inputX: gk(76) + 10 },
-    { id: "p-split", glyph: ["up", "then", "right"], action: "dash", x: gk(181), y: VY.splitShore2 - 170, from: gk(180) - 30, to: gk(183) + 60, inputX: gk(180) + 2 },
-    { id: "p-through", glyph: ["down"], action: "dive", x: gk(250, 2), y: VY.stoneCrack1 - 150, from: gk(249, 2) + 5, to: gk(253, 2), inputX: gk(252, 2) },
+    { id: "p-split", glyph: ["up", "then", "right"], action: "dash", x: gk(181) - 66, y: VY.splitShore2 - 170, from: gk(180) - 30, to: gk(183) + 60, inputX: gk(180) + 2 },
+    { id: "p-through", glyph: ["down"], action: "dive", x: gk(250, 2) + 30, y: VY.stoneCrack1 - 165, from: gk(249, 2) + 5, to: gk(253, 2), inputX: gk(252, 2) },
   ],
   stars: V_STARS,
   routes: {
@@ -1847,10 +1847,10 @@ const BORROWED_WIND = {
   decor: [],
   prompts: [
     { id: "p-breeze", glyph: ["up", "then", "hold-right"], action: "glide", x: gk(50), y: JY.breeze - 230, from: gk(48) + 40, to: gk(60), inputX: gk(48) + 90, optional: true, route: "main" },
-    { id: "p-wind", glyph: ["up"], action: "jump", x: gk(83), y: JY.breeze2 - 120, from: gk(83), to: gk(85), inputX: gk(84) + 8 },
+    { id: "p-wind", glyph: ["up"], action: "jump", x: gk(83) + 36, y: JY.breeze2 - 145, from: gk(83), to: gk(85), inputX: gk(84) + 8 },
     { id: "p-glide", glyph: ["hold-right"], action: "glide", x: gk(125), y: JY.bridgeGate - 230, from: gk(123) + 40, to: gk(137), inputX: gk(123) + 90 },
     // (From the column's far edge on: inside it the cape glides.)
-    { id: "p-top", glyph: ["right"], action: "dash", x: gk(162), y: JY.bridgeShore2 - 330, from: gk(161.7), to: gk(164), inputX: gk(162) + 10 },
+    { id: "p-top", glyph: ["right"], action: "dash", x: gk(162) - 252, y: JY.bridgeShore2 - 215, from: gk(161.7), to: gk(164), inputX: gk(162) + 10 },
   ],
   stars: J_STARS,
   routes: {
@@ -2015,8 +2015,8 @@ const L4_BASE = {
     { id: "great-3", x: gx(45) + 2 * SUPER, y: -76, line: "high above the school: a second super jump" },
   ],
   prompts: [
-    { id: "p-super", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: gx(22), y: 380, from: gx(23), to: gx(30), inputX: gx(25) },
-    { id: "p-storm", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: gx(66) + SUPER, y: 320, from: gx(67) + SUPER, to: gx(74) + SUPER, inputX: gx(68) + SUPER + 14 },
+    { id: "p-super", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: gx(22), y: 325, from: gx(23), to: gx(30), inputX: gx(25) },
+    { id: "p-storm", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: gx(66) + SUPER, y: 260, from: gx(67) + SUPER, to: gx(74) + SUPER, inputX: gx(68) + SUPER + 14 },
   ],
   stars: [
     // (The hearth's last loose stars lay beyond its trimmed end.)
