@@ -12,7 +12,7 @@ import { createGame, start, update, jump, releaseJump, dash, dive, snapshot } fr
 import { levelDef } from "../level.mjs";
 import { playRoute } from "../tests/routes.mjs";
 import { record, bake, auditAnchors } from "./bake-score.mjs";
-import { nominalRun, timingWindow, holdNeed, decisionLeads } from "./movement-audit.mjs";
+import { nominalRun, timingWindow, holdNeed, decisionLeads, inputsOf } from "./movement-audit.mjs";
 import { viewGeometry, VIEW } from "../geometry.mjs";
 
 const n = +(process.argv[2] ?? 1);
@@ -53,16 +53,19 @@ for (const a of audit) if (flag("--anchors") || Math.abs(a.ms) / d.clock > 35) c
 // happens" for the 2-bar rule (beacons, GETs, scripted world events).
 const presses = rec.result.actions.filter((q) => q.action !== "releaseJump");
 const bars = Math.round(baked.end / 16);
+// Inputs (movement-audit inputsOf): presses plus held-cape presses and
+// releases in the air, from the nominal 120 Hz run.
+const nom = nominalRun(n);
+const inputs = inputsOf(nom).map((q) => ({ time: q.tick / 120, kind: q.kind }));
 const perBar = Array.from({ length: bars }, () => 0);
-for (const p of presses) perBar[Math.min(bars - 1, Math.floor(p.time / SIX / 16))]++;
-console.log(`  inputs: ${presses.length} in ${bars} bars = ${(presses.length / bars).toFixed(2)}/bar, peak ${Math.max(...perBar)}; per bar ${perBar.join(" ")}`);
-const marks = [0, ...presses.map((p) => p.time / SIX), ...rec.events.filter((e) => ["checkpoint", "get", "moment"].includes(e.name)).map((e) => e.time / SIX), baked.end].sort((a, b) => a - b);
+for (const p of inputs) perBar[Math.min(bars - 1, Math.floor(p.time / SIX / 16))]++;
+console.log(`  inputs: ${inputs.length} in ${bars} bars = ${(inputs.length / bars).toFixed(2)}/bar (${presses.length} presses), peak ${Math.max(...perBar)}; per bar ${perBar.join(" ")}`);
+const marks = [0, ...inputs.map((p) => p.time / SIX), ...rec.events.filter((e) => ["checkpoint", "get", "moment"].includes(e.name)).map((e) => e.time / SIX), baked.end].sort((a, b) => a - b);
 let gap = 0, at = 0;
 for (let i = 1; i < marks.length; i++) if (marks[i] - marks[i - 1] > gap) ((gap = marks[i] - marks[i - 1]), (at = marks[i - 1]));
 console.log(`  longest stretch without an input or event: ${(gap / 16).toFixed(2)} bars from k ${at.toFixed(1)}`);
 const xs = [d.level.startX, ...d.checkpoints.map((c) => c.x), d.level.finishX];
 console.log(`  beacon gaps (s real): ${xs.slice(1).map((x, i) => (real((x - xs[i]) / 270)).toFixed(1)).join(" ")}`);
-const nom = nominalRun(n);
 if (flag("--windows") || flag("--holds")) {
   const windows = nom.plan.map(([, a], i) => (a === "glide" || a === "unglide" ? null : timingWindow(n, nom, i))).filter(Boolean);
   const req = windows.filter((w) => w.required);

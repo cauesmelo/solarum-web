@@ -6,7 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { RULES } from "../model.mjs";
-import { LEVELS, levelDef, createLevel } from "../level.mjs";
+import { LEVELS, LEVEL_ID, levelDef, createLevel } from "../level.mjs";
 import { PATHS, HASH } from "../score-path.mjs";
 import { record, bake, auditAnchors, sourceHash, ANCHOR_GRID } from "../scripts/bake-score.mjs";
 import {
@@ -54,9 +54,10 @@ test("every main route: each takeoff, landing, star, chain note, beacon and tile
   const kinds = {
     1: ["jump", "double-jump", "land", "star", "chain-note", "constellation", "checkpoint"],
     2: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
-    3: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
-    4: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
-    5: ["jump", "dash", "super-jump", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
+    [LEVEL_ID["still-water"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
+    [LEVEL_ID.wind]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
+    [LEVEL_ID.constellation]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
+    [LEVEL_ID.door]: ["jump", "dash", "super-jump", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
   };
   for (const n of IDS) {
     const clock = levelDef(n).clock;
@@ -90,7 +91,7 @@ test("constellations complete on an eighth, beacons sit on half bars, flights mo
   // A full flight adds 0.5 s x 227.1 px/s = 113.55 px = 3 x 37.85 px of run.
   assert.ok(Math.abs(RULES.dashSpeed * RULES.dashDuration - 3 * 270 * SIXTEENTH) < 0.01);
   // The beat cascade's pitch is one wave-beat: 207 px.
-  for (const n of [4, 5]) {
+  for (const n of [LEVEL_ID.constellation, LEVEL_ID.door]) {
     const tiles = createLevel(n).platforms.filter((q) => q.cascade).sort((a, b) => a.x - b.x);
     for (let i = 1; i < tiles.length; i++) assert.ok(Math.abs(tiles[i].x - tiles[i - 1].x - 207) < 1);
   }
@@ -198,7 +199,7 @@ test("dissonance follows only visible errors, is clearly heard (the bed goes fla
     assert.ok(gentle.player.every((v) => !v.blur), "and never blurs a note");
   }
   // Below H 0.7 the choir rests; it returns as H heals.
-  const sloppy = musicRun(SLOPPY_RUNS[3]);
+  const sloppy = musicRun(SLOPPY_RUNS[LEVEL_ID.wind]);
   assert.ok(sloppy.mixes.some((m) => !m.choir) && sloppy.mixes.at(-1).choir);
   // Kindness: three falls at one beacon soften the penalty, five forgive it.
   const t = createTuning();
@@ -238,13 +239,13 @@ test("a fall tape-stops the score (L1 short, no rewind; then backwards), L4 rest
     }
   }
   // Back to last light rewinds without the tape-stop or a penalty.
-  const c = createConductor({ level: 3, path: PATHS[3], cracked: CRACKED });
+  const c = createConductor({ level: LEVEL_ID.wind, path: PATHS[LEVEL_ID.wind], cracked: CRACKED });
   c.event({ name: "wake", time: 0 });
-  assert.equal(c.transport.pos(0), SCORES[3].pickup, "interim III wakes on its half-bar pickup");
-  const out = c.event({ name: "respawn", source: "retry", time: 9, x: beaconX("voids", 3) });
+  assert.equal(c.transport.pos(0), SCORES[LEVEL_ID.wind].pickup, "interim III wakes on its half-bar pickup");
+  const out = c.event({ name: "respawn", source: "retry", time: 9, x: beaconX("voids", LEVEL_ID.wind) });
   assert.deepEqual(out.fx.map((f) => f.kind), ["restart"]);
   assert.equal(c.tuning.H, 1);
-  assert.equal(c.transport.pos(9), Math.round(posOf(3, beaconX("voids", 3))), "on the beacon's bar");
+  assert.equal(c.transport.pos(9), Math.round(posOf(LEVEL_ID.wind, beaconX("voids", LEVEL_ID.wind))), "on the beacon's bar");
   // Restart level: a fresh, stopped, in-tune song that the next wake starts on its first bar.
   c.event({ name: "chain-fade", time: 10 });
   assert.ok(c.tuning.H < 1);
@@ -252,7 +253,7 @@ test("a fall tape-stops the score (L1 short, no rewind; then backwards), L4 rest
   assert.equal(c.transport.running, false);
   assert.equal(c.tuning.H, 1);
   c.event({ name: "wake", time: 0 });
-  assert.equal(c.transport.pos(0), SCORES[3].pickup);
+  assert.equal(c.transport.pos(0), SCORES[LEVEL_ID.wind].pickup);
 });
 
 /* ---------- the payoff ---------- */
@@ -260,9 +261,10 @@ test("a perfect run completes each level's song; a sloppy one does not; three Gr
   const layers = {
     1: ["sky", "signal", "steps", "stars", "choir", "strings"],
     2: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
-    3: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
-    4: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings", "glass"],
-    5: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
+    [LEVEL_ID["still-water"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
+    [LEVEL_ID.wind]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
+    [LEVEL_ID.constellation]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings", "glass"],
+    [LEVEL_ID.door]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
   };
   for (const n of IDS) {
     const perfect = musicRun({ level: n });
@@ -302,9 +304,9 @@ test("over a whole run the scheduler holds the grid within 2 ms under frame jitt
   // 200 ms hitch; the simulation advances min(frame, 50 ms) like game.js;
   // the audio clock advances in 128-sample render quanta.
   // L3: shaker sixteenths through its body, at 118 BPM (clock 1.103).
-  const c = createConductor({ level: 4, path: PATHS[4], cracked: CRACKED });
+  const c = createConductor({ level: LEVEL_ID.constellation, path: PATHS[LEVEL_ID.constellation], cracked: CRACKED });
   const clock = createClockMap();
-  const scale = levelDef(4).clock;
+  const scale = levelDef(LEVEL_ID.constellation).clock;
   let seed = 9;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   let wall = 0,
@@ -367,14 +369,19 @@ test("the conductor is deterministic and each level's bed respects its layer pla
     assert.ok(at("pad", [1, 2]).length >= 1, "the sky enters at the wake");
     // The sky never thins out: a pad starts in every bar (a held chord is
     // re-voiced at each bar line).
-    const first = n === 3 ? 2 : 1;
+    const first = n === LEVEL_ID.wind ? 2 : 1;
     for (let bar = first; bar < SCORES[n].bars; bar++) assert.ok(at("pad", [bar]).length >= 1, `L${n} bar ${bar} has a sky pad`);
     for (const v of a.notes) assert.ok(LAYERS[v.layer], v.layer);
     assert.ok(a.notes.filter((v) => v.layer === "choir").length > 0, "constellations bring in the choir");
   }
   const bar = (run, voice, b) => run.notes.filter((v) => v.voice === voice && v.event === "tick" && Math.floor(v.pos / BAR) + 1 === b).length;
-  // (l2-l4: the interim levels III-V, revision five's II-IV.)
-  const [l1, gift, l2, l3, l4] = IDS.map((n) => musicRun({ level: n }));
+  // (l2-l4: the interim levels, revision five's II-IV.)
+  const [l1, gift, still, l2, l3, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  // III: one soft brush on 2 and 4 (the shaker voice), from bar 5; nothing
+  // on the downbeats, no heartbeat, no marimba.
+  assert.equal(bar(still, "shaker", 3), 0, "III rests while the helper comes");
+  assert.equal(bar(still, "shaker", 6), 2);
+  assert.equal(still.notes.filter((v) => v.voice === "pulse" || v.voice === "marimba").length, 0);
   // II: the heartbeat alone (1 and 3), resting while the gift arrives and
   // over the long void; no shaker, no marimba (restraint).
   assert.equal(bar(gift, "pulse", 3), 0, "II rests while the gift arrives");
@@ -392,6 +399,7 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   assert.equal(bar(l4, "pulse", 5), 4);
   assert.equal(bar(l4, "marimba", 5), 8);
   // Each level its own space (RESEARCH_LEVELS 6): 5.5 s, 5.5, 3.5, 2.5.
-  assert.deepEqual(IDS.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5.5, 3.5, 2.5]);
-  assert.deepEqual(IDS.map((n) => SCORES[n].maxFlat), [12, 14, 15, 20, 20]);
+  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door];
+  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 5.5, 3.5, 2.5]);
+  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 15, 20, 20]);
 });

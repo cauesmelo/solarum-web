@@ -465,7 +465,9 @@ export function replayShifted(n, nom, i, delta, { hold = Infinity, skip = false,
     seen = s.eventSerial;
   for (let guard = 0; guard < 120 * 40; guard++) {
     if (s.status === "dead") return { ok: false, why: "fell", x: s.player.x };
-    if (s.status === "won" || s.player.x >= horizonX) return { ok: skip || !strict || kind === steps[i].kind, why: kind };
+    // Past the horizon she must also be standing: a held glide can carry a
+    // doomed run over the beacon's x in the air (level III).
+    if (s.status === "won" || (s.player.x >= horizonX && s.player.grounded)) return { ok: skip || !strict || kind === steps[i].kind, why: kind };
     if (releaseAt !== null && tick >= releaseAt) ((releaseAt = null), releaseJump(s));
     while (j < plan.length) {
       const [x, a, w] = plan[j];
@@ -507,6 +509,28 @@ export function replayShifted(n, nom, i, delta, { hold = Infinity, skip = false,
         }
   }
   return { ok: s.status !== "dead", why: "timeout" };
+}
+/** The player's inputs on a nominal run (RESEARCH_PROGRESSION 4.2's
+ * "inputs per bar"): every press (jump, tap, cape, dive), every press of the
+ * cape that only holds it (a glide step that does not follow a cape press at
+ * the same x) and every release of a held cape in the air (`unglide` with
+ * 'a': a timed letting-go). A release after a touch-down is not one, like a
+ * jump's release. Returns [{ i, tick, kind }]. */
+export function inputsOf(nom) {
+  const out = [];
+  nom.plan.forEach(([x, a, w], i) => {
+    const tick = nom.steps[i]?.tick;
+    if (tick == null) return;
+    if (a === "glide") {
+      const prev = nom.plan[i - 1];
+      if (!(prev && prev[1] === "dash" && Math.abs(prev[0] - x) < 1)) out.push({ i, tick, kind: "hold" });
+    } else if (a === "unglide") {
+      // Letting go and jumping again in the same instant is one gesture.
+      const jumpNow = [nom.plan[i - 1], nom.plan[i + 1]].some((q, j) => q && q[1] === "jump" && Math.abs((nom.steps[i - 1 + 2 * j]?.tick ?? -9) - tick) <= 1);
+      if (w === "a" && !jumpNow) out.push({ i, tick, kind: "let-go" });
+    } else out.push({ i, tick, kind: a });
+  });
+  return out;
 }
 export function nextBeacon(n, x) {
   const d = levelDef(n);

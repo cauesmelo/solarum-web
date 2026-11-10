@@ -10,7 +10,7 @@
  * the frames (with their events) that audio.mjs renderRunOffline plays.
  * Every function takes { level } (1-4, default 2: Borrowed Wind, clock 1). */
 import { createGame, start, update, jump, releaseJump, dash, dive } from "../model.mjs";
-import { createLevel, levelDef, LEVELS, gx } from "../level.mjs";
+import { createLevel, levelDef, LEVELS, LEVEL_ID, gx } from "../level.mjs";
 import { createRouteMemory, chooseAction } from "./routes.mjs";
 import { PATHS } from "../score-path.mjs";
 import { createConductor, LAYERS } from "../score.mjs";
@@ -20,9 +20,11 @@ export const CRACKED = new Set(LEVELS.flatMap((d) => createLevel(d).platforms.fi
 const CHALLENGE = {
   1: { "first-star": [gx(152), gx(165)] },
   2: { void: [220 + 37.85 * 100 + 113.55 * 2, 220 + 37.85 * 112 + 113.55 * 2] },
-  3: { voids: [16000 + 37.85 * 35, 16700 + 37.85 * 35] },
-  4: { voids: [16000 + 37.85 * 70, 16700 + 37.85 * 70], broken: [15100, 15700] },
-  5: { storm: [gx(68), gx(76) + 130] },
+  // III: the flight up to the glide ledge after the still beacon.
+  [LEVEL_ID["still-water"]]: { still: [220 + 37.85 * 117 + 113.55 * 2, 220 + 37.85 * 122 + 113.55 * 2] },
+  [LEVEL_ID.wind]: { voids: [16000 + 37.85 * 35, 16700 + 37.85 * 35] },
+  [LEVEL_ID.constellation]: { voids: [16000 + 37.85 * 70, 16700 + 37.85 * 70], broken: [15100, 15700] },
+  [LEVEL_ID.door]: { storm: [gx(68), gx(76) + 130] },
 };
 const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJump(s)) };
 /** A sloppy run of each level: one fall, one broken constellation and a few
@@ -30,15 +32,16 @@ const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJu
 export const SLOPPY_RUNS = Object.freeze({
   1: { level: 1, failAt: ["first-star"], removeStars: ["first-song-2"], late: [[gx(34) - 1, gx(34) + 1, 14], [gx(168) - 1, gx(168) + 1, 12]] },
   2: { level: 2, failAt: ["void"], removeStars: ["first-flight-2"], late: [[gx(23) - 1, gx(23) + 1, 12], [gx(252) + 908.4 - 1, gx(252) + 908.4 + 1, 10]] },
-  3: { level: 3, failAt: ["voids"], removeStars: ["flight-line-2"], late: [[19860, 19870, 10]] },
-  4: { level: 4, failAt: ["broken"], removeStars: ["split-song-1"], late: [[8090, 8100, 12]] },
-  5: { level: 5, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
+  [LEVEL_ID["still-water"]]: { level: LEVEL_ID["still-water"], failAt: ["still"], removeStars: ["drift-song-1"], late: [[220 + 37.85 * 156 + 113.55 * 3 - 1, 220 + 37.85 * 156 + 113.55 * 3 + 1, 10]] },
+  [LEVEL_ID.wind]: { level: LEVEL_ID.wind, failAt: ["voids"], removeStars: ["flight-line-2"], late: [[19860, 19870, 10]] },
+  [LEVEL_ID.constellation]: { level: LEVEL_ID.constellation, failAt: ["broken"], removeStars: ["split-song-1"], late: [[8090, 8100, 12]] },
+  [LEVEL_ID.door]: { level: LEVEL_ID.door, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
 });
-export const SLOPPY = SLOPPY_RUNS[3];
+export const SLOPPY = SLOPPY_RUNS[LEVEL_ID.wind];
 
 /** Calls onEvent(e, s) for every model event and onStep(s, glide) after every
  * step; returns the final state. Wake is the first event. */
-export function drive({ route = "main", level = 3, dt = 1 / 120, failAt = [], removeStars = [], late = [], maxSeconds = 160, onEvent, onStep } = {}) {
+export function drive({ route = "main", level = LEVEL_ID.wind, dt = 1 / 120, failAt = [], removeStars = [], late = [], maxSeconds = 160, onEvent, onStep } = {}) {
   const s = createGame(2021, { level });
   if (removeStars.length) s.pickups = s.pickups.filter((q) => !removeStars.includes(q.id));
   let seen = s.eventSerial;
@@ -87,7 +90,7 @@ export function drive({ route = "main", level = 3, dt = 1 / 120, failAt = [], re
 
 // timeScale defaults to the level's clock, as in the game (tolerances and
 // caps are real milliseconds).
-export function musicRun({ gentle = false, level = 3, timeScale = levelDef(level).clock, ...options } = {}) {
+export function musicRun({ gentle = false, level = LEVEL_ID.wind, timeScale = levelDef(level).clock, ...options } = {}) {
   const c = createConductor({ level, path: PATHS[level], cracked: CRACKED, gentle });
   const notes = [],
     fx = [],
@@ -123,7 +126,7 @@ export function musicRun({ gentle = false, level = 3, timeScale = levelDef(level
 
 /** Game frames at `fps` for renderRunOffline: wall time keeps running while
  * Diana falls apart and reforms (the simulation clock does not). */
-export function recordFrames({ fps = 60, level = 3, ...options } = {}) {
+export function recordFrames({ fps = 60, level = LEVEL_ID.wind, ...options } = {}) {
   const frames = [];
   let wall = 0,
     events = [];
@@ -146,4 +149,4 @@ export function recordFrames({ fps = 60, level = 3, ...options } = {}) {
   return { frames, status: s.status, time: s.time, deaths: s.deaths };
 }
 
-export const beaconX = (id, level = 3) => levelDef(level).checkpoints.find((q) => q.id === id).x;
+export const beaconX = (id, level = LEVEL_ID.wind) => levelDef(level).checkpoints.find((q) => q.id === id).x;

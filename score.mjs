@@ -17,6 +17,7 @@
  *   never Diana's voice; clean play retunes it. Gentle music keeps H = 1.
  */
 
+import { LEVELS } from "./level.mjs";
 export const BPM = 107;
 export const BEAT = 60 / BPM; // 0.5607 s
 export const SIXTEENTH = BEAT / 4; // 0.14019 s = 37.85 px of run
@@ -74,6 +75,8 @@ export const CHORDS = Object.freeze({
   A: { name: "A", root: 9, bass: 45, tones: [9, 1, 4], safe: [9, 11, 1, 4, 6], pad: [57, 61, 64, 69] },
   // II's turnaround (A C# E F#): the sixth instead of the seventh keeps it calm.
   A6: { name: "A6", root: 9, bass: 45, tones: [9, 1, 4], safe: [9, 11, 1, 4, 6], pad: [57, 61, 64, 66] },
+  // III's Lydian colour: A over G (the #11's C# against the bass).
+  "A/G": { name: "A/G", root: 9, bass: 43, tones: [9, 1, 4], safe: [9, 11, 1, 4, 6], pad: [55, 61, 64, 69] },
   Bm7: { name: "Bm7", root: 11, bass: 47, tones: [11, 2, 6], safe: [11, 2, 4, 6, 9], pad: [57, 62, 66, 69] },
   "F#m/A": { name: "F#m/A", root: 6, bass: 45, tones: [6, 9, 1], safe: [6, 9, 11, 1, 4], pad: [57, 61, 64, 66] },
   // D Lydian: the chapter's only sustained G#, at the door with three Great Stars.
@@ -135,6 +138,18 @@ const GIFT_SECTIONS = [
   { id: "plain", from: 17, to: 19, cycle: [C.Dadd9, C.Gmaj7, C.A6] },
   { id: "coda", from: 20, to: Infinity },
 ];
+// III · Still Water: G Lydian, Gmaj7#11 A/G F#m7 Em9, a chord a bar; the
+// brush rests while the helper comes and over the warm-up flight.
+const STILL_SECTIONS = [
+  { id: "warm", from: 1, to: 2, pulse: false, cycle: [C["Gmaj7#11"]] },
+  { id: "helper", from: 3, to: 4, pulse: false, cycle: [C["A/G"], C.Em9] },
+  { id: "still", from: 5, to: 7, cycle: [C["Gmaj7#11"], C["A/G"], C["F#m7"]] },
+  { id: "float", from: 8, to: 12, cycle: [C.Em9, C["Gmaj7#11"], C["A/G"], C["F#m7"], C.Em9] },
+  { id: "stair", from: 13, to: 17, cycle: [C["Gmaj7#11"], C["A/G"], C["F#m7"], C.Em9, C["Gmaj7#11"]] },
+  { id: "rise", from: 18, to: 21, cycle: [C["A/G"], C["F#m7"], C.Em9, C["Gmaj7#11"]] },
+  { id: "shelf", from: 22, to: 22, cycle: [C["A/G"]] },
+  { id: "coda", from: 23, to: Infinity },
+];
 const L1_CYCLE = [C["Bm(add9)"], C["Bm(add9)"], C["F#m7"], C.Dmaj7, C["F#m7"], C.Dmaj7, C.Gmaj7, C.Gmaj7];
 const L3_CYCLE = [C.Em9, C.A7sus4, C["Dmaj9/F#"], C["Gmaj7#11"]];
 // L3's twist (the broken well): the relative minor turns dark, Bm7 G A F#m.
@@ -169,9 +184,9 @@ const L4_SECTIONS = [
  * 1; the transport plays them at the level's own BPM (clock = BPM / 107).
  * L2 starts on a half bar (pickup 8), like the chapter's hearth it was.
  */
-export const SCORES = Object.freeze({
-  1: {
-    level: 1, bpm: 88, bars: 20, pickup: 0,
+const PRESETS = {
+  waking: {
+    bpm: 88, bars: 20, pickup: 0,
     // I · Waking, floaty and calm (RESEARCH_PROGRESSION 4.3): the cycle at
     // half harmonic rhythm in maj7 / add9 voicings, no drums at all; the pad
     // re-voicing on every bar line is the breath. Restraint (user, revision
@@ -216,8 +231,8 @@ export const SCORES = Object.freeze({
       "home-song": [78, 76, 74, 69],
     },
   },
-  2: {
-    level: 2, bpm: 94, bars: 20, pickup: 0,
+  gift: {
+    bpm: 94, bars: 20, pickup: 0,
     // II · The Gift, calm with marked beats (RESEARCH_PROGRESSION 4.3): Bm7
     // Gmaj7 Dadd9 A6, a felt heartbeat on 1 and 3 from bar 3 and nothing else
     // in the bed. Restraint: no shaker (there is no wind in II), the
@@ -242,8 +257,36 @@ export const SCORES = Object.freeze({
       "pluto-song": [74, 71, 69, 67],
     },
   },
-  3: {
-    level: 3, bpm: 107, bars: 24, pickup: 8,
+  "still-water": {
+    bpm: 100, bars: 23, pickup: 0,
+    // III · Still Water, floating and flowing (RESEARCH_PROGRESSION 4.3):
+    // G Lydian, a chord a bar. Restraint (revision five: the bed was "too
+    // full, too present, too loud"): the groove is one soft brush on 2 and
+    // 4 and nothing else; the held cape's whistle and Diana's own notes
+    // (the long descending glide lines) carry the song.
+    groove: "brush", maxFlat: 15, space: { seconds: 5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
+    sections: STILL_SECTIONS,
+    chordAt: mapOf(STILL_SECTIONS, C["Gmaj7#11"]),
+    // The wake, the still void (bar 5), letting go (bar 11) and the rise
+    // (bar 18); the theme closes from bar 21.
+    signalBars: [1, 5, 11, 18], closeFrom: 21,
+    phrases: {
+      // bar 4 (Em9): down the slope of air, B5 A5 G5 E5.
+      "float-song": [83, 81, 79, 76],
+      // bar 6 (A/G): up along the flight, down the glide, E5 F#5 A5 | B5 A5 F#5.
+      "still-song": [76, 78, 81, 83, 81, 78],
+      // bar 11 (F#m7): over the islets, C#5 E5 F#5 E5 C#5.
+      "drift-song": [73, 76, 78, 76, 73],
+      // bar 17 (Gmaj7#11): the refill climbs, D5 E5 G5 A5.
+      "refill-song": [74, 76, 79, 81],
+      // bar 20 (Em9): the rise, E5 G5 A5 B5.
+      "climb-song": [76, 79, 81, 83],
+      // bars 20-21: Neptune's song falls and opens, B5 A5 G5 | D6.
+      "neptune-song": [83, 81, 79, 86],
+    },
+  },
+  wind: {
+    bpm: 107, bars: 24, pickup: 8,
     // floaty with marked beats: heartbeat on 1 and 3, a tick on 2 and 4,
     // shaker sixteenths at about -30 dB from the wind on; the twist lifts.
     groove: "heartbeat", maxFlat: 15, space: { seconds: 5.5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
@@ -263,8 +306,8 @@ export const SCORES = Object.freeze({
       "finale-song": [71, 74, 78, 83],
     },
   },
-  4: {
-    level: 4, bpm: 118, bars: 24, pickup: 0,
+  constellation: {
+    bpm: 118, bars: 24, pickup: 0,
     // call and response: half-time backbeat (beat 3), a 3+3+2 tresillo on
     // the rim and the marimba's low root, the world calling on the grid.
     groove: "clave", maxFlat: 20, space: { seconds: 3.5, shimmer: 0.3 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
@@ -280,8 +323,8 @@ export const SCORES = Object.freeze({
       "split-song": [76, 74, 71, 69, 64],
     },
   },
-  5: {
-    level: 5, bpm: 128, bars: 26, pickup: 0,
+  door: {
+    bpm: 128, bars: 26, pickup: 0,
     // agitated, tense: a felt kick on every beat, sixteenth ticks and an
     // eighth-note F# ostinato; after a fall the ostinato rests until the
     // next constellation or beacon.
@@ -299,7 +342,11 @@ export const SCORES = Object.freeze({
       "finale-song": [78, 76, 74, 71],
     },
   },
-});
+};
+/** The presets by level number (LEVELS order), so a stage inserted into
+ * the campaign shifts the interim levels' scores with them. */
+export const SCORES = Object.freeze(Object.fromEntries(LEVELS.map((d) => [d.id, Object.freeze({ ...PRESETS[d.key], level: d.id })])));
+
 export const scoreOf = (level = 1) => SCORES[level] ?? SCORES[1];
 /** Level n's sections (kept as `SECTIONS` for level 1). */
 export const SECTIONS = SCORES[1].sections;
@@ -757,7 +804,10 @@ export function createConductor(options = {}) {
     const S = sectionOf(k);
     const grooveOn = bar >= 3 && S.pulse !== false && !st.dropped;
     const coda = sec === "coda" ? 0.6 : 1;
-    if (grooveOn && P.groove === "heartbeat") {
+    if (grooveOn && P.groove === "brush") {
+      // III: one soft brush on beats 2 and 4, nothing on the downbeats (water).
+      if (inBar === 4 || inBar === 12) bed({ layer: "pulse", voice: "shaker", dur: 0.08, gain: 0.4 * coda });
+    } else if (grooveOn && P.groove === "heartbeat") {
       // A felt heartbeat on beats 1 and 3 (the half-time feel), a tick on 2 and 4.
       if (inBar === 0 || inBar === 8) bed({ layer: "pulse", voice: "pulse", dur: 0.4, gain: (inBar === 0 ? 1 : 0.7) * coda });
       if ((inBar === 4 || inBar === 12) && S.shaker) bed({ layer: "pulse", voice: "shaker", dur: 0.06, gain: 0.62 });

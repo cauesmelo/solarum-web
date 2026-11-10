@@ -30,6 +30,7 @@ import {
 } from "../audio.mjs";
 import { createGame, start as startGame, update, jump, releaseJump, dash, dive } from "../model.mjs";
 import { createRouteMemory, chooseAction } from "./routes.mjs";
+import { LEVEL_ID } from "../level.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (name) => readFile(new URL(`../${name}`, import.meta.url), "utf8");
@@ -626,7 +627,7 @@ test("the itch ZIP ships audio.js but not the soundboard, WAV renders or the arc
 // L3 by default: every layer of the bed (backbeat, tresillo marimba, the
 // smash's celesta) at 118 BPM, so the audio clock runs at 1/clock of the
 // simulation's, as in the game.
-function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true, level = 4 } = {}) {
+function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true, level = LEVEL_ID.constellation } = {}) {
   let now = 0;
   const r = rig({ gentle, enabled, level, clock: () => now });
   const music = mockMusic();

@@ -5,12 +5,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, start, update, jump, dash, dive, retry, snapshot, RULES } from "../model.mjs";
-import { levelDef } from "../level.mjs";
+import { levelDef, LEVEL_ID } from "../level.mjs";
 
 const BEAT = 60 / 107;
 /** A flat world: one long stable floor (optionally a crack) and nothing else. */
 function world({ verbs = {}, gets = [], capeRule = "breath", platforms = null, updrafts = [], stars = [], checkpoints = [] } = {}) {
-  const base = levelDef(3);
+  const base = levelDef(LEVEL_ID.wind);
   const def = {
     ...base,
     capeRule,

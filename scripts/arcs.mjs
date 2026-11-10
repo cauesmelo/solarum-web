@@ -4,7 +4,7 @@
  *   node scripts/arcs.mjs <level> <move> [<move> ...]
  * A move is a comma list of action@sixteenth from the takeoff at a grid x:
  * j (jump, held), t (tap: jump then release), r (release), d (cape flight),
- * v (dive). Shorthands: hold = j@0, tap = t@0, double:N = j@0,j@N,
+ * v (dive), g (hold the cape: glide from here), u (let it go). Shorthands: hold = j@0, tap = t@0, double:N = j@0,j@N,
  * flight:N = j@0,d@N. CAPE=endless keeps the cape ready (refill stand-in).
  * Rows: sixteenth, dx (run, sim px), dy at exactly that sixteenth (up < 0). */
 import { createGame, update, jump, releaseJump, dash, dive, start } from "../model.mjs";
@@ -28,7 +28,7 @@ export function fly(level, move, { sixteenths = 16, physics = null, clock = null
   const acts = expand(move).split(",").map((a) => { const [c, n] = a.split("@"); return { c, n: +n, done: false }; });
   const t0 = (takeoff - 220) / 270;
   const out = [];
-  let k = -1, launched = false;
+  let k = -1, launched = false, glide = false;
   while (s.time < t0 + sixteenths * SIX + 0.01 && s.status === "running") {
     if (!launched && s.player.x >= takeoff - 0.5) launched = true;
     if (launched)
@@ -39,9 +39,11 @@ export function fly(level, move, { sixteenths = 16, physics = null, clock = null
         if (a.c === "t" || a.c === "r") releaseJump(s);
         if (a.c === "d") dash(s);
         if (a.c === "v") dive(s);
+        if (a.c === "g") glide = true;
+        if (a.c === "u") glide = false;
       }
     const before = { t: s.time, y: s.player.y };
-    update(s, 1 / 120, {});
+    update(s, 1 / 120, { glide });
     const n = Math.floor((s.time - t0) / SIX + 1e-6);
     if (launched && n > k) {
       k = n;

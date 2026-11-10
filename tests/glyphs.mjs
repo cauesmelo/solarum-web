@@ -6,7 +6,8 @@
  *   ↑ · →    jump, then open the cape near the top
  *   → · ↑    open the cape when airborne, jump 0.1 s later (super jump)
  *   hold →   press and hold the cape until the prompt's window ends
- *   ↑ · hold →  jump, then hold the cape until the window ends
+ *   ↑ · hold →  jump, then press the cape near the top (as ↑ · →) and hold
+ *              it until the window ends
  *   ↓        dive
  *   tap ↑    jump and release at once
  * Options: { at: 'from' | 'inputX', start: x, tap: true } (tap releases a
@@ -54,7 +55,8 @@ export function followGlyph(api, prompt, { route = "main", at = "from", start: f
       } else if (k === "right") {
         if (step === 0 ? !p.grounded : p.vy >= -40) (act("dash"), (done = true));
       } else if (k === "hold-right") {
-        if (!glide && !p.grounded) {
+        // After ↑ the cape is pressed near the top, as ↑ · → teaches.
+        if (!glide && !p.grounded && (prev !== "up" || p.vy >= -40)) {
           api.dash(); // pressing → is the same key that dashes elsewhere
           glide = true;
         }

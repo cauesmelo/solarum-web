@@ -858,13 +858,16 @@ const GIFT = {
     { x: gk(190, 5), movement: "II", step: "conclude", name: "II · The Gift — Pluto's steps" },
     { x: gk(248, 8), movement: "II", step: "coda", name: "II · The Gift — the heart plain" },
   ],
-  // Beacons on half bars 4½, 6½, 10½, 12½ and 15 (≤ 13.3 s real apart).
+  // Beacons on half bars 4½, 6½, 10½, 12½, 15 and 18½ (≤ 11.5 s real apart).
   checkpoints: [
     { id: "gift", x: gk(56, 1) - 3, y: GY.gift, platform: "gift-stone", story: "Gather the falling stars, and it will carry you there.", tip: "Jump, then press the cape near the top of the jump." },
     { id: "void", x: gk(88, 2) - 3, y: GY.hearth, platform: "hearth-2", story: "The same dark again. This time she knew how wide it was.", tip: "Jump at the edge, then press the cape near the top." },
     { id: "long", x: gk(152, 3) - 3, y: GY.long, platform: "long-stone", story: "The gift breathes when she runs. A long stone is a full breath.", tip: "Take every star of the song on the first flight; it gives the cape back." },
     { id: "steps", x: gk(184, 5) - 3, y: GY.voidShore, platform: "void-shore", story: "Below her the little world turned, cold and patient.", tip: "Short stones give no breath. The stars after them do." },
     { id: "pluto", x: gk(224, 7) - 3, y: GY.rock2, platform: "pluto-rock", story: "On Pluto's heart the frost held still, as if it were listening.", tip: "Jump, then press the cape near the top, down to the plain." },
+    // On the door stone (bar 18½), so no beacon gap passes 13 s (the
+    // ladder); it marks the glide lock below the ledge.
+    { id: "lock", x: gk(280, 8) - 3, y: GY.heart3, platform: "heart-door", story: "Below the last ledge a line of stars drifted down, too slowly to follow.", tip: "Run on to the door." },
   ],
   startTip: "Run through the gift. Jump, then press the cape near the top.",
   main: G_MAIN,
@@ -910,6 +913,208 @@ const GIFT = {
     // The safe line: no cape over the first gap (a jump onto the floor, a
     // hop back up), then the main route.
     safe: [GJ(23, 0), GJ(31, 0), GJ(40, 0), GJ(46, 0), ...G_PLAN_MAIN.filter(([x]) => x > gk(60, 1))],
+  },
+};
+
+/* ---- III · Still Water (100 BPM): floating, flowing; the glide ----
+ * RESEARCH_PROGRESSION 4.5 (III). Shared simulation physics (II-VIII), so
+ * the cells are II's plus the held cape (scripts/arcs.mjs g/u, on the
+ * interim III): after a flight or a jump the glide falls at most 140 px/s of
+ * simulation, 19.6 px per sixteenth, and a release drops 33.6 px in the next
+ * sixteenth and 96.6 in two. Cells (dy at k/16 after a grid takeoff, up < 0):
+ *   walk off holding the cape: 8: +122.9
+ *   jump, cape at 3, hold:     20: +134.8 (a flight alone lands +70 at 10)
+ *   jump, cape at 3:            9: -16.8
+ *   jump holding the cape:     13: +70.3 (a double lands +70 at 10.5)
+ *   jump, cape 3, let go at 13: 15: +96.9; at 14: 15: +51.7
+ *   jump, jump again at 3:       7: -160.2
+ *   jump holding, let go at 6:  8: +29.7
+ *   jump, cape 3, cape 9, hold: 17: +47.3 (two flights alone: +15 at 14)
+ *   jump, cape 3, let go and jump again at 10: 14: -117.4
+ *   jump, jump at 4, hold:      12: -84.7 (Great Star 1's float)
+ * A grid x is gk(k, F) (F flights so far). Required releases are timed
+ * presses of their own (`unglide` while airborne); a release after a
+ * touch-down is not. Every pure glide (the cape held with no flight) starts
+ * with the bar short of full, so the same key never flies there. */
+const S_CLOCK = 100 / 107;
+const SY = { plain: 90, cliff: 160, field: 283, far: 418, ledge: 401, shoreA: 471, gs2: 491, i1: 511, i2: 568, i3: 636, next: 408, stair1: 460, stair2: 490, stair3: 520, wide: 567, climb1: 450, climb2: 333, lid: 307, shelf: 281, floor: 457 };
+const sIsle = gIsle;
+const S_MAIN = [
+  // Off Pluto's plain: the warm-up flight (jump 23, cape 26) lands 70 px
+  // lower on the helper's cliff 10/16 later.
+  ["pluto-edge", -700, SY.plain, gk(23) + 10 + 700],
+  // The helper's cliff: the GET on 44; its lip at 48 is a walk-off (6 px
+  // past the grid, as in arcs.mjs) onto the field 123 px below. Holding the
+  // cape floats her down the float-song; without it she lands at about 51.5.
+  ["helper-cliff", gk(33, 1) - 100, SY.cliff, gk(48, 1) + 6 - (gk(33, 1) - 100)],
+  ["still-field", gk(51, 1) - 20, SY.field, gk(76, 1) + 10 - (gk(51, 1) - 20)],
+  // The need: jump 76, cape 79 and hold: 135 px lower 20/16 later. A flight
+  // alone is down at about 10.6/16 (515 px); the shore starts at 615.
+  ["far-shore", gk(76, 1) + 615, SY.far, gk(116, 2) + 10 - (gk(76, 1) + 615)],
+  // The cape floats when it cannot fly: a flight up 17 px onto a short
+  // ledge (4/16 of breath), then a jump holding the cape off its edge, 70 px
+  // down 13/16 later (a double alone reaches that height at 397 px).
+  sIsle("glide-ledge", 125, 3, 129, SY.ledge, 90),
+  ["shore-a", gk(129, 3) + 420, SY.shoreA, gk(156, 3) + 10 - (gk(129, 3) + 420)],
+  // Letting go: jump 156, cape 159, hold, let go at 169 over the second
+  // islet (97 px down on 171); it ends before the held glide comes down to
+  // it, so only a release lands there. A jump and a double (173, 176) climb
+  // 160 px to the next shore. The other islets are optional (high).
+  ["islet-2", gk(171, 4) - 19, SY.i2, gk(173, 4) + 8 - (gk(171, 4) - 19)],
+  sIsle("next-shore", 180, 4, 204, SY.next, 90),
+  // The water stair: jump, cape, hold, let go at 14/16 (52 px down on 15);
+  // then twice a jump holding the cape, let go at 6/16 (30 px down on 8).
+  sIsle("stair-1", 219, 5, 223, SY.stair1, 60),
+  sIsle("stair-2", 231, 5, 235, SY.stair2, 55),
+  sIsle("stair-3", 243, 5, 260, SY.stair3, 55),
+  // The widest void: jump 260, cape 263, the refill-song, cape 269 and hold:
+  // 47 px down 17/16 later (870 px). Two flights alone are down by 14.6/16.
+  ["wide-shore", gk(260, 5) + 820, SY.wide, gk(292, 7) + 10 - (gk(260, 5) + 820)],
+  // The rise: jump, cape, hold, let go and jump again 7/16 after the cape:
+  // 117 px up 14/16 after the takeoff, twice (the climb-song charges the second).
+  sIsle("climb-1", 306, 8, 310, SY.climb1, 80),
+  sIsle("climb-2", 324, 9, 327, SY.climb2, 80),
+  // The dive lock: a glinting lid on the main line, 26 px up (a held hop,
+  // 5/16), that she runs across and cannot open (no dive yet); a last hop
+  // onto Neptune's shelf and the door (bar 23).
+  sIsle("lock-lid", 332, 9, 336, SY.lid, 75).concat("lid"),
+  ["neptune-shelf", gk(341, 9) - 75, SY.shelf, gk(352, 9) + 520 - (gk(341, 9) - 75)],
+];
+const S_HIGH = [
+  // The letting-go islets the main route floats over: the first (a release
+  // over it lands short of every shore), Great Star 2's tiny high islet (an
+  // exact release at 163) and the third (too low to climb out of).
+  ["islet-1", gk(167, 4), SY.i1, 76],
+  ["islet-gs2", gk(165, 4) + 5, SY.gs2, 55],
+  ["islet-3", gk(175, 4) + 10, SY.i3, 70],
+  // The lid's catch.
+  ["lock-floor", gk(330, 9), SY.floor, 37.85 * 8],
+];
+// Star y at sixteenth j of a cell from a takeoff on ground y0 (dy from the cells).
+const at = (y0, dy) => Math.round(y0 + dy - 36);
+const S_CHAINS = [
+  // The safe first use: the descending line only a held cape follows.
+  { id: "float-song", route: "low", stars: [[51, 24.9], [52, 44.4], [53, 64.1], [54, 83.7]].map(([k, dy]) => [gk(k, 1) + 39.5, at(SY.cliff, dy)]) },
+  // The need: three along the flight, three down the held glide.
+  { id: "still-song", route: "low", stars: [...flightStars(79, 1, SY.field, 3, false), ...[[86, -61.4], [88, -22.2], [90, 17.1]].map(([k, dy]) => [gk(k, 2) + 39.5, at(SY.field, dy)])] },
+  // Letting go: along the flight and the first of the glide.
+  { id: "drift-song", route: "low", stars: [...flightStars(159, 3, SY.shoreA, 3, false), ...[[166, -61.4], [168, -22.2]].map(([k, dy]) => [gk(k, 4) + 39.5, at(SY.shoreA, dy)])] },
+  // The widest void: one per sixteenth from the cape, complete on 266, so
+  // the second flight (269) has its cape.
+  { id: "refill-song", route: "low", stars: flightStars(263, 5, SY.stair3, 4, false) },
+  // The rise: two on climb-1 and two on the second jump's rise, complete on
+  // 312, before the second cape (313).
+  { id: "climb-song", route: "low", stars: [[gk(307, 8) + 39.5, SY.climb1 - 40], [gk(308, 8) + 39.5, SY.climb1 - 40], [gk(311, 8) + 39.5, at(SY.climb1, -64.7)], [gk(312, 8) + 39.5, at(SY.climb1, -99.3)]] },
+  // Neptune's song: along the last flight and the top of the last jump.
+  { id: "neptune-song", route: "low", stars: [...flightStars(313, 8, SY.climb1, 3, false), [gk(322, 9) + 39.5, at(SY.climb1, -146.7)]] },
+];
+const S_GREAT = [
+  { id: "great-1", x: gk(60, 1) + 20, y: at(SY.cliff, -84.7), line: "the longest float: off the cliff, jump again, then hold the cape" },
+  { id: "great-2", x: gk(165, 4) + 32, y: SY.gs2 - 40, line: "a tiny islet: let go of the cape exactly over it" },
+  { id: "great-3", x: gk(268, 6) + 20, y: Math.round(SY.stair3 - 165 - 36), line: "over the widest void: jump, jump again, the cape, then hold it" },
+];
+const SJ = (k, F, when = "g") => [gk(k, F) - 0.3, "jump", when];
+const SD = (k, F) => [gk(k, F) - 0.3, "dash", "a"];
+const SG = (k, F, when = "*") => [gk(k, F) - 0.3, "glide", when];
+const SU = (k, F, when = "a") => [gk(k, F) - 0.3, "unglide", when];
+const S_PLAN_MAIN = [
+  SJ(23, 0), SD(26, 0),
+  // The safe first use: hold the cape at the lip; let go on the field.
+  SG(46, 1, "g"), SU(57, 1, "g"),
+  // The need.
+  SJ(76, 1), SD(79, 1), SG(79, 1), SU(97, 2, "g"),
+  // The cape floats when it cannot fly.
+  SJ(116, 2), SD(119, 2), SJ(129, 3), SG(129, 3), SU(143, 3, "g"),
+  // Letting go.
+  SJ(156, 3), SD(159, 3), SG(159, 3), SU(169, 4), SJ(173, 4), SJ(176, 4, "a"),
+  // The water stair.
+  SJ(204, 4), SD(207, 4), SG(207, 4), SU(218, 5),
+  SJ(223, 5), SG(223, 5), SU(229, 5),
+  SJ(235, 5), SG(235, 5), SU(241, 5),
+  // The widest void.
+  SJ(260, 5), SD(263, 5), SD(269, 6), SG(269, 6), SU(278, 7, "g"),
+  // The rise, twice.
+  SJ(292, 7), SD(295, 7), SG(295, 7), SJ(302, 8, "a"), SU(302, 8),
+  SJ(310, 8), SD(313, 8), SG(313, 8), SJ(320, 9, "a"), SU(320, 9),
+  // Over the lid and onto the shelf.
+  SJ(327, 9), SJ(336, 9),
+];
+const STILL = {
+  key: "still-water",
+  title: "Still Water",
+  look: "neptune",
+  toward: "Neptune",
+  introduces: "glide",
+  bpm: 100,
+  clock: S_CLOCK,
+  physics: {},
+  verbs: { double: true, cape: true, glide: false, dive: false, super: false },
+  gets: [{ id: "helper", verb: "glide", x: gk(44, 1) }],
+  capeRule: "breath",
+  view: null,
+  level: { title: "Still Water", speed: 270, startX: 220, startY: SY.plain, finishX: gk(352, 9), finishY: SY.shelf, beat: BEAT },
+  movements: [{ id: "III", x: -1000, numeral: "III", name: "Still Water" }],
+  sections: [
+    { x: -1000, movement: "III", step: "warm", name: "III · Still Water" },
+    { x: gk(36, 1), movement: "III", step: "get", name: "III · Still Water — the helper" },
+    { x: gk(64, 1), movement: "III", step: "need", name: "III · Still Water — the still void" },
+    { x: gk(104, 2), movement: "III", step: "twist", name: "III · Still Water — floating, letting go" },
+    { x: gk(192, 4), movement: "III", step: "develop", name: "III · Still Water — the water stair" },
+    { x: gk(280, 7), movement: "III", step: "conclude", name: "III · Still Water — the rise" },
+    { x: gk(326, 9), movement: "III", step: "coda", name: "III · Still Water — Neptune's shelf" },
+  ],
+  // Beacons on half bars 5, 7½, 10, 13, 16½ and 18 (11.7 s real apart at most).
+  checkpoints: [
+    { id: "float", x: gk(64, 1) - 3, y: SY.field, platform: "still-field", story: "Something small and kind drifted ahead of her, and the air held it up.", tip: "Jump, press the cape near the top, and keep holding it." },
+    { id: "still", x: gk(104, 2) - 3, y: SY.far, platform: "far-shore", story: "Out here the dark lay still as water, and holding on was enough.", tip: "After a flight the cape cannot fly again, but held, it still floats." },
+    { id: "drift", x: gk(144, 3) - 3, y: SY.shoreA, platform: "shore-a", story: "Some shores are only reached by letting go.", tip: "Let go of the cape over the second islet, then jump twice." },
+    { id: "stair", x: gk(192, 4) - 3, y: SY.next, platform: "next-shore", story: "The little light went down the sea's stair, one step at a time.", tip: "Jump holding the cape, and let go above each step." },
+    { id: "wide", x: gk(248, 5) - 3, y: SY.stair3, platform: "stair-3", story: "Below her Neptune turned, slow as a breath held under water.", tip: "Take every star of the first flight: it gives the cape back for a second." },
+    { id: "rise", x: gk(280, 7) - 3, y: SY.wide, platform: "wide-shore", story: "Fly, float, let go, and rise: the water had taught her that.", tip: "Fly, hold, then let go and jump while you float." },
+  ],
+  startTip: "Run through the little light. Hold the cape to float.",
+  main: S_MAIN,
+  high: S_HIGH,
+  updrafts: [],
+  cascades: [],
+  chains: S_CHAINS,
+  great: S_GREAT,
+  // The helper (RESEARCH_PROGRESSION 2.1): a small wandering light that
+  // drifts down the slope of air at the cliff's lip from 36; Diana runs
+  // through it on 44 (the GET), and the cape ripples for one bar.
+  moments: [
+    { id: "helper-drift", kind: "helper", k: 36, target: "helper" },
+    { id: "cape-ripple", kind: "ripple", k: 44, target: "helper" },
+  ],
+  decor: [{ id: "helper", kind: "helper", x: gk(44, 1), y: SY.cliff - 40, to: [gk(56, 1), SY.field - 40] }],
+  prompts: [
+    { id: "p-float", glyph: ["hold-right"], action: "glide", x: gk(47, 1), y: SY.cliff - 150, from: gk(46, 1), to: gk(56, 1), inputX: gk(48, 1) + 10, optional: true, route: "main" },
+    { id: "p-hold", glyph: ["up", "then", "hold-right"], action: "glide", x: gk(77, 1), y: SY.field - 170, from: gk(76, 1) - 30, to: gk(96, 2), inputX: gk(76, 1) + 14 },
+  ],
+  stars: [
+    // Running stars where the bar is full or the next cape press is a
+    // flight anyway (after the plain's wake and each beacon).
+    ...[[12, 0, SY.plain], [15, 0, SY.plain], [18, 0, SY.plain], [106, 2, SY.far], [109, 2, SY.far], [112, 2, SY.far], [146, 3, SY.shoreA], [149, 3, SY.shoreA], [152, 3, SY.shoreA], [194, 4, SY.next], [197, 4, SY.next], [200, 4, SY.next], [250, 5, SY.stair3], [253, 5, SY.stair3], [256, 5, SY.stair3], [282, 7, SY.wide], [285, 7, SY.wide], [288, 7, SY.wide], [343, 9, SY.shelf], [346, 9, SY.shelf], [349, 9, SY.shelf]].map(([k, F, y], i) => [`run-star-${i}`, gk(k, F) + 33.5, y - 40, "low"]),
+    // A star on each hop's rise.
+    ...[[327, SY.climb2], [336, SY.lid]].map(([k, y], i) => [`hop-star-${i}`, gk(k + 1, 9) + 33.5, y - 64 - 36, "low"]),
+  ],
+  routes: {
+    main: S_PLAN_MAIN,
+    upper: [
+      SJ(23, 0), SD(26, 0),
+      // Great Star 1: jump at the lip, jump again, hold: the longest float.
+      SG(46, 1, "g"), SJ(48, 1), SJ(52, 1, "a"), SU(71, 1, "g"),
+      ...S_PLAN_MAIN.filter(([x]) => x > gk(74, 1) && x < gk(150, 3)),
+      // Great Star 2: let go early (163) onto the tiny islet, hop to the second.
+      SJ(156, 3), SD(159, 3), SG(159, 3), SU(163, 4), SJ(166, 4, "g"), SJ(173, 4), SJ(176, 4, "a"),
+      ...S_PLAN_MAIN.filter(([x]) => x > gk(200, 4) && x < gk(258, 5)),
+      // Great Star 3: jump, jump again, the cape, hold over the widest void.
+      SJ(260, 5), SJ(264, 5, "a"), SD(267, 5), SG(267, 5), SU(285, 6, "g"),
+      ...S_PLAN_MAIN.filter(([x]) => x > gk(290, 7)),
+    ],
+    ability: S_PLAN_MAIN,
+    // The safe line: walk off the cliff without the cape, then the main route.
+    safe: S_PLAN_MAIN.filter(([x, a]) => !(x > gk(40, 1) && x < gk(60, 1) && (a === "glide" || a === "unglide"))),
   },
 };
 
@@ -1447,7 +1652,7 @@ export const CAMPAIGN = Object.freeze(
   [
     { stage: 1, key: "waking", title: "Waking", toward: "Home", bpm: 88, introduces: "double", look: "home", def: WAKING },
     { stage: 2, key: "gift", title: "The Gift", toward: "Pluto", bpm: 94, introduces: "cape", look: "pluto", def: GIFT },
-    { stage: 3, key: "still-water", title: "Still Water", toward: "Neptune", bpm: 100, introduces: "glide", look: "neptune", def: null },
+    { stage: 3, key: "still-water", title: "Still Water", toward: "Neptune", bpm: 100, introduces: "glide", look: "neptune", def: STILL },
     { stage: 4, key: "way-down", title: "The Way Down", toward: "Uranus", bpm: 107, introduces: "dive", look: "uranus", def: null },
     { stage: 5, key: "breaking", title: "The Breaking Constellation", toward: "Saturn", bpm: 112, introduces: "cracks", look: "saturn", def: null },
     { stage: 6, key: "borrowed-wind", title: "Borrowed Wind", toward: "Jupiter", bpm: 118, introduces: "wind", look: "jupiter", def: null },
@@ -1480,6 +1685,9 @@ for (const q of CAMPAIGN) {
   BUILT.push({ ...q.def, stage: q.stage });
 }
 export const LEVELS = Object.freeze([...BUILT.map((d, i) => register(d, i, {})), ...INTERIM.map((d, i) => register(d, BUILT.length + i, { stage: null, interim: true }))]);
+/** Level numbers by key (tests and tools name the interim levels this way,
+ * so building a stage never renumbers them by hand). */
+export const LEVEL_ID = Object.freeze(Object.fromEntries(LEVELS.map((d) => [d.key, d.id])));
 /** Saved progress (game.js keeps it in guarded storage). Version 2 stores
  * the furthest open numeral (`unlocked`, a count along LEVELS) and the best
  * Great Stars by level key, so a later rebuild that inserts a level keeps
