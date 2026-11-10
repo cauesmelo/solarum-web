@@ -6,7 +6,7 @@
     "height": 640,
     "clickToPlay": true,
     "fullscreenButton": true,
-    "mobileFriendly": true,
+    "mobileFriendly": false,
     "orientation": "landscape"
   }
 }
