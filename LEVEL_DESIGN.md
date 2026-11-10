@@ -13,8 +13,8 @@ Every level is simulated in 107 BPM units: a sixteenth is 15/107 s and 37.85 px 
 | Verbs | jump (tap / hold, float), double | + cape, wind, glide, dive | + cracked stone, cascade | + super jump (required) |
 | Physics (real) | g 1050, jump 510, double 460, hang ×0.5 while held and \|vy\| < 70, fall ≤ 560 | 1500 / 570 / 525 | same, cracks break 5/16 (0.64 s) | same, cracks 0.59 s |
 | Coordinates | own (x 220 → 15966) | chapter (13846 → 21984) | chapter (6276 → 18123) | own (220 → 10870) |
-| Bars / real s | 26 / 65.0 | 12½ / 28.0 (a half-bar pickup) | 19 / 38.6 | 17 / 31.9 |
-| Beacons (largest nominal gap, real) | 4 (13.8 s) | 3 (9.8 s) | 3 (13.2 s) | 4 (11.2 s) |
+| Bars / real s | 26 / 65.0 | 22½ / 50.5 (a half-bar pickup) | 23 / 46.8 | 25 / 46.9 |
+| Beacons | 4 | 5 (voids, updraft, bridge, currents, finale) | 4 (well, broken, hearth, voids) | 6 (storm, wave, crown, voids, finale, stair) |
 | Min view (landscape / portrait) | 880 / 720 | 880 / 720 | 970 / 775 | 1050 / 840 |
 
 `scripts/arcs.mjs <level> <move>` flies a move with the real model in free space and prints its height at exactly each sixteenth; the cells below were solved with it, then every main route was baked and audited (`npm run score:bake`).
@@ -38,15 +38,23 @@ Cells (height at k/16 after a grid takeoff, + = lower): hold 5: −104, 6: −63
 | 328 (21½) | beacon *crown* | |
 | 344–416 | coda | Two gentle hops, *home-song* on the last arc, the door on bar 27 |
 
+Sections are added with `insertSection(def, { cut, dx, dy, content })`: everything at x ≥ cut moves by whole sixteenths of run (plus three per inserted flight), so the rest of the level keeps its grid, beacons, pilots and music; the new section starts on an island where the cut's transition used to land and ends on a copy of the island that transition left from.
+
 ### II · Borrowed Wind (107 BPM): floating with marked beats
+
+Added (2026-11-10): **the void again** (cut after the hearth void: it lands on a copy of the wind shore along its star line, a 4/16 hop climbs 80 px onto a second hearth, and the same void follows without stars; two bars); **the glide bridge** (beacon *bridge*; jump at 16th 540 into a column with the cape held, glide past its top across a void: no-glide runs come down about 150 px short, the held cape lands 20/16 after the jump on the grid; four bars); **the currents** (beacon *currents*; jump and flight, the flight ends over a low islet and a dive at 7/16 lands 44 px down 1/16 later; a jump into a column that carries Diana past the island beneath it, a dive at 16th 554 lands on it 1/16 later; jump and flight up 69 px onto the exit shore; three bars and two flights).
 
 Movement III at its own coordinates; Diana wakes on the hearth at chapter sixteenth 360 (a half bar: the score enters on a pickup and the door falls on bar 14). Changes: the split voids are one **long void** (takeoff 16003.45: jump, flight at 3/16, the four-star *void-song* along the flight refills the cape, flight at 9/16, landing 14/16 later 15 px lower on the far rock); a tap from the far rock lands on the wind gate 4/16 later. **GS2** sits above the void for a double jump between the flights. The finale's cracked launch became stable rock (no cracked stone before III). **GS1** is in the star cache under the second lid (the dive); **GS3** at the top of the finale wind, reached only with the cape held in it.
 
 ### III · The Breaking Constellation (118 BPM): call and response
 
+Added (2026-11-10): Movement II's lid is optional again (the main route runs over it; GS2 in its well). **The broken well**, after the crown's late double (beacon *broken*): jump and flight onto a 520 px cracked lid (it never refills the cape); the well under it is 276 px deep, deeper than the 265 px a walk-off survives, so walking, jumping or double jumping off the lid's end dies, while a dive through the lid lowers the allowance by `RULES.smashDrop` (120 px) and lands on the floor (dive half a sixteenth past the grid: the 2.6/16 fall lands on it); the floor refills the cape: jump, second press 3/16 later, flight 3/16 after that, 606 px out onto the far shore 13/16 later; a hop onto a copy of the last crack and the crown's late double. Four bars, two flights; the rest sits 28 px lower. The paragraph below describes the first version.
+
 Movement II plus the hearth void and the split voids, at their own coordinates, from chapter sixteenth 160. Cracks break 5/16 after touch-down; the first crack's floor moved to 129 px below it so the fall lands 3/16 after the break, and a 4/16 hop climbs 80 px to the second crack. The upper path ends at the lid: the main route dives through it on the grid (k 285), lands in the well 95 px down 1/16 later, and leaves with a double jump (second press 4/16 later) straight up 76 px onto the second tile, 9/16 later, the same touch-down as Movement II's bounce; the cascade has five tiles (its first drops when the chapter's second did). **GS1** on the cracked chain, **GS2** for an early (3/16) second press out of the well, **GS3** on a two-step cracked stair above the crown. The split voids' constellation is required (cracks never refill). The door is on wind-gate's rock, bar 20.
 
 ### IV · The Far Door (128 BPM): agitated, precise but fair
+
+Added (2026-11-10): **the voids at 128** after the crown (Movement III's hearth void and split voids translated so their first takeoff is the hearth's, at 16th 206; beacon *voids*; the split-song refill is required; the finale follows 159 px lower) and **the rising stair** before the door (beacon *stair*; two double jumps, second press 4/16 after the first, 135 px up each, along the six-star stair-song; the walk-off from the top step lands on the door island as from the finale's high shore).
 
 The school: from the storm floor, jump, open the cape 2/16 later and jump again 2/16 into the flight (super jump, apex 267 px at 7/16, 233 px up at 9/16) onto a high shore; the floor runs on underneath, and a plain jump climbs from it to the step. The stable school shore gives the cape back for a second super jump (**GS3** at its apex). After the beacon *storm* the same super jump is required across a void to a shore 233 px up. Then Movement II's well and cascade (translated so chapter sixteenth 264 lands on 88, whole bars earlier, so every tile still drops on a beat; **GS1** for a super jump off the wave's end landing on the last crack 11/16 later, **GS2** in the well under the lid) and Movement III's finale with its cracked launch and low safe line (translated so chapter sixteenth 490 is 202; the door is on bar 18). Earth and the recording wait behind this door only.
 
