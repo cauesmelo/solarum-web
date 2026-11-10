@@ -1,17 +1,17 @@
 # A Signal in the Dark — level design
 
-This describes what `level.mjs`, `model.mjs` and `geometry.mjs` actually implement (2026-11-09), following the approved brief in [RESEARCH.md](./RESEARCH.md). Where the build departs from the brief, the reason is given.
+This describes what `level.mjs`, `model.mjs` and `geometry.mjs` actually implement (2026-11-09, revision five: the map re-timed on the soundtrack's 107 BPM grid), following the approved briefs in [RESEARCH.md](./RESEARCH.md) and [RESEARCH_MUSIC.md](./RESEARCH_MUSIC.md). Where the build departs from a brief, the reason is given. The [Beat map](#beat-map-revision-five) section explains the grid; the tables below are current.
 
 ## Structure
 
 Three movements of one idea each, plus a coda (kishōtenketsu: introduce, develop, twist, conclude):
 
-- **I · Waking — the jump.** Tap and hold, a two-beat hop grid, then the second jump for distance and for height.
+- **I · Waking — the jump.** Tap and hold, four hops on the 107 BPM grid, then the second jump for distance and for height.
 - **II · The Breaking Constellation — crumble.** Shelves that break under Diana, a chain over a safe ridge, the dive-smash lid, the beat cascade, and a double jump off a breaking shelf.
 - **III · Borrowed Wind — the cape.** A flight line, a required midair refill, the solar wind and the super jump, then everything at once with a safe line beneath.
 - **Coda · The Far Door.** A long calm island.
 
-Nominal time is `(x − 220) / 270`. The finish is at x = 22180 (81.3 s nominal; the QA routes take 79.1–80.1 s because flights add 230 px/s). The brief's chart was about 86 s; it was compressed by about 5 s so that the existing root QA budget (`maxSeconds ?? 85`) still completes the chapter.
+Times below are the main route's real times on the beat map (bar 1 starts at the wake; a bar is 2.243 s). The finish is at x = 21984, reached on the downbeat of bar 36 at 78.51 s; the four QA routes take 78.45–79.35 s, so the root QA budget (`maxSeconds ?? 85`) still completes the chapter. Nominal time `(x − 220) / 270` is still what the fairness tests use for beacon spacing and telegraphs.
 
 ## Units and envelope
 
@@ -23,137 +23,195 @@ World px, y down; a platform's y is its walkable top and Diana's y is her feet (
 | Gravity | 1500 px/s² | — | — |
 | Jump | 570 px/s (tap: capped to 280) | 205 px flat, 106 px rise; tap 106 px, 30 px | 170 px gap, 90 px rise; tap 80 px |
 | Double jump | 525 px/s | up to 373 px flat, 196 px rise | 280 px gap, 165 px rise |
-| Flight | 0.5 s, vy = 0, +230 px/s | jump + flight ≈ 450 px | 400 px gap |
+| Flight | exactly 0.5 s, vy = 0, +227.1 px/s (113.55 px = 3/16 of run) | jump + flight ≈ 450 px | 400 px gap |
 | Super jump | jump during flight: 720 px/s, once per flight | ≈ 173 px rise | optional lines only |
 | Glide | hold cape: 350 px/s², fall ≤ 140 px/s | — | taught only in the wind |
 | Updraft | −700 px/s² net, rise ≤ 240 px/s; ×1.4 while gliding | 180 px column: +106 px walking in, +186 gliding, +231 jumping in | — |
 | Dive | ≥ 700 px/s down; through cracks ≥ 500 px/s | — | — |
 | Crumble | collapses 0.65 s after first landing | — | — |
+| Cascade | one tile per 107 BPM beat, 207 px pitch | — | bounce of 5 and 6 sixteenths |
 | Coyote / buffer | 0.12 s / 0.14 s | — | — |
 
 Every required landing leaves ≥ 135 px of runway; every beacon leaves ≥ 400 px before the next required input (tested). Drops on any intended line stay under 240 px so the camera shows the landing and the death line never cuts a catch (tested).
 
+## Beat map (revision five)
+
+The user asked for the music to "draw itself, harmonically, exactly where it should" when the intended path is followed. The brief's answer (RESEARCH_MUSIC 5.2–5.3) is to author the main route on the soundtrack's grid. Before this revision the map was at chance level: 54% of the main route's musical events were within 35 ms of a 107 BPM sixteenth (chance 50%).
+
+**Grid.** 107 BPM (measured from `assets/soundtrack.mp3`), beat 0 at the wake. A sixteenth is 15/107 s = 140.19 ms = 37.85 px of run; a beat 151.4 px; a bar 605.6 px and 2.243 s. Because a full flight now adds exactly 113.55 px (three sixteenths, `dashSpeed` 227.1 px/s over exactly 0.5 s), every grid moment on the ground is at x = 220 + 37.85 k, flights included. Takeoff thresholds in `tests/routes.mjs` sit on that lattice, half a pixel early.
+
+**Rhythm cells** (measured with the 1/120 s integrator; takeoff on the grid, landing height relative to takeoff):
+
+| Move | Lands on the grid at |
+| --- | --- |
+| Full jump | +84 px at 4/16 · +31 px at 5/16 · −51 px at 6/16 · −163 px at 7/16 (flat ground lands 59 ms off, so no main hop is flat) |
+| Double, second press at 3/16 | +166 px at 7/16 (the climb) |
+| Double, second press at 4/16 | +142 px at 8/16 (onto the hearth) · −5 px at 10/16 (the leap) |
+| Double, second press at 5/16 | −58 px at 11/16 (down to the long landing) |
+| Cape at 2/16 | +14 px at 8/16 after takeoff (flight A) |
+| Cape at 3/16 | −67 px at 10/16 (the hearth void, flight B) |
+
+Heights were solved by a scratch harness that moved each landing platform until its landing sat on the planned sixteenth, then rounded to whole pixels; the cascade's alternating heights come straight from the cells.
+
+**Main-route timeline** (bars are 1-based; `score.mjs` maps them to chords):
+
+| Bars | Place | What lands on the grid |
+| --- | --- | --- |
+| 1–2 | Wake, home | first jump at sixteenth 23 |
+| 3–4 | The hops | takeoffs 32, 40, 50, 64; the first constellation on 44, 48, 52, 56 (the motif's head D5 C♯5 B4 A4) |
+| 5½ | Beacon *leap* (sixteenth 72) | the leap: jump 82, second jump 86, land 92 |
+| 7–10 | Climb, crown, long landing | the double climb 112 / 115 / 119; climb-song on 113, 115, 117, 120 |
+| 11 | Card II (160) | lands on gate-2 at 162 |
+| 11½ | Beacon *breaking* (168) | first crack lands 187, falls to the floor at 194 |
+| 15–17 | The ridge | 8 sixteenths shorter than before (see below) |
+| 17½ | Beacon *well* (264) | |
+| 19½–21¾ | The cascade | the bounce lands 299, 305, 310, 316, 321, 327, 333; tiles drop on 312, 316, … 332 (beats) |
+| 23½ | Beacon *hearth* + card III (360) | the double off the last crack lands on the hearth on 360 |
+| 26 | Beacon *voids* (400) | the hearth flight lands on it; flight-line on 392–398 |
+| 27–28 | Two voids | split-song on 417, 419, 421, 424, 428; flight B at 429 |
+| 29 | Beacon *updraft* (448) | lands on the beacon |
+| 32 | Beacon *finale* (496) | lands on the beacon |
+| 33–35 | Finale, coda (544) | finale-song 521–524; the walk-off lands on the door island at 548 |
+| 36 | The far door (560) | win on the downbeat |
+
+**Constraints that shaped it.**
+- *Beacon spacing.* Leap (sixteenth 72) to the old well beacon (272) was 200 sixteenths, and one beacon in between cannot keep both gaps at or under 99 sixteenths (14 s). The ridge gave up eight sixteenths of ground (beat-isle and ridge-c are 151.4 px shorter each, which keeps the lattice) and the hearth got them back as calm after its beacon, so everything after the hearth is where it was. Every beacon is still on a half bar, at most 13.5 s apart.
+- *The cascade at 107 BPM* (brief: 207 px pitch). A full jump covers about one pitch, so the line is a bounce: hops of 5 and 6 sixteenths alternate, up 31 and down 51 px, and every touch-down is the next takeoff. `lead` 551 puts the main route's first drop on beat 3 of bar 20 (sixteenth 312) and every drop on a beat; the bouncing line leaves tile k 13, 11, 10, 8, 7 and 5 sixteenths before it falls (tested), so the wave closes in visibly and a player can be about 0.1 s late on each hop. The tiles are 150 px with 57 px gaps.
+- *The hearth.* Landing on it at the top of a double jump was fragile (the integrator's apex is a few px short, and a 30 Hz press misses), so the wave ends 51 px down, a 4/16 hop rises 84 px onto the last crack and a standard late double (4/16 + 4/16, still descending) climbs 139 px onto the hearth.
+- *The first crack's floor* sits 80 px below it so the fall after the 0.65 s crumble lands seven sixteenths after the touch-down.
+- *The optional cracked chain* over the ridge rose with it and stays more than 25 px above every main-line arc, so a ridge hop never lip-catches onto it.
+- *Model precision fixes* that the grid needed: flights last exactly 0.5 s at every sampling rate (the last substep used to be dropped), and crumble / cascade collapses run in their own pass before collisions (a tile sorted after the surface Diana stood on used to drop seconds late).
+
+**Audit** (`npm run score:bake`, `scripts/bake-score.mjs`): the main pilot at 120 Hz produces 171 anchors (38 jumps, 5 double jumps, 5 cape presses, 40 landings, 41 stars, 21 chain notes, 5 completions, 7 beacons, 3 movement cards, 6 tile drops); worst 16.5 ms. All are within 35 ms at 60, 120 and 240 Hz (tested); at 30 Hz the pilot only acts every 33 ms, and the test allows that sampling on top. The bake writes `score-path.mjs` (x → sixteenth every 25 px, every anchor, a hash of `level.mjs`, `model.mjs` and `tests/routes.mjs`); a stale table fails the tests. After any geometry or pilot change: `npm run score:bake`, then `npm test`.
+
+**Root QA screenshots.** The chosen times still show their beats and nobody is dead: 26 s (low, in the air over the first crack), 40.6 s (mastery, in the star well), 45 s (low, on tile 4), 66 s (ability, just out of the solar wind over the lifted shore), 76 s (ability, on `finale-high` with the door ahead). Slightly better frames: 26.4 s (standing on the first crack), 65.3 s (inside the column) and 77 s (on the door island).
+
 ## Fix round after the first real-input playtest (2026-11-09)
 
-The playtester's findings and what changed: the updraft "hold →" no longer starts a level dash under the shore (no dash inside wind; a flight entering wind ends; one glyph at a time); near-miss jumps pop onto island lips (≤ 25 px, never for walk-offs) and lips are trimmed to the colliders; grey now only means "breaking now", optional stone has a dotted rim, lids a star-shaped break; the first gap is 90 px flat (full jump from x 960–1110, 0 ms tap from 1060–1110); the opening hops and the ridge vary; the cascade wave now outruns Diana; a second lid on the lifted shore opens a star cache and a breeze over the hearth teaches glide; stars inside the hearth and in voids were moved and every star is pilot-reachable; story lines sit on ink plates; the Saturn limb is gone (rings only); completion lines are hairlines between collected stars; world stars are always filled; a tiny Earth glint pulses the signal ahead. Tables below are current.
+The playtester's findings and what changed: the updraft "hold →" no longer starts a level dash under the shore (no dash inside wind; a flight entering wind ends; one glyph at a time); near-miss jumps pop onto island lips (≤ 25 px, never for walk-offs) and lips are trimmed to the colliders; grey now only means "breaking now", optional stone has a dotted rim, lids a star-shaped break; the first gap was 90 px flat (full jump from x 960–1110, 0 ms tap from 1060–1110; revision five makes it 105 px with a 44 px drop); the opening hops and the ridge vary; the cascade wave now outruns Diana; a second lid on the lifted shore opens a star cache and a breeze over the hearth teaches glide; stars inside the hearth and in voids were moved and every star is pilot-reachable; story lines sit on ink plates; the Saturn limb is gone (rings only); completion lines are hairlines between collected stars; world stars are always filled; a tiny Earth glint pulses the signal ahead. Tables below are current.
 
 ## Platforms
 
 `type`: crumble (breaks 0.65 s after the first landing), lid (holds a run, breaks under a dive), cascade (drops on the beat wave), alt (optional mastery or safe line). Untyped = stable stone.
 
-| id | x | end | y | width | type | t (s) |
+| id | x | end | y | width | type | main landing: sixteenth (bar) |
 | --- | --- | --- | --- | --- | --- | --- |
-| `home` | −700 | 1100 | 540 | 1800 | | 0.0 |
-| `hop-a` | 1190 | 1450 | 540 | 260 | | 3.6 |
-| `hop-b` | 1570 | 1760 | 500 | 190 | | 5.0 |
-| `hop-c` | 1840 | 2140 | 470 | 300 | | 6.0 |
-| `hop-d` | 2260 | 2710 | 520 | 450 | | 7.6 |
-| `leap-shore` | 2830 | 3330 | 490 | 500 | | 9.7 |
-| `far-shore` | 3590 | 4000 | 490 | 410 | | 12.5 |
-| `gs1-ledge` | 4080 | 4280 | 320 | 200 | alt | 14.3 |
-| `climb-base` | 4110 | 4490 | 500 | 380 | | 14.4 |
-| `climb-crown` | 4630 | 5030 | 335 | 400 | | 16.3 |
-| `crown-step` | 5110 | 5360 | 335 | 250 | | 18.1 |
-| `high-crown` | 5420 | 5590 | 215 | 170 | alt | 19.3 |
-| `long-landing` | 5620 | 6140 | 400 | 520 | | 20.0 |
-| `gate-2` | 6260 | 7120 | 470 | 860 | | 22.4 |
-| `crack-floor` | 7150 | 7800 | 560 | 650 | | 25.7 |
-| `first-crack` | 7190 | 7520 | 430 | 330 | crumble | 25.8 |
-| `second-crack` | 7900 | 8200 | 500 | 300 | crumble | 28.4 |
-| `beat-isle` | 8220 | 8700 | 480 | 480 | | 29.6 |
-| `ridge-a` | 8820 | 9180 | 450 | 360 | | 31.9 |
-| `ridge-stone` | 9270 | 9390 | 430 | 120 | | 33.5 |
-| `chain-a` | 8880 | 9080 | 320 | 200 | crumble (alt) | 32.1 |
-| `chain-b` | 9210 | 9410 | 300 | 200 | crumble (alt) | 33.3 |
-| `ridge-b` | 9480 | 9800 | 490 | 320 | | 34.3 |
-| `chain-c` | 9540 | 9740 | 320 | 200 | crumble (alt) | 34.5 |
-| `chain-exit` | 9880 | 10100 | 320 | 220 | alt | 35.8 |
-| `ridge-c` | 9930 | 10300 | 440 | 370 | | 35.9 |
-| `b3-isle` | 10420 | 10980 | 480 | 560 | | 37.8 |
-| `well-rim-a` | 11100 | 11220 | 470 | 120 | | 40.3 |
-| `well-floor` | 11150 | 11670 | 640 | 520 | alt | 40.5 |
-| `lid` | 11220 | 11440 | 470 | 220 | lid | 40.7 |
-| `well-rim-b` | 11440 | 11700 | 470 | 260 | | 41.6 |
-| `well-exit` | 11700 | 11910 | 530 | 210 | alt | 42.5 |
-| `tile-0` … `tile-5` | 11820 + 240·i | +170 | 470 | 170 | cascade | 43.0–47.4 |
-| `cascade-end` | 13300 | 13660 | 470 | 360 | | 48.4 |
-| `last-crack` | 13770 | 14070 | 460 | 300 | crumble | 50.2 |
-| `hearth` | 14200 | 15100 | 340 | 900 | | 51.8 |
-| `wind-shore` | 15480 | 16020 | 400 | 540 | | 56.5 |
-| `split-crack` | 16380 | 16590 | 400 | 210 | crumble | 59.9 |
-| `split-far` | 16950 | 17330 | 400 | 380 | | 62.0 |
-| `wind-gate` | 17450 | 18070 | 470 | 620 | | 63.8 |
-| `lifted-shore` | 18370 | 18560 | 300 | 190 | | 67.2 |
-| `star-cache` | 18520 | 18900 | 470 | 380 | alt | 67.8 |
-| `lid-2` | 18560 | 18810 | 300 | 250 | lid | 67.9 |
-| `lifted-down` | 18930 | 19230 | 400 | 300 | | 69.3 |
-| `finale-gate` | 19350 | 19870 | 470 | 520 | | 70.9 |
-| `finale-crack` | 19990 | 20190 | 440 | 200 | crumble | 73.2 |
-| `low-a` | 20190 | 20450 | 560 | 260 | alt (safe line) | 74.0 |
-| `low-b` | 20560 | 21100 | 560 | 540 | alt (safe line) | 75.3 |
-| `finale-high` | 21080 | 21380 | 330 | 300 | | 77.3 |
-| `low-c` | 21210 | 21410 | 560 | 200 | alt (safe line) | 77.7 |
-| `far-door` | 21440 | 22740 | 470 | 1300 | | 78.6 |
+| `home` | -700 | 1100 | 540 | 1800 |  |  |
+| `hop-a` | 1205 | 1450 | 584 | 245 |  | 29 (bar 2.81) |
+| `hop-b` | 1540 | 1760 | 501 | 220 |  | 36 (bar 3.25) |
+| `hop-c` | 1840 | 2140 | 478 | 300 |  | 45 (bar 3.82) |
+| `hop-d` | 2260 | 2710 | 527 | 450 |  | 56 (bar 4.50) |
+| `leap-shore` | 2790 | 3350 | 496 | 560 |  | 69 (bar 5.31) |
+| `far-shore` | 3610 | 4000 | 503 | 390 |  | 92 (bar 6.75) |
+| `gs1-ledge` | 4080 | 4280 | 320 | 200 | alt |  |
+| `climb-base` | 4110 | 4490 | 553 | 380 |  | 104 (bar 7.50) |
+| `climb-crown` | 4630 | 5030 | 391 | 400 |  | 119 (bar 8.44) |
+| `crown-step` | 5110 | 5380 | 359 | 270 |  | 131 (bar 9.18) |
+| `high-crown` | 5420 | 5590 | 215 | 170 | alt |  |
+| `long-landing` | 5620 | 6140 | 421 | 520 |  | 147 (bar 10.19) |
+| `gate-2` | 6260 | 7120 | 471 | 860 |  | 162 (bar 11.12) |
+| `crack-floor` | 7150 | 7800 | 520 | 650 |  | 194 (bar 13.12) |
+| `first-crack` | 7190 | 7520 | 440 | 330 | crumble | 187 (bar 12.69) |
+| `second-crack` | 7900 | 8200 | 489 | 300 | crumble | 205 (bar 13.81) |
+| `beat-isle` | 8220 | 8548.6 | 457 | 328.6 |  | 213 (bar 14.31) |
+| `ridge-a` | 8668.6 | 9028.6 | 425 | 360 |  | 225 (bar 15.06) |
+| `chain-a` | 8728.6 | 8928.6 | 297 | 200 | crumble (alt) |  |
+| `chain-b` | 9058.6 | 9258.6 | 277 | 200 | crumble (alt) |  |
+| `ridge-stone` | 9148.6 | 9268.6 | 476 | 120 |  | 238 (bar 15.88) |
+| `ridge-b` | 9328.6 | 9648.6 | 444 | 320 |  | 243 (bar 16.19) |
+| `chain-c` | 9388.6 | 9588.6 | 297 | 200 | crumble (alt) |  |
+| `chain-exit` | 9728.6 | 9948.6 | 297 | 220 | alt |  |
+| `ridge-c` | 9748.6 | 9997.2 | 413 | 248.6 |  | 253 (bar 16.82) |
+| `b3-isle` | 10117.2 | 10677.2 | 464 | 560 |  | 264 (bar 17.50) |
+| `well-rim-a` | 10797.2 | 10917.2 | 432 | 120 |  | 281 (bar 18.56) |
+| `well-floor` | 10847.2 | 11367.2 | 640 | 520 | alt |  |
+| `lid` | 10917.2 | 11137.2 | 432 | 220 | lid |  |
+| `well-rim-b` | 11137.2 | 11397.2 | 432 | 260 |  |  |
+| `well-exit` | 11397.2 | 11607.2 | 530 | 210 | alt |  |
+| `tile-0` | 11477.2 | 11627.2 | 400 | 150 | cascade | 299 (bar 19.69) |
+| `tile-1` | 11684.2 | 11834.2 | 451 | 150 | cascade | 305 (bar 20.06) |
+| `tile-2` | 11891.2 | 12041.2 | 419 | 150 | cascade | 310 (bar 20.37) |
+| `tile-3` | 12098.2 | 12248.2 | 468 | 150 | cascade | 316 (bar 20.75) |
+| `tile-4` | 12305.2 | 12455.2 | 437 | 150 | cascade | 321 (bar 21.07) |
+| `tile-5` | 12512.2 | 12662.2 | 489 | 150 | cascade | 327 (bar 21.44) |
+| `cascade-end` | 12719.2 | 13357.2 | 540 | 638 |  | 333 (bar 21.81) |
+| `last-crack` | 13467.2 | 13767.2 | 458 | 300 | crumble | 351 (bar 22.94) |
+| `hearth` | 13817.2 | 15060 | 319 | 1242.8 |  | 360 (bar 23.50) |
+| `wind-shore` | 15435 | 16020 | 377 | 585 |  | 400 (bar 26.00) |
+| `split-crack` | 16380 | 16590 | 360 | 210 | crumble | 422 (bar 27.37) |
+| `split-far` | 16950 | 17330 | 427 | 380 |  | 436 (bar 28.25) |
+| `wind-gate` | 17450 | 18070 | 478 | 620 |  | 448 (bar 29.00) |
+| `lifted-shore` | 18370 | 18560 | 311 | 190 |  | 471 (bar 30.44) |
+| `star-cache` | 18520 | 18900 | 470 | 380 | alt |  |
+| `lid-2` | 18560 | 18810 | 311 | 250 | lid |  |
+| `lifted-down` | 18930 | 19230 | 360 | 300 |  | 488 (bar 31.50) |
+| `finale-gate` | 19314 | 19870 | 412 | 556 |  | 496 (bar 32.00) |
+| `finale-crack` | 19990 | 20190 | 381 | 200 | crumble | 515 (bar 33.19) |
+| `low-a` | 20190 | 20450 | 560 | 260 | alt (safe line) |  |
+| `low-b` | 20560 | 21100 | 560 | 540 | alt (safe line) |  |
+| `finale-high` | 21080 | 21402 | 340 | 322 |  | 539 (bar 34.69) |
+| `low-c` | 21210 | 21410 | 560 | 200 | alt (safe line) |  |
+| `far-door` | 21440 | 22740 | 470 | 1300 |  | 548 (bar 35.25) |
 
-55 platforms (43 main, 12 alternate): 8 crumbling shelves, 2 lids, 6 cascade tiles. 90 stars, 30 of them in 7 constellations, plus 3 Great Fallen Stars; two updrafts plus the hearth breeze.
+56 platforms (44 main, 12 alternate): 8 crumbling shelves, 2 lids, 6 cascade tiles. 90 stars, 30 of them in 7 constellations, plus 3 Great Fallen Stars; two updrafts plus the hearth breeze.
 
 ## Beat by beat
 
-### I · Waking (0–22 s)
+### I · Waking (bars 1–10, 0–22.4 s)
 
 - **Introduce.** The title is the start island seen from the centre; the sprout (Diana's leaves) wakes into the start clip and the camera eases to the run framing. 2.6 s of flat ground. Three stars at tap height (y 437–442, a 30 px hop reaches them) and three at hold height (y 372–378, only a held jump). Stars teach; nothing is locked.
-- **Develop.** Four hops whose takeoffs fall on a two-beat (368 px) grid, 120–130 px gaps and 30–45 px rises. *first-song* (4 stars) alternates jump apexes and running height across hops b and c.
-- **Beacon *leap*** (x 2900, 9.9 s).
-- **Twist.** `leap-shore → far-shore` is a 260 px flat gap: one full jump reaches 237 px with the body overlap, so a second jump is needed, and it must come late enough (≥ 0.2 s) to carry distance. Glyph ↑ ↑. Great Star 1 sits above `gs1-ledge` (y 320), reached by an early double jump off the far shore and visible from the main route.
-- **Conclude.** A 165 px double-jump climb (`climb-base → climb-crown`, *climb-song* traces the arc), an 80 px hop, and a 260 px late-double gap down to `long-landing`. An early double instead lands on the optional `high-crown` (three upper stars) and drops back.
+- **Develop.** Four hops on the grid (takeoff sixteenths 23, 32, 40, 50, 64): down 44 px over the forgiving 105 px gap (a 0 ms tap clears it, walking off does not), up 83 px onto a rock, up 23 px, down 49 px to the long island. *first-song* (4 stars, sixteenths 44–56) plays the soundtrack's motif head D5 C♯5 B4 A4 across hops b and c.
+- **Beacon *leap*** (x 2943, bar 5½, 10.1 s).
+- **Twist.** `leap-shore → far-shore` is a 260 px gap (7 px down): one full jump reaches about 237 px with the body overlap, so a second jump is needed, and it must come late enough to carry distance (the pilot presses it 4/16 after the first). Glyph ↑ ↑. Great Star 1 sits above `gs1-ledge` (y 320), reached by an early double jump off the far shore and visible from the main route.
+- **Conclude.** A 50 px drop, the 162 px double climb (`climb-base → climb-crown`, second press 3/16 in; *climb-song* traces it), a 32 px hop up to `crown-step`, and a late double (5/16 + 6/16) down 62 px to `long-landing`. An early double instead lands on the optional `high-crown` (three upper stars) and drops back.
 
-### II · The Breaking Constellation (22–51 s)
+### II · The Breaking Constellation (bars 11–23, 22.4–50.5 s)
 
-- **Card II** at x 6280, as Diana lands on `gate-2`, finishing before the first input (tested; cards, story lines and tips are timed in simulation seconds). **Beacon *breaking*** (6670, 23.9 s).
-- **Introduce.** `first-crack` (330 px) is long enough that the 0.65 s crumble always breaks under a runner; `crack-floor` 130 px below catches her (tested). `second-crack` (300 px) breaks about 175 px after landing, so the jump must come before it, toward `beat-isle`, one beat past the break point. Glyph ↑.
-- **Develop.** A stable three-island ridge; above it the optional chain of three cracked shelves (y 300–320) and `chain-exit`, which drops back onto `ridge-c`.
-- **Beacon *well*** (10440, 37.9 s).
+- **Card II** at x 6276, on the downbeat of bar 11 as Diana drops onto `gate-2`, finishing before the first input (tested; cards, story lines and tips are timed in simulation seconds). **Beacon *breaking*** (6577, bar 11½, 23.5 s).
+- **Introduce.** `first-crack` (330 px) is long enough that the 0.65 s crumble always breaks under a runner; `crack-floor` 80 px below catches her seven sixteenths after the touch-down (tested). `second-crack` (300 px) breaks about 175 px after landing, so the jump must come before it, toward `beat-isle`. Glyph ↑.
+- **Develop.** A stable ridge: a wide island, a drop onto the small `ridge-stone` and straight off it, then two rises; above it the optional chain of three cracked shelves (y 277–297) and `chain-exit`, from which the mastery line jumps on to `b3-isle`.
+- **Beacon *well*** (10211, bar 17½, 37.0 s).
 - **Twist 1, the lid.** `well-rim-a | lid | well-rim-b` form one continuous floor; the lid glints with starlight through its cracks and a dim optional ↓ glyph floats over it. A dive breaks it (instantly, ≥ 500 px/s carry) onto `well-floor` 170 px below: Great Star 2 and *well-song* (5 stars) lead along the floor and up the exit arc onto the cascade. Running across leaves the lid whole.
-- **Twist 2, the beat cascade.** Six 170 px tiles with 70 px gaps (240 px pitch). On first contact the wave is anchored to tile 0, which drops when Diana's nominal position is 430 px past its start; each later tile drops one beat (0.68 s) after the previous one, shaking for its last 0.35 s. The wave travels 352 px/s against her 270, gaining 56 px a beat, so the last tile drops when she is 150 px into it: a hop at each edge lands in time, a late coyote hop on the last tiles is caught unless she spends her second jump (both tested).
-- **Conclude.** `last-crack` breaks 0.65 s after landing; a double jump from it climbs 120 px to the hearth crown.
+- **Twist 2, the beat cascade.** Six 150 px tiles with 57 px gaps (207 px pitch), stepping up 31 and down 51 px in turn. On first contact the wave is anchored to tile 0, which drops when Diana's nominal position is 551 px past its start; each later tile drops one 107 BPM beat (0.561 s) after the previous one, shaking for its last 0.35 s. The wave travels 369 px/s against her 270, gaining 55.6 px a beat. A full jump spans about one pitch, so the intended line is a bounce: every touch-down is the next takeoff, in hops of 5 and 6 sixteenths. The bouncing line leaves each tile 13 down to 5 sixteenths before it falls; a runner who lingers or hops late is caught (both tested).
+- **Conclude.** The wave ends 51 px down on `cascade-end`; a 4/16 hop climbs 82 px onto `last-crack`, which breaks 0.65 s after landing, and a late double jump from it (4/16 + 4/16) climbs 139 px to the hearth crown.
 
-### III · Borrowed Wind (51–78 s)
+### III · Borrowed Wind (bars 23½–34, 50.5–76.3 s)
 
-- **Beacon *hearth*** (14200, 51.8 s) and **card III**: three calm seconds and a story line.
-- **Introduce.** A 380 px void from the 340 px-high hearth. Glyph ↑ · →. *flight-line* (4 stars) lies on the flight altitude of a dash made near the jump apex; completing it re-inks the cape midair, so the player sees the refill rule before it is needed. Without the cape the void is not crossable (tested).
-- **Beacon *voids*** (15540, 56.7 s).
-- **Develop.** Two 360 px voids split by `split-crack`. Flight A spends the cape; the cracked landing does not refill it; *split-song* (5 stars: two on flight A's line, one on the descent, one on the shelf, one on the jump off it) refills it in time for flight B. Removing one of its stars makes void B fail (tested). This is the only required chain and its beacon is 5 s before it.
-- **Beacon *updraft*** (17480, 63.9 s).
+- **Beacon *hearth*** (13843, bar 23½, 50.5 s) and **card III**, as Diana lands: four calm seconds and a story line (the hearth took back the ridge's eight sixteenths).
+- **Introduce.** A 375 px void from the 319 px-high hearth. Glyph ↑ · →. *flight-line* (4 stars, sixteenths 392–398) lies on the flight altitude of a cape opened 3/16 after the jump; completing it re-inks the cape midair, so the player sees the refill rule before it is needed. Without the cape the main line dies in the void (tested); a frame-perfect late double from the very lip can also reach the far shore, as in earlier revisions.
+- **Beacon *voids*** (15470, bar 26, 56.1 s), lit as the flight lands on it.
+- **Develop.** Two voids split by `split-crack`. Flight A (cape 2/16 after the jump) spends the cape; the cracked landing does not refill it; *split-song* (5 stars: two on flight A's line, one on the descent, one on the shelf, one on the jump off it) refills it one sixteenth before flight B. Removing one of its stars makes void B fail (tested). This is the only required chain and its beacon is 5 s before it.
+- **Beacon *updraft*** (17515, bar 29, 62.8 s), lit as the hop lands on it.
 - **Twist, the wind.** The 180 px column *first-wind* (x 18080–18260) rises from below `wind-gate`; the whole column is drawn top to bottom. Jumping into it (glyph ↑) lifts Diana 231 px, enough for `lifted-shore` 170 px up across a 300 px gap; walking in and then double-jumping, or gliding, also works. Glyphs appear one at a time: ↑ at the edge, then (optional) "hold →" inside the column — the cape glides upward there, never dashing level — then (optional) → · ↑ just past the column top: cape, then super jump, reaches Great Star 3 at (18520, 80); a plain double jump falls short of it. Without the wind the main route dies here (tested). On the shore, an optional ↓ breaks `lid-2` into the star cache (*cache-song*), which rejoins at `lifted-down`.
-- **Beacon *finale*** (19380, 71.0 s).
-- **Conclude.** From `finale-crack` (cracked, no refill): jump, flight, double jump, *finale-song* refills the cape at the apex, second flight, then *finale-wind* (x 20860–21030, top 150, bottom 480) catches the end of the flight and lifts Diana to `finale-high`. Under all of it lies the **safe line** `low-a/b/c` (y 560), reached by simply falling; it is stable and needs only jumps, and the column's bottom stops above it so it never lifts a low-line runner by surprise.
+- **Beacon *finale*** (19330, bar 32, 69.5 s), lit as the hop lands on it.
+- **Conclude.** From `finale-crack` (cracked, no refill): jump, flight, double jump, *finale-song* (four sixteenths in a row, 521–524) refills the cape at the double, second flight (a full one: it ends 47 px before the column), then *finale-wind* (x 20880–21050, top 150, bottom 480) lifts Diana to `finale-high`; its end is placed so the walk-off lands on the door island on the grid. Under all of it lies the **safe line** `low-a/b/c` (y 560), reached by simply falling; it is stable and needs only jumps, and the column's bottom stops above it so it never lifts a low-line runner by surprise.
 
 ### Coda
 
-`far-door` (1300 px) and the original portal at x 22180, grounded 3 px into the island. With all three Great Stars, Earth glows blue inside the arch.
+`far-door` (1300 px) and the original portal at x 21984, grounded 3 px into the island; Diana reaches it on the downbeat of bar 36. With all three Great Stars, Earth glows blue inside the arch.
 
 ## Beacons
 
-| id | x, y | Platform | Nominal t | Gap | Protects | Story line |
-| --- | --- | --- | --- | --- | --- | --- |
-| `leap` | 2900, 490 | leap-shore | 9.9 s | 9.9 s | first double jump | "The stars seemed to know the way." |
-| `breaking` | 6670, 470 | gate-2 | 23.9 s | 14.0 s | first crumble | "Some stars are too tired to hold her. She is light enough." |
-| `well` | 10440, 480 | b3-isle | 37.9 s | 14.0 s | lid, cascade | "Under the cracks, something was still shining." |
-| `hearth` | 14200, 340 | hearth | 51.8 s | 13.9 s | first flight | "A warm stone. A breath. The signal is louder here." |
-| `voids` | 15540, 400 | wind-shore | 56.7 s | 5.0 s | required constellation | "The cape remembers the wind of home." |
-| `updraft` | 17480, 470 | wind-gate | 63.9 s | 7.2 s | first updraft | "Wind rises where the dark is deepest." |
-| `finale` | 19380, 470 | finale-gate | 71.0 s | 7.0 s | finale | "Somewhere ahead, a little blue world is listening." |
-| finish | 22180, 470 | far-door | 81.3 s | 10.4 s | | |
+| id | x, y | Platform | Main-route time | Sixteenth (bar) | Gap | Protects | Story line |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `leap` | 2943, 496 | leap-shore | 10.09 s | 72 (5½) | 10.1 s | first double jump | "There it was again: the signal, somewhere ahead." |
+| `breaking` | 6577, 471 | gate-2 | 23.54 s | 168 (11½) | 13.5 s | first crumble | "Some stars are too tired to hold her. She is light enough." |
+| `well` | 10211, 464 | b3-isle | 37.00 s | 264 (17½) | 13.5 s | lid, cascade | "Under the cracks, something was still shining." |
+| `hearth` | 13843, 319 | hearth | 50.46 s | 360 (23½) | 13.5 s | first flight | "A warm stone. A breath. The signal is louder here." |
+| `voids` | 15470, 377 | wind-shore | 56.06 s | 400 (26) | 5.6 s | required constellation | "The cape remembers the wind of home." |
+| `updraft` | 17515, 478 | wind-gate | 62.79 s | 448 (29) | 6.7 s | first updraft | "Wind rises where the dark is deepest." |
+| `finale` | 19330, 412 | finale-gate | 69.52 s | 496 (32) | 6.7 s | finale | "Somewhere ahead, a little blue world is listening." |
+| finish | 21984, 470 | far-door | 78.51 s | 560 (36) | 9.0 s | | |
 
-A beacon lights when Diana stands on it (feet within 1 px of its y, x within [x, x+400]); flying over does not count. Lighting saves stars, constellations and progress, banks any carried Great Star, refills the cape, resets the fall counter and the star net. Each has a one-line tip shown after three falls there.
+A beacon lights when Diana stands on it (feet within 1 px of its y, x within [x, x+400]); flying over does not count. Every beacon sits on a half bar of the path clock (tested), so a fall's restart re-enters the score on a strong beat. Lighting saves stars, constellations and progress, banks any carried Great Star, refills the cape, resets the fall counter and the star net. Each has a one-line tip shown after three falls there.
 
 ## Rules in detail
 
-**Cape (M1).** `RULES.capeRule = 'landing'`: `capeCharges` is 0 or 1. `dash()` needs an airborne Diana and a charge, sets vy = 0 for 0.5 s at +230 px/s. Refills: any landing on uncracked stone, any beacon, any completed constellation. Landing ends a flight. `'cooldown'` restores the archived 6 s timer (beacons and constellations reset it).
+**Cape (M1).** `RULES.capeRule = 'landing'`: `capeCharges` is 0 or 1. `dash()` needs an airborne Diana and a charge, sets vy = 0 for exactly 0.5 s at +227.1 px/s (three sixteenths of extra run). Refills: any landing on uncracked stone, any beacon, any completed constellation. Landing ends a flight. `'cooldown'` restores the archived 6 s timer (beacons and constellations reset it).
 
 **Smash (M2).** A diving Diana that meets a crumble, lid or cascade surface breaks it in the same substep and keeps falling at ≥ 500 px/s, so a lower platform in the same substep still catches. A grounded dive breaks only cracked stone; ordinary stone ignores it. Chips and a 3 px shake are renderer-only and skipped under reduced motion.
 
-**Constellations (M3).** Stars of one chain must be taken in order with at most 1.2 s between them; passing an untaken star (50 px) or waiting too long fades the chain. Taken stars still count. Completion increments `ringsCrossed` and `constellations` and refills the cape. Notes (synthesised, `audio.mjs`): kalimba D5 E5 F#5 A5 B5 D6, D major pentatonic, the soundtrack's key; completion re-strums them into a D add9 bloom.
+**Constellations (M3).** Stars of one chain must be taken in order with at most 1.2 s between them; passing an untaken star (50 px) or waiting too long fades the chain. Taken stars still count. Completion increments `ringsCrossed` and `constellations` and refills the cape. Each star has an authored note (`score.mjs` PHRASES, tested against the chord where the main route takes it); completion blooms the chord and brings in the choir for four bars; a fade lets the last note sigh 50 cents down (README, "Sound").
 
 **Great Stars (M7).** Taking one puts it in `greatPending` (it circles Diana and its HUD slot pulses). Touching any ground or a beacon banks it. A fall before banking returns it to the sky; banked ones survive every retry. Three banked → `win` carries `earth: true` and the door shows Earth.
 
@@ -172,11 +230,11 @@ A beacon lights when Diana stands on it (feet within 1 px of its y, x within [x,
 | id | Glyph | Where | Hidden by |
 | --- | --- | --- | --- |
 | `p-jump` | ↑ | end of the home island | jump |
-| `p-double` | ↑ ↑ | over the long leap | double jump |
-| `p-climb` | ↑ ↑ | before the 165 px climb | double jump |
-| `p-crack` | ↑ | over the second cracked shelf | jump |
+| `p-double` | ↑ ↑ | over the long leap (window 3290–3340) | double jump |
+| `p-climb` | ↑ ↑ | before the 162 px climb | double jump |
+| `p-crack` | ↑ | over the second cracked shelf (window 8030–8120) | jump |
 | `p-lid` (optional) | ↓ | over the lid | dive |
-| `p-cape` | ↑ · → | edge of the hearth | cape |
+| `p-cape` | ↑ · → | edge of the hearth (jump window 14980–15060) | cape |
 | `p-updraft` | ↑ | edge of `wind-gate` | jump |
 | `p-wind` (optional) | hold → | inside the column | glide in the wind |
 | `p-super` (optional) | → · ↑ | top of the column | super jump |
@@ -187,17 +245,18 @@ Pilots read a fixed list of `[x, action, when]` steps and call only public actio
 
 | Route | What it does | Result |
 | --- | --- | --- |
-| `main` / `low` | Every required action, high line in the finale | won 79.242 s · 52 stars · 5 constellations · 7 beacons · 42 jumps / 5 flights |
-| `upper` / `high` / `mastery` | GS1 ledge, high crown, the cracked chain, lid smash and well, glide + flight + super jump for GS3 | won 79.133 s · 64 stars (15 upper) · **3 Great Stars** · 6 constellations · 1 smash · 1 super jump |
-| `ability` | Main route plus a released-jump hop, the lid smash and the well, glide in the wind | won 79.242 s · 57 stars · GS2 · 6 constellations |
-| `safe` | Main route, but drops to the finale's stable low line | won 80.083 s · 51 stars · 3 flights |
+| `main` / `low` | Every required action on the grid, high line in the finale | won 78.508 s · 62 stars (3 upper) · 5 constellations · 7 beacons · 43 jumps / 5 flights · the whole song on time |
+| `upper` / `high` / `mastery` | GS1 ledge, high crown, the cracked chain, lid smash and well, glide + flight + super jump for GS3 | won 78.450 s · 73 stars (14 upper) · **3 Great Stars** · 6 constellations · 1 smash · 1 super jump |
+| `ability` | Main route plus a released-jump hop, the lid smash and the well, glide in the wind, the star cache | won 78.508 s · 77 stars (15 upper) · GS2 · 7 constellations · 2 smashes |
+| `safe` | Main route, but drops to the finale's stable low line | won 79.350 s · 61 stars · 4 constellations · 3 flights |
 
-All four win at 30, 60, 120 and 240 Hz. Failure checks: no second jump → dies over the leap (after beacon *leap*); no cape → dies in the first void (after *hearth*); one constellation star removed → dies over void B (after *voids*); no wind → dies at the updraft (after *updraft*).
+All four win at 30, 60, 120 and 240 Hz. Failure checks: no second jump → dies over the leap (after beacon *leap*); no cape → dies in the first void (after *hearth*); one constellation star removed → dies over void B (after *voids*); no wind → dies at the updraft (after *updraft*). The upper, ability and safe lines are not grid-locked (they take other arcs); the score quantises them and re-phases at anchors.
 
 ## Risks and next tuning
 
 - The required midair constellation is the most demanding read in the chapter. If players miss it, widen star tolerance or move its last star lower on the jump arc before touching the void width.
-- The cascade cannot catch a runner by construction; it is pressure, not a threat. If it needs teeth, the honest lever is narrower tiles, not a faster wave.
+- The cascade is now a bounce (hop length ≈ pitch at 107 BPM). It is the most rhythmic stretch of the chapter; watch whether first-time players find the landing-is-takeoff rhythm, and whether 0.7 s of slack on the last tile is too generous or too tight.
 - 165 px and 170 px climbs sit at the authoring limit; watch first-time players there.
-- Tempo is the GDD's 88 BPM, but the soundtrack measures 107 BPM (onset autocorrelation and its MP3 `TBPM` tag; README, Sound). Spacing still uses 88; retuning it is open.
+- The map is authored on the soundtrack's measured 107 BPM; the GDD's 88 BPM is retired. Any geometry change needs `npm run score:bake` and the alignment test to stay green.
+- The first void can be crossed without the cape by a frame-perfect late double jump from the very lip (also true before this revision). The test proves the main line needs the cape; tightening it would shrink an already narrow cape window.
 - Human sessions should note where a glyph is first misread, which line people choose in the finale, and whether 1.1 s respawns feel instant enough.
