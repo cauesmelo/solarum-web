@@ -233,7 +233,7 @@ test("A3: presses at landing, respawn, pause and level start are honoured or ign
 
 /* ---------- B. Jump, forgiveness, air resources ---------- */
 test("B5-B8: apex time, tap/hold ratio, release cut and fall per level (L1 floats on purpose)", () => {
-  const want = { 1: [0.5, 0.53], 2: [0.41, 0.44], [LEVEL_ID["still-water"]]: [0.39, 0.42], [LEVEL_ID["way-down"]]: [0.36, 0.39], [LEVEL_ID.breaking]: [0.34, 0.37], [LEVEL_ID["borrowed-wind"]]: [0.32, 0.35], [LEVEL_ID.door]: [0.3, 0.33] };
+  const want = { 1: [0.5, 0.53], 2: [0.41, 0.44], [LEVEL_ID["still-water"]]: [0.39, 0.42], [LEVEL_ID["way-down"]]: [0.36, 0.39], [LEVEL_ID.breaking]: [0.34, 0.37], [LEVEL_ID["borrowed-wind"]]: [0.32, 0.35], [LEVEL_ID["falling-road"]]: [0.31, 0.34], [LEVEL_ID.door]: [0.3, 0.33] };
   for (const n of IDS) {
     const held = arc(n),
       tap = arc(n, { release: 0 }),
@@ -471,7 +471,7 @@ test("E1/E2: every movement action has a sound and a visual on its own tick; the
 
 /* ---------- F. Solarum: windows, leads ---------- */
 test("F: every required action in every level has a press window of at least 120 ms (real) and a readable cue", () => {
-  const minimum = { 1: 600, 2: 330, [LEVEL_ID["still-water"]]: 315, [LEVEL_ID["way-down"]]: 290, [LEVEL_ID.breaking]: 240, [LEVEL_ID["borrowed-wind"]]: 190, [LEVEL_ID.door]: 280 };
+  const minimum = { 1: 600, 2: 330, [LEVEL_ID["still-water"]]: 315, [LEVEL_ID["way-down"]]: 290, [LEVEL_ID.breaking]: 240, [LEVEL_ID["borrowed-wind"]]: 190, [LEVEL_ID["falling-road"]]: 190, [LEVEL_ID.door]: 280 };
   for (const n of IDS) {
     const nom = nominalRun(n);
     assert.equal(nom.status, "won");
