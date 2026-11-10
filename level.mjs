@@ -1903,7 +1903,7 @@ const RY = (() => {
     ["b0", -140], ["b1", 51], ["b2", -31], ["b3", 51], ["b4", -31], ["b5", 51], ["waveEnd", 57.3],
     ["roadShore", -141.3], ["roadShore2", 18],
     ["c0", -140], ["s0", 149.3], ["c1", -84], ["s1", 149.3], ["c2", -84], ["s2", 149.3], ["diveShore", -135.1], ["diveShore2", 18],
-    ["d0", -31], ["d2", 60], ["d4", 115], ["d5", 51], ["k1", -26], ["k2", -100.9], ["gapShore", 57.3], ["gapShore2", 18],
+    ["d0", -31], ["d2", 60], ["d4", 115], ["d5", 51], ["k1", -26], ["k2", -185], ["gapShore", 57.3],
     ["ka", -11.5], ["redStone", -11.5],
     ["e0", -31], ["e1", 51], ["e2", -31], ["e3", 51], ["marsShore", -53.2], ["marsShore2", 18],
     ["f0", -31], ["f1", 51], ["f2", -31], ["lastStone", 57.3], ["plain", -135.1],
@@ -1975,12 +1975,13 @@ const R_MAIN = [
   // double or flight overshoots it (the level's narrowest window).
   rTile("d4", 240, 2, RY.d4, 40, 70),
   rTile("d5", 246, 2, RY.d5),
-  // Then cracks, land and go: up onto k1 (251), a double (253, 256) onto
-  // k2 (261) and down onto the beacon's stone (269).
+  // The leaf need (RESEARCH_REFILLS 3): up onto the crack k1 (251), jump
+  // (253) and double (256); a lit leaf star at the double's top gives the
+  // air jump back, and a third jump (259) climbs 185 px onto the stone k2
+  // (264): up, the leaf's job. Down onto the beacon's stone (272).
   rIsle("k1", 251, 2, 253, RY.k1, 55, "crumble", -6),
-  rIsle("k2", 261, 2, 263, RY.k2, 60, "crumble", -6),
-  rIsle("gap-shore", 269, 2, 269, RY.gapShore, 60, undefined, 10),
-  ["gap-shore-2", gk(272, 2) - 60, RY.gapShore2, gk(283, 2) + 10 - (gk(272, 2) - 60)],
+  rIsle("k2", 264, 2, 266, RY.k2, 80, undefined, -6),
+  ["gap-shore", gk(272, 2) - 70, RY.gapShore, gk(283, 2) + 10 - (gk(272, 2) - 70)],
   // Flights kept alive by stars (the owner's brief, 2026-11-10): jump (283)
   // and fly (285) off the gap shore onto a crack (291), whose run gives no
   // breath; the red-song along that flight, the crack's touch-down and its
@@ -2049,10 +2050,7 @@ const R_CHAINS = [
   { id: "gap-song", route: "low", stars: [[gk(220) + 31.84 + 39.5, rAt(RY.d0, -104.6)], rRun(226, 1, RY.d2), rArc(228, 1, RY.d2, -99.3), rArc(230, 1, RY.d2, -79.9)] },
   // The gap shore's run and the jump's rise (complete on 284),
   // before the first flight of the pair.
-  { id: "spark-song", route: "low", stars: [rRun(278, 2, RY.gapShore2), rRun(280, 2, RY.gapShore2), rRun(282, 2, RY.gapShore2), rArc(284, 2, RY.gapShore2, -64.7)] },
-  // Required: along the first flight (2/16 into it and just after it), the
-  // crack's touch-down and its run (complete on 292), before the second.
-  { id: "red-song", route: "low", stars: [[gk(287, 2) + 63.67 + 39.5, rAt(RY.gapShore2, -100)], [gk(289, 3) + 39.5, rAt(RY.gapShore2, -97)], rRun(291, 3, RY.ka), rRun(292, 3, RY.ka)] },
+  { id: "spark-song", route: "low", stars: [rRun(278, 2, RY.gapShore), rRun(280, 2, RY.gapShore), rRun(282, 2, RY.gapShore), rArc(284, 2, RY.gapShore, -64.7)] },
   // Home: the last tiles, the stone and the double's rise (complete on 382).
   { id: "home-song", route: "low", stars: [rRun(366, 4, RY.f1), rRun(371, 4, RY.f2), rRun(377, 4, RY.lastStone), rArc(382, 4, RY.lastStone, -135.2)] },
 ];
@@ -2065,11 +2063,14 @@ const R_GREAT = [
 const R_STARS = [
   ...[[387, 4], [390, 4], [393, 4]].map(([k, F], i) => [`run-star-${i}`, gk(k + 4, F) + 33.5, RY.plain - 40, "low"]),
   // Over each land-and-go hop, on its rise.
-  ...[[38, 0, RY.warmShore], [120, 0, RY.waveEnd], [161, 0, RY.s0], [171, 0, RY.s1], [181, 0, RY.s2], [253, 2, RY.k1], [263, 2, RY.k2], [293, 3, RY.ka], [303, 4, RY.redStone], [379, 4, RY.lastStone]].map(([k, F, y], i) => [`hop-star-${i}`, gk(k + 1, F) + 33.5, rAt(y, -64.7), "low"]),
+  ...[[38, 0, RY.warmShore], [120, 0, RY.waveEnd], [161, 0, RY.s0], [171, 0, RY.s1], [181, 0, RY.s2], [266, 2, RY.k2], [293, 3, RY.ka], [303, 4, RY.redStone], [379, 4, RY.lastStone]].map(([k, F, y], i) => [`hop-star-${i}`, gk(k + 1, F) + 33.5, rAt(y, -64.7), "low"]),
   // At the top of each beacon breeze's lift.
   ...[[65, 0, RY.floor], [137, 0, RY.roadShore2], [201, 0, RY.diveShore2], [345, 4, RY.marsShore2]].map(([k, F, y], i) => [`breeze-star-${i}`, gk(k + 4, F) + 33.5, rAt(y, -167.8), "low"]),
   // At the top of each bounce between tiles (a loose star: 1/8 of breath).
   ...[[44, 0, RY.a0], [50, 0, RY.a1], [84, 0, RY.b0], [90, 0, RY.b1], [95, 0, RY.b2], [101, 0, RY.b3], [106, 0, RY.b4], [308, 4, RY.e0], [314, 4, RY.e1], [319, 4, RY.e2], [360, 4, RY.f0], [366, 4, RY.f1], [371, 4, RY.f2]].map(([k, F, y], i) => [`bounce-star-${i}`, gk(k + 3, F) + 33.5, rAt(y, -104.3), "low"]),
+  // Along the first flight of the pair and on its crack (loose: an eighth
+  // of breath each, so the bar shows half when the cape star is reached).
+  ...[[gk(287, 2) + 63.67, rAt(RY.gapShore, -100)], [gk(289, 3), rAt(RY.gapShore, -97)], [gk(291, 3), RY.ka - 40], [gk(292, 3), RY.ka - 40]].map(([x, y], i) => [`red-star-${i}`, x + 33.5, y, "low"]),
   // Along the second flight of the pair (loose: an eighth of breath each).
   ...[297, 299].map((k, i) => [`flight-star-${i}`, gk(k, 3) + (k === 297 ? 63.67 : 113.55) + 33.5, rAt(RY.ka, k === 297 ? -100 : -97), "low"]),
   // On the rise of each hop onto a road's first tile.
@@ -2090,8 +2091,7 @@ const R_PLAN_MAIN = [
   RJ(137, 0),
   RJ(147, 0), RJ(151, 0, "a"), RJ(155, 0), RV(158, 0), RJ(161, 0), RJ(165, 0), RV(168, 0), RJ(171, 0), RJ(175, 0), RV(178, 0), RJ(181, 0), RJ(185, 0, "a"),
   RT(197, 0), RJ(201, 0),
-  RJ(211, 0), RJ(216, 0), RD(219, 0), RJ(226, 1), RJ(230, 1, "a"), RD(232, 1), RJ(240, 2), RJ(246, 2), RJ(253, 2), RJ(256, 2, "a"), RJ(263, 2),
-  RT(269, 2),
+  RJ(211, 0), RJ(216, 0), RD(219, 0), RJ(226, 1), RJ(230, 1, "a"), RD(232, 1), RJ(240, 2), RJ(246, 2), RJ(253, 2), RJ(256, 2, "a"), RJ(259, 2, "a"), RJ(266, 2),
   RJ(283, 2), RD(285, 2), RJ(293, 3), RD(295, 3),
   RJ(303, 4), RJ(308, 4), RJ(314, 4), RJ(319, 4), RJ(325, 4), RG(325, 4), RU(337, 4),
   RT(341, 4), RJ(345, 4),
@@ -2129,7 +2129,7 @@ const FALLING_ROAD = {
     { id: "road", x: gk(64) - 3, y: RY.floor, platform: "road-floor", story: "Behind her the road fell away, stone by stone, keeping time.", tip: "Bounce as soon as you land: the road falls on the beat." },
     { id: "wave", x: gk(136) - 3, y: RY.roadShore2, platform: "road-shore-2", story: "Mars hung red ahead, and the road was falling toward it.", tip: "Jump on each tile, dive at the top onto the stone below, hop up again." },
     { id: "dive", x: gk(200) - 3, y: RY.diveShore2, platform: "dive-shore-2", story: "Two stones of the road had never been laid. She would have to fly those beats.", tip: "Jump on the tile and press the cape over the gap; take the stars to fly again." },
-    { id: "gap", x: gk(272, 2) - 3, y: RY.gapShore2, platform: "gap-shore-2", story: "Every star she caught gave the cape a little more of the sky.", tip: "Fly off the shore, take the stars along the flight, and fly again from the crack." },
+    { id: "gap", x: gk(272, 2) - 3, y: RY.gapShore, platform: "gap-shore", story: "Every star she caught gave the cape a little more of the sky.", tip: "Fly off the shore, take the stars along the flight, and fly again from the crack." },
     { id: "mars", x: gk(344, 4) - 3, y: RY.marsShore2, platform: "mars-shore-2", story: "The dust of Mars rose to meet her in a warm wind, and the road ran home along it.", tip: "Bounce on the beat, then jump twice up onto the plain." },
   ],
   startTip: "Bounce as soon as you land: the road falls on the beat.",
@@ -2139,6 +2139,13 @@ const FALLING_ROAD = {
   cascades: R_CASCADES,
   chains: R_CHAINS,
   great: R_GREAT,
+  // RESEARCH_REFILLS 3: the leaf need over the second missing tile's climb
+  // (at the double's top) and the cape need of the pair (on the crack's
+  // jump, the bar spent by the first flight).
+  refills: [
+    { id: "leaf-k1", kind: "leaf", x: gk(259, 2), y: RY.k1 - 190 - 36, required: true },
+    { id: "cape-ka", kind: "cape", x: gk(295, 3), y: RY.ka - 99.3 - 36, required: true },
+  ],
   moments: [],
   // The super-jump lock: a star on the high ledge over Mars's shore (drawn,
   // never collected; VIII's super jump reaches its like).
@@ -2171,7 +2178,7 @@ const FALLING_ROAD = {
       ],
     ],
     // No breeze hops and no tap down: the beacons' runs walked.
-    ability: R_PLAN_MAIN.filter(([x]) => ![[65, 0], [137, 0], [201, 0], [269, 2], [345, 4], [197, 0], [341, 4]].some(([k, F]) => Math.abs(x - gk(k, F) + 0.3) < 1)),
+    ability: R_PLAN_MAIN.filter(([x]) => ![[65, 0], [137, 0], [201, 0], [345, 4], [197, 0], [341, 4]].some(([k, F]) => Math.abs(x - gk(k, F) + 0.3) < 1)),
     safe: R_PLAN_MAIN,
   },
 };
