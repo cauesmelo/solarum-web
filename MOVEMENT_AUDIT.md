@@ -30,6 +30,27 @@ The campaign now opens with the rebuilt **I · Waking** (88 BPM) and the new **I
 - **The hang ends at touch-down:** a key still held from the jump before no longer slows a walk-off (level I's lookout and crown edges drop onto the grid).
 - **Verbs per level:** before I's GET there is no air jump (a late press waits in the buffer, U2); II's cape breathes (C1–C6).
 
+## Per-level numbers, eight levels (2026-11-10, after VII · The Falling Road)
+
+Re-measured with `node scripts/movement-audit.mjs arcs` and `windows` and `scripts/level-report.mjs` (main route, real units). Level VIII is still revision six's Far Door (interim) until the eighth stage is built; its row is that level's.
+
+| | I · Waking | II · The Gift | III · Still Water | IV · The Way Down | V · Breaking Constellation | VI · Borrowed Wind | VII · The Falling Road | VIII (interim Far Door) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| BPM, run px/s | 88, 222 | 94, 237 | 100, 252 | 107, 270 | 112, 283 | 118, 298 | 123, 310 | 128, 323 |
+| B5 apex (held), held height | 0.507 s, 121 px | 0.427, 106 | 0.401, 106 | 0.375, 106 | 0.358, 106 | 0.340, 106 | 0.326, 106 | 0.313, 106 |
+| B6 0 ms tap / hold; 50 ms tap | 0.228; 0.432 | 0.236; 0.484 | 0.236; 0.484 | 0.236; 0.484 | 0.236; 0.522 | 0.236; 0.522 | 0.236; 0.522 | 0.236; 0.559 |
+| F required actions (of all) | 20 / 23 | 21 / 25 | 24 / 26 | 27 / 33 | 35 / 45 | 25 / 46 | 37 / 61 | 29 / 36 |
+| F narrowest window, smallest early side | 618 ms, 385 | 332, 104 | 321, 98 | 300, 92 | 263, 72 | 204, 38 | 203, 51 | 300, 42 |
+| Median required window | 628 ms | 626 | 606 | 583 | 549 | 537 | 428 | — |
+| Edge lead (landscape / portrait) | 3.22 / 2.66 s | 2.54 / 2.03 | 2.40 / 1.92 | 2.25 / 1.80 | 2.23 / 1.74 | 2.06 / 1.78 | 2.06 / 1.56 | 2.21 / 1.71 |
+| Landing lead (landscape / portrait) | 2.60 / 2.06 s | 1.68 / 1.16 | 0.79 / 0.30 | 1.07 / 0.62 | 1.72 / 1.39 | 1.44 / 1.07 | 1.38 / 0.95 | 1.04 / 0.77 |
+| Inputs a bar (peak) | 1.21 (2) | 1.32 (3) | 1.55 (3) | 1.71 (4) | 1.96 (3) | 2.26 (3) | 2.52 (5) | — |
+| Largest beacon gap | 13.6 s | 10.7 | 11.7 | 9.8 | 10.7 | 10.2 | 9.5 | — |
+
+- **VII:** the narrowest window is the double on the *gap-song*'s last star over the second missing tile (a double pressed early rises away under the star; a late one overshoots the small tile d4). Every route wins at 30/60/120/240 Hz with 0 falls and 0 step-ups. Both of its required refill stars (RESEARCH_REFILLS) are touched lit on every route and rate.
+- **The cape press buffer (the milestone-A critic's item 1):** a cape press that cannot fly yet (an empty bar or inside a solar-wind column) now waits 0.14 s real and flies the tick it can (a refill in the air, a lit cape star, the column's edge); a touch-down drops it. This widens the early side of flights charged by a song or a star, and C1 counts such a press as empty only if it never flies.
+- **Not measured this round:** L6's sloppy-bot ladder (σ 40 / 100 ms) for VII, and the critic's late-press rescue and death-curve findings (II-VI), which are queued for the next round (SHARED_MEMORY handoff).
+
 ## Scorecard
 
 | # | Criterion | Before | After |
