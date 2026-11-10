@@ -1128,6 +1128,213 @@ const STILL = {
   },
 };
 
+/* ---- IV · The Way Down (107 BPM): the song at home; the dive ----
+ * RESEARCH_PROGRESSION 4.5 (IV). Clock 1, shared simulation physics; the
+ * glide is owned, the necklace (the GET on 44) gives the dive. Cells (dy at
+ * k/16 after a grid takeoff, up < 0; scripts/arcs.mjs on the interim III):
+ *   jump, cape 3, hold:            15: +36.7 (the warm-up)
+ *   a dive on a lid falls 127 px in 1.4/16: pressed 0.4/16 (56 ms) before
+ *   the grid its notes snap onto it and the landing is on the next one
+ *   (the score's quantiser only waits forward, at most 70 ms)
+ *   a dive from the air falls 427 px in 3/16; through a lid 77 px below
+ *   the dive's height it breaks it 1.18/16 in (the shards snap onto the
+ *   next eighth) and lands on the floor 276 px under the lid on the grid
+ *   jump, cape 3, dive 6:           7: +2.2 (the dive cuts the flight 3/16
+ *                                  in: +94.9 px instead of 113.55; without it
+ *                                  the flight runs on over the islet)
+ *   jump holding the cape, dive 8:  9: +84.2 (a dive cancels a glide)
+ *   jump, cape 3, dive 8:           9: +38.4
+ *   jump, cape 3, hold, dive 10:   11: +48.3
+ *   jump, jump 3, cape 6:          11: -160.4 (out of the broken well)
+ *   held hop 4: -79.9; jump, cape 3: 9: -16.8; jump, jump 3: 7: -160.2
+ * A grid x is wk(k, F, C): F completed flights, C flights a dive cut 3/16 in. */
+const WD_CUT = 94.9;
+const wk = (k, F = 0, C = 0) => 220 + 37.85 * k + 113.55 * F + WD_CUT * C;
+const wIsle4 = (id, landK, F, C, takeoffK, y, lead = 90) => [id, wk(landK, F, C) - lead, y, wk(takeoffK, F, C) + 10 - (wk(landK, F, C) - lead)];
+const DY = { gate: 62, lid: 99, floor: 226, islet: 228, shore: 148, rock: 232, cacheLid: 152, cache: 295, gateB: 135, brokenLid: 212, well: 488, wellShore: 328, ringGate: 412, ring1: 450, ring2: 534, ring3: 582, ringHigh: 422, plane: 460, lidWell: 702, gs3: 550 };
+const D_MAIN = [
+  ["uranus-gate", -700, DY.gate, wk(23) + 10 + 700],
+  // The glinting stone: the warm-up's flight and held cape land on 38, and
+  // from 42 the stone is a lid. The necklace wakes on 44, and a dive breaks
+  // the lid on 53.6 into the star row 127 px below (55). Running on, she
+  // crosses the lid and walks off the ledge after it at 60 onto the same floor.
+  ["glint-rock", wk(38, 1) - 81, DY.lid, wk(42, 1) - (wk(38, 1) - 81)],
+  ["glint-lid", wk(42, 1), DY.lid, 37.85 * 14, "lid"],
+  ["glint-ledge", wk(56, 1), DY.lid, wk(60, 1) + 6 - wk(56, 1)],
+  ["glint-floor", wk(42, 1), DY.floor, wk(76, 1) + 10 - wk(42, 1)],
+  // The need: jump 76, cape 79, dive 82 cuts the flight over the islet
+  // (lands 83); without the dive the flight runs on past its end (60 px
+  // after the landing) and the fall after it misses everything.
+  ["cut-islet", wk(83, 1, 1) - 80, DY.islet, 140],
+  // A held hop up 80 (84), then a jump holding the cape and a dive that
+  // cancels the glide onto the rock (96, 104, 105).
+  wIsle4("cut-shore", 88, 1, 1, 96, DY.shore, 70),
+  wIsle4("glide-rock", 105, 1, 1, 124, DY.rock, 80),
+  // The glint: a lid that holds a run (the cache under it is optional), a
+  // jump and a flight up 17 px off its end (136, 139).
+  wIsle4("cache-lid", 128, 1, 1, 136, DY.cacheLid, 70).concat("lid"),
+  wIsle4("broken-gate", 145, 2, 1, 164, DY.gateB, 90),
+  // The broken well: a jump and a flight (164, 167) over a long lid on a
+  // well deeper than a walk-off survives; the dive at 172 breaks the lid
+  // from the air and lands on the well's floor on 175 (a flight alone lands
+  // on the lid, and a dive there still opens it); out by jump, double and
+  // flight (185, 188, 191), 160 px up on 196.
+  ["broken-lid", wk(171, 3, 1), DY.brokenLid, 480, "lid"],
+  ["well-floor", wk(171, 3, 1), DY.well, wk(185, 3, 1) + 10 - wk(171, 3, 1)],
+  wIsle4("well-shore", 196, 4, 1, 204, DY.wellShore, 90),
+  // The way down into Uranus's rings: hold and dive, then fly and dive,
+  // hold and dive, fly, hold and dive.
+  wIsle4("ring-gate", 213, 4, 1, 228, DY.ringGate, 80),
+  wIsle4("ring-1", 237, 5, 1, 241, DY.ring1, 70),
+  wIsle4("ring-2", 250, 5, 1, 254, DY.ring2, 70),
+  // (Its lid, the well's lid, is optional: Great Star 2 is under it.)
+  wIsle4("ring-3", 265, 6, 1, 268, DY.ring3, 80),
+  ["ring-lid", wk(268, 6, 1) + 10, DY.ring3, 37.85 * 8, "lid"],
+  ["ring-3b", wk(276, 6, 1) + 10, DY.ring3, wk(292, 6, 1) + 10 - (wk(276, 6, 1) + 10)],
+  // Up again (a double, 292/295), then a jump, a flight and a dive down to
+  // the ring plane and the door (bar 22).
+  wIsle4("ring-high", 299, 6, 1, 302, DY.ringHigh, 80),
+  ["ring-plane", wk(311, 7, 1) - 80, DY.plane, wk(336, 7, 1) + 520 - (wk(311, 7, 1) - 80)],
+];
+const D_HIGH = [
+  // The star cache under the glint (Great Star 1); out by a double.
+  ["star-cache", wk(129, 1, 1), DY.cache, 37.85 * 9],
+  // The well under the ring lid (Great Star 2); out by a double onto ring-3b.
+  ["lid-well", wk(268, 6, 1) + 10, DY.lidWell, 37.85 * 9],
+  // Great Star 3's tiny islet: a dive early out of the held cape (261).
+  ["ring-islet", wk(261.6, 6, 1), DY.gs3, 37.85 * 1.4],
+];
+const atY = (y0, dy) => Math.round(y0 + dy - 36);
+const D_CHAINS = [
+  // The warm-up's flight and held cape.
+  { id: "warm-song", route: "low", stars: [...flightStars(26, 0, DY.gate, 3, false), ...[[32, -95.6], [34, -61.4]].map(([k, dy]) => [wk(k, 1) + 39.5, atY(DY.gate, dy)])] },
+  // On the glint's lid and the next jump's rise: complete on 138, before
+  // the flight off its end (139): the lid gives no breath.
+  { id: "glint-song", route: "low", stars: [[wk(132, 1, 1) + 39.5, DY.cacheLid - 40], [wk(134, 1, 1) + 39.5, DY.cacheLid - 40], [wk(137, 1, 1) + 39.5, atY(DY.cacheLid, -64.7)], [wk(138, 1, 1) + 39.5, atY(DY.cacheLid, -99.3)]] },
+  // The cache (upper only).
+  { id: "cache-song", route: "high", stars: [131, 132, 133, 134].map((k) => [wk(k, 1, 1) + 39.5, DY.cache - 40]) },
+  // In the broken well: on its floor and out along the jump and the double,
+  // complete on 190, before the flight (191).
+  { id: "well-song", route: "low", stars: [[wk(183, 3, 1) + 39.5, DY.well - 40], [wk(186, 3, 1) + 39.5, atY(DY.well, -64.7)], [wk(188, 3, 1) + 39.5, atY(DY.well, -104.3)], [wk(190, 3, 1) + 39.5, atY(DY.well, -190.3)]] },
+  // On ring-2 and the next jump's rise: complete on 256, before its flight
+  // (257), on the flight's own line (an optional flight before it cannot
+  // spend its charge).
+  { id: "ring-song", route: "low", stars: [[wk(251, 5, 1) + 39.5, DY.ring2 - 40], [wk(252, 5, 1) + 39.5, DY.ring2 - 40], [wk(255, 5, 1) + 39.5, atY(DY.ring2, -64.7)], [wk(256, 5, 1) + 39.5, atY(DY.ring2, -99.3)]] },
+  // On ring-high and the last jump's rise: complete on 304, before its flight (305).
+  { id: "plane-song", route: "low", stars: [[wk(300, 6, 1) + 39.5, DY.ringHigh - 40], [wk(301, 6, 1) + 39.5, DY.ringHigh - 40], [wk(303, 6, 1) + 39.5, atY(DY.ringHigh, -64.7)], [wk(304, 6, 1) + 39.5, atY(DY.ringHigh, -99.3)]] },
+];
+const D_GREAT = [
+  { id: "great-1", x: wk(133, 1, 1) + 20, y: DY.cache - 46, line: "the star cache under the glinting lid: dive" },
+  { id: "great-2", x: wk(272, 6, 1) + 20, y: DY.lidWell - 46, line: "under the ring's lid: dive, then jump twice out" },
+  { id: "great-3", x: wk(262, 6, 1) + 10, y: DY.gs3 - 40, line: "fly, hold the cape, then dive exactly onto the tiny islet" },
+];
+const DJ = (k, F, C, when = "g") => [wk(k, F, C) - 0.3, "jump", when];
+const DD = (k, F, C) => [wk(k, F, C) - 0.3, "dash", "a"];
+const DG = (k, F, C, when = "*") => [wk(k, F, C) - 0.3, "glide", when];
+const DU = (k, F, C, when = "g") => [wk(k, F, C) - 0.3, "unglide", when];
+const DV = (x, when = "a") => [x - 0.3, "dive", when];
+const D_PLAN_MAIN = [
+  DJ(23, 0, 0), DD(26, 0, 0), DG(26, 0, 0), DU(39, 1, 0),
+  // The safe first use: a dive breaks the glinting lid.
+  DV(wk(53.6, 1), "g"),
+  // The need: jump, cape, and the dive that cuts the flight 3/16 in.
+  DJ(76, 1, 0), DD(79, 1, 0), DV(wk(79, 1) + 3 * 69.69),
+  DJ(84, 1, 1),
+  DJ(96, 1, 1), DG(96, 1, 1), DV(wk(104, 1, 1)), DU(106, 1, 1),
+  DJ(124, 1, 1), DJ(136, 1, 1), DD(139, 1, 1),
+  // The broken well.
+  DJ(164, 2, 1), DD(167, 2, 1), DV(wk(172, 3, 1)), DJ(185, 3, 1), DJ(188, 3, 1, "a"), DD(191, 3, 1),
+  // The way down.
+  DJ(204, 4, 1), DG(204, 4, 1), DV(wk(212, 4, 1)), DU(214, 4, 1),
+  DJ(228, 4, 1), DD(231, 4, 1), DV(wk(236, 5, 1)),
+  DJ(241, 5, 1), DG(241, 5, 1), DV(wk(249, 5, 1)), DU(251, 5, 1),
+  DJ(254, 5, 1), DD(257, 5, 1), DG(257, 5, 1), DV(wk(264, 6, 1)), DU(266, 6, 1),
+  DJ(292, 6, 1), DJ(295, 6, 1, "a"),
+  DJ(302, 6, 1), DD(305, 6, 1), DV(wk(310, 7, 1)),
+];
+const WAY_DOWN = {
+  key: "way-down",
+  title: "The Way Down",
+  look: "uranus",
+  toward: "Uranus",
+  introduces: "dive",
+  bpm: 107,
+  clock: 1,
+  physics: {},
+  verbs: { double: true, cape: true, glide: true, dive: false, super: false },
+  gets: [{ id: "necklace", verb: "dive", x: wk(44, 1) }],
+  capeRule: "breath",
+  view: null,
+  level: { title: "The Way Down", speed: 270, startX: 220, startY: DY.gate, finishX: wk(336, 7, 1), finishY: DY.plane, beat: BEAT },
+  movements: [{ id: "IV", x: -1000, numeral: "IV", name: "The Way Down" }],
+  sections: [
+    { x: -1000, movement: "IV", step: "warm", name: "IV · The Way Down" },
+    { x: wk(36, 1), movement: "IV", step: "get", name: "IV · The Way Down — the necklace" },
+    { x: wk(64, 1), movement: "IV", step: "need", name: "IV · The Way Down — the cut" },
+    { x: wk(112, 1, 1), movement: "IV", step: "twist", name: "IV · The Way Down — the glint" },
+    { x: wk(152, 2, 1), movement: "IV", step: "twist", name: "IV · The Way Down — the broken well" },
+    { x: wk(216, 4, 1), movement: "IV", step: "conclude", name: "IV · The Way Down — the rings" },
+    { x: wk(311, 7, 1), movement: "IV", step: "coda", name: "IV · The Way Down — the ring plane" },
+  ],
+  // Beacons on half bars 5, 8, 10½, 14½ and 18½ (at most 9.8 s real apart).
+  checkpoints: [
+    { id: "down", x: wk(64, 1) - 3, y: DY.floor, platform: "glint-floor", story: "The stone at her throat woke, and showed her where the ground was thin.", tip: "Jump, press the cape near the top, then press down over the islet." },
+    { id: "glint", x: wk(112, 1, 1) - 3, y: DY.rock, platform: "glide-rock", story: "Where stars had fallen through, the stone still glinted.", tip: "Hold the cape off the edge, then press down to drop out of the float." },
+    { id: "broken", x: wk(152, 2, 1) - 3, y: DY.gateB, platform: "broken-gate", story: "Down was a way too. Uranus lay on its side, and so could she.", tip: "Fly over the long lid, then press down: only a dive opens the well." },
+    { id: "rings", x: wk(216, 4, 1) - 3, y: DY.ringGate, platform: "ring-gate", story: "Below her the rings of Uranus stood upright, like doors left open.", tip: "Fly, then press down onto each ring stone on the beat." },
+    { id: "plane", x: wk(280, 6, 1) - 3, y: DY.ring3, platform: "ring-3b", story: "One more ring, one more fall, and the plane of the rings held her.", tip: "Jump twice up, then fly and drop onto the plane." },
+  ],
+  startTip: "The necklace wakes on the glinting stone. Press down to break it.",
+  main: D_MAIN,
+  high: D_HIGH,
+  updrafts: [],
+  cascades: [],
+  chains: D_CHAINS,
+  great: D_GREAT,
+  // The necklace (RESEARCH_PROGRESSION 2.1): the eye-stone she has carried
+  // since II wakes over the glinting stone (44); a ring of light pulses from
+  // her chest and the lids glint from then on.
+  moments: [{ id: "necklace-wake", kind: "necklace", k: 44, target: "necklace" }],
+  decor: [{ id: "glint-stone", kind: "glint", x: wk(44, 1), y: DY.lid }],
+  prompts: [
+    { id: "p-break", glyph: ["down"], action: "dive", x: wk(52, 1), y: DY.lid - 150, from: wk(48, 1), to: wk(58, 1), inputX: wk(56, 1), optional: true, route: "main" },
+    { id: "p-cut", glyph: ["down"], action: "dive", x: wk(80, 1), y: DY.floor - 200, from: wk(79, 1) + 2 * 69.69, to: wk(83, 1, 1), inputX: wk(79, 1) + 3.4 * 69.69 },
+  ],
+  stars: [
+    // The star row the safe dive drops her onto.
+    ...[55, 57, 59, 61].map((k, i) => [`row-star-${i}`, wk(k, 1) + 33.5, DY.floor - 40, "low"]),
+    // Running stars after the beacons (the bar is full there anyway).
+    ...[[66, 1, 0, DY.floor], [69, 1, 0, DY.floor], [72, 1, 0, DY.floor], [114, 1, 1, DY.rock], [117, 1, 1, DY.rock], [120, 1, 1, DY.rock], [154, 2, 1, DY.gateB], [157, 2, 1, DY.gateB], [160, 2, 1, DY.gateB], [218, 4, 1, DY.ringGate], [221, 4, 1, DY.ringGate], [224, 4, 1, DY.ringGate], [282, 6, 1, DY.ring3], [285, 6, 1, DY.ring3], [288, 6, 1, DY.ring3], [316, 7, 1, DY.plane], [319, 7, 1, DY.plane], [322, 7, 1, DY.plane]].map(([k, F, C, y], i) => [`run-star-${i}`, wk(k, F, C) + 33.5, y - 40, "low"]),
+    // Two along the cut flight (loose: the held capes after it must not find a full bar).
+    ...[1, 2].map((j, i) => [`cut-star-${i}`, wk(79, 1) + 69.69 * j + 33.5, DY.floor - 141, "low"]),
+    // Along the held capes after their presses, the broken lid, the flights
+    // of the way down and the plane (loose: none before a held cape on its own).
+    ...[[98, 1, 1, DY.shore, -99.3], [100, 1, 1, DY.shore, -99.1], [102, 1, 1, DY.shore, -67.1], [177, 3, 1, DY.well, -4], [179, 3, 1, DY.well, -4], [206, 4, 1, DY.wellShore, -99.3], [208, 4, 1, DY.wellShore, -99.1], [210, 4, 1, DY.wellShore, -67.1], [243, 5, 1, DY.ring1, -99.3], [245, 5, 1, DY.ring1, -99.1], [247, 5, 1, DY.ring1, -67.1], [325, 7, 1, DY.plane, -4], [328, 7, 1, DY.plane, -4]].map(([k, F, C, y, dy], i) => [`line-star-${i}`, wk(k, F, C) + 33.5, atY(y, dy), "low"]),
+    ...[[231, 4, 1, DY.ringGate, 1], [231, 4, 1, DY.ringGate, 2], [257, 5, 1, DY.ring2, 1], [257, 5, 1, DY.ring2, 2]].map(([k, F, C, y, j], i) => [`flight-star-${i}`, wk(k, F, C) + 69.69 * j + 33.5, y - 141, "low"]),
+    // A star on each held hop's rise.
+    ...[[84, 1, 1, DY.islet], [124, 1, 1, DY.rock]].map(([k, F, C, y], i) => [`hop-star-${i}`, wk(k + 1, F, C) + 33.5, y - 64 - 36, "low"]),
+  ],
+  routes: {
+    main: D_PLAN_MAIN,
+    upper: [
+      ...D_PLAN_MAIN.filter(([x]) => x < wk(120, 1, 1)),
+      // Great Star 1: dive through the glint into the cache; out by jump,
+      // double and flight (the bar is full: no flight off the lid's end).
+      DJ(124, 1, 1), DV(wk(129.5, 1, 1), "g"), DJ(135, 1, 1), DJ(138, 1, 1, "a"), DD(141, 1, 1),
+      ...D_PLAN_MAIN.filter(([x]) => x > wk(160, 2, 1) && x < wk(252, 5, 1)),
+      // Great Star 3: fly, hold, dive early onto the tiny islet; walk off.
+      DJ(254, 5, 1), DD(257, 5, 1), DG(257, 5, 1), DV(wk(260.6, 6, 1)), DU(263, 6, 1),
+      // Great Star 2: dive through the ring's lid (120 px down), jump and
+      // jump again early (before the jump's top could pop her onto the lip).
+      DV(wk(269.5, 6, 1), "g"), DJ(273, 6, 1), DJ(275, 6, 1, "a"),
+      ...D_PLAN_MAIN.filter(([x]) => x > wk(290, 6, 1)),
+    ],
+    ability: D_PLAN_MAIN,
+    // The safe line: run on along the glinting lid and walk off its end.
+    safe: D_PLAN_MAIN.filter(([x, a]) => !(a === "dive" && x < wk(60, 1))),
+  },
+};
+
 /**
  * Open a level at `cut` and insert a section (RESEARCH_LEVELS: content, not
  * padding). Everything at x >= cut moves by (dx, dy): platforms, wind,
@@ -1663,7 +1870,7 @@ export const CAMPAIGN = Object.freeze(
     { stage: 1, key: "waking", title: "Waking", toward: "Home", bpm: 88, introduces: "double", look: "home", def: WAKING },
     { stage: 2, key: "gift", title: "The Gift", toward: "Pluto", bpm: 94, introduces: "cape", look: "pluto", def: GIFT },
     { stage: 3, key: "still-water", title: "Still Water", toward: "Neptune", bpm: 100, introduces: "glide", look: "neptune", def: STILL },
-    { stage: 4, key: "way-down", title: "The Way Down", toward: "Uranus", bpm: 107, introduces: "dive", look: "uranus", def: null },
+    { stage: 4, key: "way-down", title: "The Way Down", toward: "Uranus", bpm: 107, introduces: "dive", look: "uranus", def: WAY_DOWN },
     { stage: 5, key: "breaking", title: "The Breaking Constellation", toward: "Saturn", bpm: 112, introduces: "cracks", look: "saturn", def: null },
     { stage: 6, key: "borrowed-wind", title: "Borrowed Wind", toward: "Jupiter", bpm: 118, introduces: "wind", look: "jupiter", def: null },
     { stage: 7, key: "falling-road", title: "The Falling Road", toward: "Mars", bpm: 123, introduces: "cascade", look: "mars", def: null },

@@ -150,6 +150,19 @@ const STILL_SECTIONS = [
   { id: "shelf", from: 22, to: 22, cycle: [C["A/G"]] },
   { id: "coda", from: 23, to: Infinity },
 ];
+// IV · The Way Down: the soundtrack's own cycle (Bm | F#m D | F#m D | G)
+// from bar 3; the heartbeat rests while the necklace wakes and in the
+// broken well, keeps only its downbeat over the cut and the glint, and
+// beats on 1 and 3 in the rings.
+const WAY_SECTIONS = [
+  { id: "warm", from: 1, to: 2, pulse: false },
+  { id: "necklace", from: 3, to: 4, pulse: false },
+  { id: "down", from: 5, to: 7, downbeat: true },
+  { id: "glint", from: 8, to: 10, downbeat: true },
+  { id: "broken", from: 11, to: 13, pulse: false },
+  { id: "rings", from: 14, to: 20 },
+  { id: "coda", from: 21, to: Infinity },
+];
 const L1_CYCLE = [C["Bm(add9)"], C["Bm(add9)"], C["F#m7"], C.Dmaj7, C["F#m7"], C.Dmaj7, C.Gmaj7, C.Gmaj7];
 const L3_CYCLE = [C.Em9, C.A7sus4, C["Dmaj9/F#"], C["Gmaj7#11"]];
 // L3's twist (the broken well): the relative minor turns dark, Bm7 G A F#m.
@@ -287,6 +300,39 @@ const PRESETS = {
       "climb-song": [76, 79, 81, 83],
       // bars 20-21: Neptune's song falls and opens, B5 A5 G5 | D6.
       "neptune-song": [83, 81, 79, 86],
+    },
+  },
+  "way-down": {
+    bpm: 107, bars: 22, pickup: 0,
+    // IV · The Way Down, the song at home at its own tempo (RESEARCH_PROGRESSION
+    // 4.3): the soundtrack's cycle and a felt heartbeat. Restraint: no
+    // ticks and no shaker (the brief's sixteenths are left out), the
+    // heartbeat on 1 and 3 only in the rings; the dives, smashes and the
+    // descending lines are Diana's own.
+    groove: "heartbeat", maxFlat: 16, space: { seconds: 4.5, shimmer: 0.35 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
+    sections: WAY_SECTIONS,
+    chordAt(pos) {
+      const bar = barOf(Math.max(0, pos));
+      if (bar <= 2) return C.Bm;
+      if (bar <= 20) return CYCLE[(bar - 3) % 4][halfOf(pos)];
+      return C.Dadd9;
+    },
+    // The wake, the cut (bar 5), the well (bar 11) and the rings (bar 15);
+    // the theme closes from bar 20.
+    signalBars: [1, 5, 11, 15], closeFrom: 20,
+    phrases: {
+      // bars 2-3 (Bm): along the warm-up's flight and held cape, B4 D5 F#5 | E5 D5.
+      "warm-song": [71, 74, 78, 76, 74],
+      // bar 9 (F#m | D): over the glint, A5 F#5 | E5 D5.
+      "glint-song": [81, 78, 76, 74],
+      // bar 9 (F#m): the cache, C#5 E5 F#5 A5.
+      "cache-song": [73, 76, 78, 81],
+      // bar 12 (F#m | D): out of the well, C#5 | D5 F#5 A5.
+      "well-song": [73, 74, 78, 81],
+      // bar 16 (D, its second half): on ring-2 and up, D5 F#5 A5 B5.
+      "ring-song": [74, 78, 81, 83],
+      // bars 19-20 (Bm | F#m): up to the plane, B4 D5 F#5 | A5.
+      "plane-song": [71, 74, 78, 81],
     },
   },
   wind: {
@@ -813,7 +859,8 @@ export function createConductor(options = {}) {
       if (inBar === 12) bed({ layer: "pulse", voice: "shaker", dur: 0.08, gain: 0.4 * coda });
     } else if (grooveOn && P.groove === "heartbeat") {
       // A felt heartbeat on beats 1 and 3 (the half-time feel), a tick on 2 and 4.
-      if (inBar === 0 || inBar === 8) bed({ layer: "pulse", voice: "pulse", dur: 0.4, gain: (inBar === 0 ? 1 : 0.7) * coda });
+      // (A section may keep only the downbeat: IV's cut and glint.)
+      if (inBar === 0 || (inBar === 8 && !S.downbeat)) bed({ layer: "pulse", voice: "pulse", dur: 0.4, gain: (inBar === 0 ? 1 : 0.7) * coda });
       if ((inBar === 4 || inBar === 12) && S.shaker) bed({ layer: "pulse", voice: "shaker", dur: 0.06, gain: 0.62 });
     } else if (grooveOn && P.groove === "clave") {
       // Half-time backbeat on beat 3; the tresillo (3+3+2) on the rim and a
@@ -1122,6 +1169,10 @@ export function createConductor(options = {}) {
     st.melody = { step: -1, t: -9 };
     st.variation = st.falls;
     if (penalty) tuning.apply("respawn", { fallsHere });
+    // The bar the score restarts on is not a clean bar yet (a beacon on a
+    // downbeat used to heal the fall on its first tick).
+    st.lastBar = barOf(Math.round(target));
+    st.barErrors = 0;
     out.fx.push({ kind: "restart", pos: Math.round(target), bar: barOf(Math.round(target)) });
     return out;
   }

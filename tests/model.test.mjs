@@ -135,6 +135,7 @@ test("each main route reaches every beacon and uses its level's kit through publ
     1: { dash: 0, "double-jump": 5, constellations: 3 },
     2: { dash: 8, "double-jump": 2, constellations: 5 },
     [LEVEL_ID["still-water"]]: { dash: 9, "double-jump": 3, constellations: 6 },
+    [LEVEL_ID["way-down"]]: { dash: 8, dive: 1, "double-jump": 2, constellations: 5 },
     [LEVEL_ID.wind]: { dash: 5, "double-jump": 1, constellations: 3 },
     [LEVEL_ID.constellation]: { dash: 3, dive: 1, constellations: 2, cascade: true },
     [LEVEL_ID.door]: { dash: 4, "super-jump": 2, constellations: 1, cascade: true },
@@ -682,6 +683,7 @@ test("a beacon (or the level's start) sits right before the first required use o
     1: { tap: gx(90), "double-jump": gx(152) },
     2: { flight: 220 + 37.85 * 71 + 113.55, constellation: 220 + 37.85 * 167 + 113.55 * 3 + 39.5 },
     [LEVEL_ID["still-water"]]: { flight: gx(26), glide: 220 + 37.85 * 79 + 113.55, constellation: 220 + 37.85 * 266 + 113.55 * 6 + 39.5 },
+    [LEVEL_ID["way-down"]]: { flight: gx(26), dive: 220 + 37.85 * 79 + 113.55 + 3 * 69.69, constellation: 220 + 37.85 * 138 + 113.55 + 94.9 + 39.5 },
     [LEVEL_ID.wind]: { flight: 14982, constellation: 16157 + 37.85 * 35, updraft: 18047 + 37.85 * 35, glide: 21113.2, dive: 21491.7 + 37.85 * 64 },
     [LEVEL_ID.constellation]: { fragile: 7190, cascade: 11477.2, dive: 14925, flight: 14982 + 37.85 * 70, constellation: 16147 + 37.85 * 70 },
     [LEVEL_ID.door]: { "super-jump": gx(68) + 63.67, cascade: createLevel(LEVEL_ID.door).platforms.find((q) => q.id === "tile-0").x, constellation: 16147 - 6988.46 },
@@ -714,7 +716,7 @@ test("main-route gaps and rises respect each level's authoring limits", () => {
   // L1's float allows a 180 px double rise; L4's super jump climbs 235 px;
   // L2's long void is crossed by two flights around a refill constellation.
   // L3's broken well is left by jump, double jump and flight (606 px).
-  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID.wind]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID.constellation]: { rise: 165, gap: 400, long: { "well-bottom": 610 } }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
+  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.wind]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID.constellation]: { rise: 165, gap: 400, long: { "well-bottom": 610 } }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
   for (const n of IDS) {
     const chains = createLevel(n).pickups.filter((q) => q.chain);
     for (const [a, b] of mainPairs(n)) {
@@ -725,7 +727,7 @@ test("main-route gaps and rises respect each level's authoring limits", () => {
       if (gap <= 0 || windBetween(n, a, b) || lid) continue;
       const refill = chains.some((q) => q.x > a.x + a.width && q.x < b.x);
       assert.ok(rise <= limits[n].rise, `L${n} ${a.id}→${b.id} rise ${rise}`);
-      // (III: a held glide crosses up to 820 px.)
+      // (III: a held glide crosses up to 820 px; IV: 600.)
       assert.ok(gap <= (limits[n].long?.[a.id] ?? (refill && limits[n].void ? limits[n].void : limits[n].glide ?? limits[n].gap)), `L${n} ${a.id}→${b.id} gap ${gap}`);
       assert.ok(b.y - a.y <= 240, `L${n} ${a.id}→${b.id} drop`);
     }
@@ -736,6 +738,7 @@ test("no blind landings: every required landing is in view when the input that c
     1: [["tier-3", "stone-a"], ["hang-1", "rim-1"]],
     2: [["crater-floor", "gift-stone"]],
     [LEVEL_ID["still-water"]]: [["islet-gs2", "islet-2"], ["islet-1", "islet-2"]],
+    [LEVEL_ID["way-down"]]: [["star-cache", "broken-gate"], ["lid-well", "ring-3b"], ["ring-islet", "ring-3"]],
     [LEVEL_ID.wind]: [["lid-2", "star-cache"], ["finale-rock", "low-a"]],
     [LEVEL_ID.constellation]: [["chain-exit", "ridge-c"], ["crown-stair-2", "hearth"]],
     [LEVEL_ID.door]: [["school-shore", "storm-step"], ["lid", "well-floor"], ["finale-crack", "low-a"]],

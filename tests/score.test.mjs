@@ -55,6 +55,7 @@ test("every main route: each takeoff, landing, star, chain note, beacon and tile
     1: ["jump", "double-jump", "land", "star", "chain-note", "constellation", "checkpoint"],
     2: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID["still-water"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
+    [LEVEL_ID["way-down"]]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID.wind]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint"],
     [LEVEL_ID.constellation]: ["jump", "double-jump", "dash", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
     [LEVEL_ID.door]: ["jump", "dash", "super-jump", "land", "star", "chain-note", "constellation", "checkpoint", "tile-drop"],
@@ -262,6 +263,7 @@ test("a perfect run completes each level's song; a sloppy one does not; three Gr
     1: ["sky", "signal", "steps", "stars", "choir", "strings"],
     2: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID["still-water"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
+    [LEVEL_ID["way-down"]]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID.wind]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
     [LEVEL_ID.constellation]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings", "glass"],
     [LEVEL_ID.door]: ["sky", "signal", "pulse", "steps", "stars", "choir", "strings"],
@@ -376,7 +378,15 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   }
   const bar = (run, voice, b) => run.notes.filter((v) => v.voice === voice && v.event === "tick" && Math.floor(v.pos / BAR) + 1 === b).length;
   // (l2-l4: the interim levels, revision five's II-IV.)
-  const [l1, gift, still, l2, l3, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  const [l1, gift, still, way, l2, l3, l4] = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door].map((n) => musicRun({ level: n }));
+  // IV: the heartbeat rests while the necklace wakes and in the broken well,
+  // keeps its downbeat over the cut and beats 1 and 3 in the rings; no
+  // ticks, no shaker, no marimba.
+  assert.equal(bar(way, "pulse", 3), 0, "IV rests while the necklace wakes");
+  assert.equal(bar(way, "pulse", 6), 1);
+  assert.equal(bar(way, "pulse", 12), 0, "IV rests in the broken well");
+  assert.equal(bar(way, "pulse", 16), 2);
+  assert.equal(way.notes.filter((v) => v.voice === "shaker" || v.voice === "marimba").length, 0);
   // III: one soft brush on beat 4 (the shaker voice), from bar 5; nothing
   // on the downbeats, no heartbeat, no marimba.
   assert.equal(bar(still, "shaker", 3), 0, "III rests while the helper comes");
@@ -399,7 +409,7 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   assert.equal(bar(l4, "pulse", 5), 4);
   assert.equal(bar(l4, "marimba", 5), 8);
   // Each level its own space (RESEARCH_LEVELS 6): 5.5 s, 5.5, 3.5, 2.5.
-  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door];
-  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 5.5, 3.5, 2.5]);
-  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 15, 20, 20]);
+  const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.wind, LEVEL_ID.constellation, LEVEL_ID.door];
+  assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 4.5, 5.5, 3.5, 2.5]);
+  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 15, 20, 20]);
 });

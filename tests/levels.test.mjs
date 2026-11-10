@@ -18,7 +18,7 @@ import { LAYERS } from "../score.mjs";
 
 const SIX = 15 / 107;
 const BUILT = LEVELS.filter((d) => !d.interim);
-const [I, II, III] = BUILT;
+const [I, II, III, IV] = BUILT;
 /** The built stages that own the cape's breath (II on). */
 const BREATH = BUILT.filter((d) => d.capeRule === "breath" && (d.verbs.cape || d.gets.some((g) => g.verb === "cape")));
 /** RESEARCH_PROGRESSION 2.1: the verbs each stage starts with, in order. */
@@ -82,6 +82,9 @@ test("U3: without its GET the route wins up to the first required use and dies e
     [I, "main", "first-star", gx(152), gx(168)],
     [II, "safe", "gift", gk(68, 1), gk(80, 1)],
     [III, "main", "float", gk(76, 1), gk(96, 2)],
+    // IV's main route (the safe dive through the glinting lid is optional)
+    // dies at the cut: the flight runs on over the islet.
+    [IV, "main", "down", gk(79, 1), gk(100, 2)],
   ].filter(([d]) => d)) {
     const { s } = run({ ...d, gets: [] }, route);
     assert.equal(s.status, "dead", d.numeral);
@@ -213,7 +216,17 @@ function c1(d) {
       const plan = nom.plan.map((q, j) => (j === i ? [x - 0.01, q[1], "*"] : j > i && j < group ? [q[0] + dt * 270 * TICK, q[1], q[2]] : q));
       const empty = [];
       const s = game({ ...d, routes: { ...d.routes, main: plan } });
-      playRoute(api(s, { dash: (g, ready) => !ready && empty.push(Math.round(g.player.x)) }), { route: "main" });
+      const m = createRouteMemory("main");
+      const a = api(s, { dash: (g, ready) => !ready && empty.push(Math.round(g.player.x)) });
+      for (let t = 0; s.status === "running" && t < 120 * 120; t++) {
+        // A person who touches down before an airborne press of the shifted
+        // airtime (a late flight's held cape lands before its dive) simply
+        // does not make it; the pilot would wait for the next airtime.
+        if (s.player.grounded && m.i > i && m.i < group && plan[m.i][2] === "a") m.i = group;
+        const act = chooseAction(snapshot(s), m);
+        if (act) a[act]();
+        update(s, TICK, { glide: m.glide });
+      }
       assert.equal(s.status, "won", `${d.numeral} step ${i} shifted ${dt} ticks`);
       assert.deepEqual(empty, [], `${d.numeral} step ${i} shifted ${dt} ticks: a flight press on an empty bar`);
       shifted++;
