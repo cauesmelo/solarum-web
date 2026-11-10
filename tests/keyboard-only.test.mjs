@@ -196,3 +196,14 @@ test("createInk without a document is inert, and reduced motion never boils", ()
   assert.equal(live.boil(), 0, "nothing drawn, nothing to step");
   assert.equal(live.phase, 1, "but the phase advances (it is the clock)");
 });
+
+test("every element id game.js reads exists in the markup (a removed control must not leave a null behind)", async () => {
+  const js = await read("game.js"),
+    html = await read("index.html");
+  const ids = new Set([...js.matchAll(/\$\("([a-z][a-z0-9-]*)"\)/g)].map((q) => q[1]));
+  ids.delete("ink-noise"); // lives in the SVG defs, still in index.html
+  assert.ok(ids.size > 60, `${ids.size} ids read`);
+  const missing = [...ids].filter((id) => !html.includes(`id="${id}"`));
+  assert.deepEqual(missing, [], "ids game.js reads that index.html does not have");
+  assert.ok(html.includes('id="ink-noise"'));
+});

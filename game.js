@@ -102,7 +102,6 @@ let manifest = null,
   wonAt = -99,
   pace = 1, // Gentle pace multiplies every level's own clock (0.8)
   shake = 0,
-  turnHintShown = false,
   // The title's wake: Diana emerging from the earth under the sprout
   // (emergence.mjs). null on the plain title and once she runs.
   emergence = null,
@@ -168,10 +167,9 @@ function unlockAudio() {
 function setSound(on) {
   sound.on = on;
   writeSoundSetting(() => window.localStorage, on);
-  for (const id of ["sound", "pause-sound"]) {
-    $(id).setAttribute("aria-pressed", String(on));
-    $(id).classList.toggle("off", !on);
-  }
+  // (#sound is the title's badge, a hint for M; only the card's button is a pressed-state control.)
+  $("pause-sound").setAttribute("aria-pressed", String(on));
+  for (const id of ["sound", "pause-sound"]) $(id).classList.toggle("off", !on);
   setLabel($("pause-sound"), on ? "♫ Sound on" : "♫ Sound off");
   $("sound").setAttribute("aria-label", on ? "Sound on" : "Sound off");
   // The badge's drawn slash and the card button's outline follow the state.
@@ -258,11 +256,6 @@ function resize() {
   // Glyph discs keep about 20 css px of radius on small skies (a layout
   // constant: it changes on resize only, never per frame).
   signLayout = layoutScale(fit.cssHeight / H);
-  if (layout === "portrait" && !turnHintShown && ready) {
-    turnHintShown = true;
-    $("turn-hint").hidden = false;
-    setTimeout(() => ($("turn-hint").hidden = true), 4000);
-  }
   soilFraction = titleSoil();
   $("title-ui").style.setProperty("--title-soil", String(soilFraction));
   layoutStations();
