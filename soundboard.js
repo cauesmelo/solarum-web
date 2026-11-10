@@ -241,7 +241,7 @@ const STEMS = [
   ["stars", "Stars: loose stars climb the chord, constellations play their phrases and bloom", { kind: "main", from: 3, seconds: 18 }],
   ["choir", "Choir: four bars after each completed constellation", { kind: "main", from: 6, seconds: 14 }],
   ["strings", "Strings: jumps, doubles, dives, cape vowels and the wind's runs", { kind: "main", from: 4, seconds: 14 }],
-  ["glass", "Glass: the celesta arpeggio a lid smash earns (L3)", { kind: "main", from: 12, seconds: 12, level: 3 }],
+  ["glass", "Glass: the celesta arpeggio a lid smash earns (interim IV)", { kind: "main", from: 12, seconds: 12, level: 4 }],
   ["earth", "Earth: star dust and G# after a Great Star (mastery line)", { kind: "upper", from: 12, seconds: 10 }],
 ];
 for (const [layer, about, opts] of STEMS)

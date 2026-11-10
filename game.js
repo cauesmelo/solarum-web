@@ -14,7 +14,7 @@ import {
   capeReady,
   RULES,
 } from "./model.mjs";
-import { LEVELS, CARD, checkpointIndex, shownPrompts } from "./level.mjs";
+import { LEVELS, CARD, checkpointIndex, shownPrompts, readSave, writeSave } from "./level.mjs";
 import { characterLayers, frameForClip, footFor, clipFor } from "./animation.mjs";
 import {
   VIEW,
@@ -53,8 +53,8 @@ const INK = "#0c0c0f",
 const PROGRESS_KEY = "solarum.levels";
 function readProgress() {
   try {
-    const v = JSON.parse(window.localStorage.getItem(PROGRESS_KEY) || "null");
-    if (v && Number.isInteger(v.unlocked)) return { unlocked: Math.max(1, Math.min(LEVELS.length, v.unlocked)), great: v.great ?? {}, done: v.done ?? {} };
+    // level.mjs readSave: a version-1 save keeps its numeral, not its stars.
+    return readSave(JSON.parse(window.localStorage.getItem(PROGRESS_KEY) || "null"));
   } catch {
     /* storage blocked or corrupt: start fresh */
   }
@@ -62,7 +62,7 @@ function readProgress() {
 }
 function writeProgress() {
   try {
-    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(writeSave(progress)));
   } catch {
     /* storage blocked: progress lasts for this session */
   }

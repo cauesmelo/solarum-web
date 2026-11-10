@@ -19,24 +19,26 @@ export const CRACKED = new Set(LEVELS.flatMap((d) => createLevel(d).platforms.fi
 /** Where each beacon's challenge is (x range of the first airborne press to block). */
 const CHALLENGE = {
   1: { "first-star": [gx(152), gx(165)] },
-  2: { voids: [16000 + 37.85 * 35, 16700 + 37.85 * 35] },
-  3: { voids: [16000 + 37.85 * 70, 16700 + 37.85 * 70], broken: [15100, 15700] },
-  4: { storm: [gx(68), gx(76) + 130] },
+  2: { void: [220 + 37.85 * 100 + 113.55 * 2, 220 + 37.85 * 112 + 113.55 * 2] },
+  3: { voids: [16000 + 37.85 * 35, 16700 + 37.85 * 35] },
+  4: { voids: [16000 + 37.85 * 70, 16700 + 37.85 * 70], broken: [15100, 15700] },
+  5: { storm: [gx(68), gx(76) + 130] },
 };
 const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJump(s)) };
 /** A sloppy run of each level: one fall, one broken constellation and a few
  * grounded jumps pressed late (still on the island). */
 export const SLOPPY_RUNS = Object.freeze({
   1: { level: 1, failAt: ["first-star"], removeStars: ["first-song-2"], late: [[gx(34) - 1, gx(34) + 1, 14], [gx(168) - 1, gx(168) + 1, 12]] },
-  2: { level: 2, failAt: ["voids"], removeStars: ["flight-line-2"], late: [[19860, 19870, 10]] },
-  3: { level: 3, failAt: ["broken"], removeStars: ["split-song-1"], late: [[8090, 8100, 12]] },
-  4: { level: 4, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
+  2: { level: 2, failAt: ["void"], removeStars: ["first-flight-2"], late: [[gx(23) - 1, gx(23) + 1, 12], [gx(252) + 908.4 - 1, gx(252) + 908.4 + 1, 10]] },
+  3: { level: 3, failAt: ["voids"], removeStars: ["flight-line-2"], late: [[19860, 19870, 10]] },
+  4: { level: 4, failAt: ["broken"], removeStars: ["split-song-1"], late: [[8090, 8100, 12]] },
+  5: { level: 5, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
 });
-export const SLOPPY = SLOPPY_RUNS[2];
+export const SLOPPY = SLOPPY_RUNS[3];
 
 /** Calls onEvent(e, s) for every model event and onStep(s, glide) after every
  * step; returns the final state. Wake is the first event. */
-export function drive({ route = "main", level = 2, dt = 1 / 120, failAt = [], removeStars = [], late = [], maxSeconds = 160, onEvent, onStep } = {}) {
+export function drive({ route = "main", level = 3, dt = 1 / 120, failAt = [], removeStars = [], late = [], maxSeconds = 160, onEvent, onStep } = {}) {
   const s = createGame(2021, { level });
   if (removeStars.length) s.pickups = s.pickups.filter((q) => !removeStars.includes(q.id));
   let seen = s.eventSerial;
@@ -85,7 +87,7 @@ export function drive({ route = "main", level = 2, dt = 1 / 120, failAt = [], re
 
 // timeScale defaults to the level's clock, as in the game (tolerances and
 // caps are real milliseconds).
-export function musicRun({ gentle = false, level = 2, timeScale = levelDef(level).clock, ...options } = {}) {
+export function musicRun({ gentle = false, level = 3, timeScale = levelDef(level).clock, ...options } = {}) {
   const c = createConductor({ level, path: PATHS[level], cracked: CRACKED, gentle });
   const notes = [],
     fx = [],
@@ -121,7 +123,7 @@ export function musicRun({ gentle = false, level = 2, timeScale = levelDef(level
 
 /** Game frames at `fps` for renderRunOffline: wall time keeps running while
  * Diana falls apart and reforms (the simulation clock does not). */
-export function recordFrames({ fps = 60, level = 2, ...options } = {}) {
+export function recordFrames({ fps = 60, level = 3, ...options } = {}) {
   const frames = [];
   let wall = 0,
     events = [];
@@ -144,4 +146,4 @@ export function recordFrames({ fps = 60, level = 2, ...options } = {}) {
   return { frames, status: s.status, time: s.time, deaths: s.deaths };
 }
 
-export const beaconX = (id, level = 2) => levelDef(level).checkpoints.find((q) => q.id === id).x;
+export const beaconX = (id, level = 3) => levelDef(level).checkpoints.find((q) => q.id === id).x;
