@@ -1,7 +1,38 @@
+/** Clips that loop on screen; every other clip holds its last frame. */
+export const LOOPS = new Set(["idle", "run", "air", "sprout", "nocapeIdle", "nocapeRun", "nocapeAir"]);
+/** The original no-cape override clips (Animations/Diana/No Cape, applied by
+ * no-cape-diana.overrideController) for each model animation state. The
+ * model keeps its state names and durations; only the drawing changes. Their
+ * keyframe times are the archive's own: nocape-airbourne has 2 frames (the
+ * caped one 6), nocape-idle 1 (12), nocape-stop 10 (9) and
+ * nocape-hard-landing 14 (13, one more airborne frame first); the model's
+ * state durations (start 1/3 s, hard landing 13/12 s, stop 0.75 s) cut the
+ * longer ones a frame early, as Unity's transitions would. nocape-dash is
+ * the bodyDash sheet alone: no cape layer. */
+export const NOCAPE_CLIPS = Object.freeze({
+  idle: "nocapeIdle",
+  start: "nocapeStart",
+  run: "nocapeRun",
+  stop: "nocapeStop",
+  jump: "nocapeJump",
+  air: "nocapeAir",
+  softLanding: "nocapeSoftLanding",
+  hardLanding: "nocapeHardLanding",
+  dive: "nocapeDive",
+  dash: "nocapeDash",
+});
+/** The clip to draw for a model animation state in a sprite set ("cape" |
+ * "nocape"). A no-cape clip missing from the manifest falls back to the
+ * caped clip, so a partial extraction never draws nothing. */
+export function clipFor(manifest, name, set = "cape") {
+  if (set !== "nocape") return name;
+  const clip = NOCAPE_CLIPS[name];
+  return clip && manifest?.animations?.[clip] ? clip : name;
+}
 /** Sample original Unity keyframe times instead of globally cycling sprite grids. */
 export function frameForClip(manifest, name, age) {
   const clip = manifest.animations[name] || manifest.animations.air;
-  const loop = ["idle", "run", "air", "sprout"].includes(name);
+  const loop = LOOPS.has(name);
   const cursor = loop
     ? Math.max(0, age) % clip.duration
     : Math.min(Math.max(0, age), clip.duration - 1e-7);

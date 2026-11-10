@@ -11,8 +11,9 @@
  * The sprite set is a parameter: `SPRITE_SETS` maps the roles the emergence
  * needs (body: the frame that rises, start: the original start clip, run) to
  * manifest clip names. A level that starts without the cape names the
- * `nocape` set; until its sheets are extracted into the manifest, `resolveSet`
- * falls back to the cape set, so the emergence never draws a missing clip. */
+ * `nocape` set (the archive's no-cape override clips, extracted since the
+ * eight-level campaign); a manifest without them makes `resolveSet` fall
+ * back to the cape set, so the emergence never draws a missing clip. */
 
 /** Real-seconds beats. Full: 0.26 twitch + 0.42 rise + 0.30 look + 0.24 pop =
  * 1.22 s, then the model's 0.333 s `start` clip runs into the run: 1.55 s from

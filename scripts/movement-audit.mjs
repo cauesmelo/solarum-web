@@ -87,10 +87,28 @@ export const PLAY_CLIPS = {
 /** Run-cycle flight phases: both feet are off the ground by design (the
  * stride's float), so they are reported, not drawn lower (that would invert
  * the run's bob). Ids are sheet:frame. */
-export const STRIDE_FLOAT = new Set(["run:4", "run:9", "softLanding:4", "softLanding:9", "jumpLanding:13", "jumpLanding:18", "startStop:3"]);
-export function playFrames(manifest, table) {
+export const STRIDE_FLOAT = new Set([
+  "run:4", "run:9", "softLanding:4", "softLanding:9", "jumpLanding:13", "jumpLanding:18", "startStop:3",
+  // The no-cape sheets repeat the same strides (measured 5.9-7.1 px).
+  "nocapeRun:4", "nocapeRun:9", "nocapeSoftLanding:4", "nocapeSoftLanding:9", "nocapeJumpLanding:13", "nocapeJumpLanding:18", "nocapeStartStop:3",
+]);
+/** The no-cape set (level I wears no cape; animation.mjs NOCAPE_CLIPS): the
+ * same states on the archive's override clips. Its flight (nocapeDash) is
+ * the bodyDash sheet already checked under `dash`. */
+export const NOCAPE_PLAY_CLIPS = {
+  nocapeIdle: "ground",
+  nocapeStart: "ground",
+  nocapeRun: "ground",
+  nocapeStop: "ground",
+  nocapeSoftLanding: "ground",
+  nocapeHardLanding: "ground",
+  nocapeJump: "air",
+  nocapeAir: "air",
+  nocapeDive: "air",
+};
+export function playFrames(manifest, table, clips = PLAY_CLIPS) {
   const out = [];
-  for (const [clip, kind] of Object.entries(PLAY_CLIPS))
+  for (const [clip, kind] of Object.entries(clips))
     manifest.animations[clip].frames.forEach((q, i) => {
       const m = table.get(`${q.sheet}:${q.frame}`);
       out.push({ clip, index: i, kind, id: `${q.sheet}:${q.frame}`, ...m, stride: STRIDE_FLOAT.has(`${q.sheet}:${q.frame}`) });

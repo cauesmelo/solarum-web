@@ -17,6 +17,7 @@ import {
   readManifest,
   frameTable,
   playFrames,
+  NOCAPE_PLAY_CLIPS,
   belowSweep,
   approach,
   approachKinds,
@@ -311,6 +312,25 @@ test("C1: every frame Diana shows in play is drawn with its lowest pixel on the 
     assert.ok(f.bodyX1 - f.bodyX0 >= RULES.playerWidth, `${where}: body narrower than the collider`);
     assert.ok(-f.top >= RULES.playerHeight, `${where}: body shorter than the collider`);
   }
+});
+test("C1 (no cape): every no-cape frame Diana shows in play sits on the collider's feet (±2 px), except the same stride floats", () => {
+  // Level I wears no cape (RESEARCH_PROGRESSION 2.3): the archive's override
+  // clips, drawn exactly as the caped ones (bottom pivot, 0.42, baked foot).
+  const frames = playFrames(manifest, table, NOCAPE_PLAY_CLIPS);
+  assert.equal(frames.length, 62, `${frames.length} frames`);
+  for (const f of frames) {
+    const where = `${f.clip}[${f.index}] ${f.id}: toe ${f.residual.toFixed(1)} px above the feet`;
+    assert.ok(f.id.startsWith("nocape"), `${f.clip} draws a no-cape sheet (${f.id})`);
+    if (f.stride) assert.ok(f.residual > 4 && f.residual < 7.5, `${where} (a stride's float)`);
+    else assert.ok(Math.abs(f.residual) <= 2, where);
+    assert.ok(f.bodyX1 - f.bodyX0 >= RULES.playerWidth, `${where}: body narrower than the collider`);
+    // The stop's deepest crouch (45 px without the cape over her back) plays
+    // only in the door after the win, where nothing collides.
+    if (f.id === "nocapeStartStop:6") assert.ok(-f.top > 40 && f.clip === "nocapeStop");
+    else assert.ok(-f.top >= RULES.playerHeight, `${where}: body shorter than the collider`);
+  }
+  // Ground poses keep their bob: no foot baked into them.
+  for (const f of frames.filter((q) => NOCAPE_PLAY_CLIPS[q.clip] === "ground" && q.index > 1)) assert.equal(f.foot, 0, f.id);
 });
 test("C1/B12: from below onto every platform type of every level, nothing looks landed and falls, and nothing clearly short lands", () => {
   // The user's report: "it looks like you made it, but you don't go up".

@@ -2245,6 +2245,811 @@
     "height": 251,
     "frames": []
   },
+  "nocapeRun": {
+    "file": "assets/nocapeRun.png",
+    "source": "Sprites/Diana/No Cape/no-cape-diana-run.png",
+    "width": 1000,
+    "height": 400,
+    "frames": [
+      {
+        "x": 0.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "6639873029506642264"
+      },
+      {
+        "x": 200.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "6476262638803943596"
+      },
+      {
+        "x": 400.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "6235344851615802194"
+      },
+      {
+        "x": 600.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "3158810673063495168"
+      },
+      {
+        "x": 800.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-7322497276883477190"
+      },
+      {
+        "x": 0.0,
+        "y": 200.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "4404455919228020939"
+      },
+      {
+        "x": 200.0,
+        "y": 200.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "3487702985060057697"
+      },
+      {
+        "x": 400.0,
+        "y": 200.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "5569954701014326549"
+      },
+      {
+        "x": 600.0,
+        "y": 200.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-6285736054889292572"
+      },
+      {
+        "x": 800.0,
+        "y": 200.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-4560653313737614368"
+      }
+    ]
+  },
+  "nocapeIdle": {
+    "file": "assets/nocapeIdle.png",
+    "source": "Sprites/Diana/No Cape/no-cape-diana-idle.png",
+    "width": 1000,
+    "height": 601,
+    "frames": [
+      {
+        "x": 0.0,
+        "y": 1.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "4364670924644523845"
+      },
+      {
+        "x": 200.0,
+        "y": -2.99999999811007e-05,
+        "w": 200.0,
+        "h": 200.33333,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-8979051630248327075"
+      },
+      {
+        "x": 400.0,
+        "y": 1.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "2125382332188178604"
+      },
+      {
+        "x": 600.0,
+        "y": -2.99999999811007e-05,
+        "w": 200.0,
+        "h": 200.33333,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-154956644558288752"
+      },
+      {
+        "x": 800.0,
+        "y": 1.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "5020571952658750288"
+      },
+      {
+        "x": 0.0,
+        "y": 200.0,
+        "w": 200.0,
+        "h": 200.33333,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-8524542249956178153"
+      },
+      {
+        "x": 200.0,
+        "y": 201.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "6692204261089463751"
+      },
+      {
+        "x": 400.0,
+        "y": 200.0,
+        "w": 200.0,
+        "h": 200.33333,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "4672021378263305497"
+      },
+      {
+        "x": 600.0,
+        "y": 201.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "1235093383128605062"
+      },
+      {
+        "x": 800.0,
+        "y": 201.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "5823898379354619180"
+      },
+      {
+        "x": 0.0,
+        "y": 399.99999825000003,
+        "w": 200.0,
+        "h": 200.33333,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-5802315078868158130"
+      },
+      {
+        "x": 200.0,
+        "y": 401.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "233593428615021670"
+      }
+    ]
+  },
+  "nocapeAir": {
+    "file": "assets/nocapeAir.png",
+    "source": "Sprites/Diana/No Cape/no-cape-diana-airbourne.png",
+    "width": 1000,
+    "height": 600,
+    "frames": [
+      {
+        "x": 0.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "-6967092496232136060",
+        "foot": 35
+      },
+      {
+        "x": 200.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "7057390889364490272",
+        "foot": 35
+      },
+      {
+        "x": 400.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "-2227766446383838014"
+      },
+      {
+        "x": 600.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "5599859853744464226"
+      },
+      {
+        "x": 800.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "4929386717298022789"
+      },
+      {
+        "x": 0.0,
+        "y": 300.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "5554504359399515201"
+      }
+    ]
+  },
+  "nocapeDrop": {
+    "file": "assets/nocapeDrop.png",
+    "source": "Sprites/Diana/No Cape/no-cape-diana-drop.png",
+    "width": 1000,
+    "height": 400,
+    "frames": [
+      {
+        "x": 0.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "1352535642194571478",
+        "foot": 0
+      },
+      {
+        "x": 200.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-818923126444840904",
+        "foot": 0
+      },
+      {
+        "x": 400.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "8512096763870782124",
+        "foot": 0
+      },
+      {
+        "x": 600.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "5268960090043752210",
+        "foot": 3
+      },
+      {
+        "x": 800.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "2687435500292723463",
+        "foot": 4
+      },
+      {
+        "x": 0.0,
+        "y": 200.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "3037607742667166060",
+        "foot": 0
+      }
+    ]
+  },
+  "nocapeJumpLanding": {
+    "file": "assets/nocapeJumpLanding.png",
+    "source": "Sprites/Diana/No Cape/no-cape-diana-jump-hard-landing.png",
+    "width": 1000,
+    "height": 1000,
+    "frames": [
+      {
+        "x": 0.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "-3117803607394113440",
+        "foot": 0
+      },
+      {
+        "x": 200.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "5909816025204817446",
+        "foot": 15
+      },
+      {
+        "x": 400.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "-2402054178883450468",
+        "foot": 31
+      },
+      {
+        "x": 600.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "3734396784530766218",
+        "foot": 35
+      },
+      {
+        "x": 800.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "-5614546041348951141",
+        "foot": 36
+      },
+      {
+        "x": 0.0,
+        "y": 300.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "7388395802090568954",
+        "foot": 42
+      },
+      {
+        "x": 200.0,
+        "y": 300.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "1379445814662986412",
+        "foot": 28
+      },
+      {
+        "x": 400.0,
+        "y": 300.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "-26486038989512294"
+      },
+      {
+        "x": 600.0,
+        "y": 300.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "-4282452636700521775"
+      },
+      {
+        "x": 800.0,
+        "y": 300.0,
+        "w": 200.0,
+        "h": 300.0,
+        "pivotX": 0.5,
+        "pivotY": 0.333,
+        "sourceID": "-50272989307691307"
+      },
+      {
+        "x": 0.0,
+        "y": 600.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-8258733468183077087"
+      },
+      {
+        "x": 200.0,
+        "y": 600.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-1313268015587069865"
+      },
+      {
+        "x": 400.0,
+        "y": 600.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "5171656832487720812"
+      },
+      {
+        "x": 600.0,
+        "y": 600.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "2919125383433511911"
+      },
+      {
+        "x": 800.0,
+        "y": 600.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "181600182382127307"
+      },
+      {
+        "x": 0.0,
+        "y": 800.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "1197260405047406798"
+      },
+      {
+        "x": 200.0,
+        "y": 800.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "4534306758308774703"
+      },
+      {
+        "x": 400.0,
+        "y": 800.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "7880866643139198119"
+      },
+      {
+        "x": 600.0,
+        "y": 800.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "1189483784408303429"
+      }
+    ]
+  },
+  "nocapeSoftLanding": {
+    "file": "assets/nocapeSoftLanding.png",
+    "source": "Sprites/Diana/No Cape/no-cape-diana-soft-landing.png",
+    "width": 1000,
+    "height": 450,
+    "frames": [
+      {
+        "x": 0.0,
+        "y": 0.0,
+        "w": 200.0,
+        "h": 250.0,
+        "pivotX": 0.5,
+        "pivotY": 0.4,
+        "sourceID": "-4521805683979584335"
+      },
+      {
+        "x": 201.0,
+        "y": 50.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "7148805623237078957"
+      },
+      {
+        "x": 400.0,
+        "y": 50.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "5521677979531743859"
+      },
+      {
+        "x": 600.0,
+        "y": 50.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "9147926123647343739"
+      },
+      {
+        "x": 800.0,
+        "y": 50.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "6801776606379231677"
+      },
+      {
+        "x": 0.0,
+        "y": 250.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "8276941646595085827"
+      },
+      {
+        "x": 200.0,
+        "y": 250.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-1949389034954177113"
+      },
+      {
+        "x": 400.0,
+        "y": 250.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-2391071132072625128"
+      },
+      {
+        "x": 600.0,
+        "y": 250.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-8386750390983914255"
+      },
+      {
+        "x": 800.0,
+        "y": 250.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "7486420569020572694"
+      }
+    ]
+  },
+  "nocapeStartStop": {
+    "file": "assets/nocapeStartStop.png",
+    "source": "Sprites/Diana/No Cape/no-cape-diana-start-stop.png",
+    "width": 1000,
+    "height": 601,
+    "frames": [
+      {
+        "x": 0.0,
+        "y": 1.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-3613259267813632887"
+      },
+      {
+        "x": 200.0,
+        "y": 1.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "1325049049408859852"
+      },
+      {
+        "x": 400.0,
+        "y": 1.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-3488034912661984982"
+      },
+      {
+        "x": 600.0,
+        "y": 1.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-6639648376048838090"
+      },
+      {
+        "x": 800.0,
+        "y": 1.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "4376434125815085653"
+      },
+      {
+        "x": 0.0,
+        "y": 201.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "4831959296940382600"
+      },
+      {
+        "x": 200.0,
+        "y": 201.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "543428240796106784"
+      },
+      {
+        "x": 400.0,
+        "y": 201.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "5973523459381933307"
+      },
+      {
+        "x": 600.0,
+        "y": 201.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-6348626509346620089"
+      },
+      {
+        "x": 800.0,
+        "y": 201.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-4731720301144328618"
+      },
+      {
+        "x": 0.0,
+        "y": 401.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-4766992912474173074"
+      },
+      {
+        "x": 200.0,
+        "y": 401.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-7918695826841868908"
+      },
+      {
+        "x": 400.0,
+        "y": 401.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "-8366432360275867612"
+      },
+      {
+        "x": 600.0,
+        "y": 401.0,
+        "w": 200.0,
+        "h": 200.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "3361885172115372469"
+      },
+      {
+        "x": 800.0,
+        "y": 399.99999825000003,
+        "w": 200.0,
+        "h": 200.33333,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "sourceID": "2184877766877778788"
+      }
+    ]
+  },
+  "breathDisc": {
+    "file": "assets/breathDisc.png",
+    "source": "Sprites/UI/DianaCooldownCircle.png",
+    "width": 1080,
+    "height": 1080,
+    "frames": [],
+    "hud": true
+  },
+  "breathFrame": {
+    "file": "assets/breathFrame.png",
+    "source": "Sprites/UI/barrinha.png",
+    "width": 442,
+    "height": 250,
+    "frames": [],
+    "hud": true
+  },
+  "breathFill": {
+    "file": "assets/breathFill.png",
+    "source": "Sprites/UI/recheioBarra.png",
+    "width": 1080,
+    "height": 1080,
+    "frames": [],
+    "hud": true
+  },
+  "meteor": {
+    "file": "assets/meteor.png",
+    "source": "Sprites/UI/meteoroCheio.png",
+    "width": 1080,
+    "height": 1080,
+    "frames": [],
+    "hud": true
+  },
   "animations": {
     "run": {
       "source": "Animations/Diana/running.anim",
@@ -3127,6 +3932,466 @@
       "duration": 0.5833333666666666,
       "fps": 24.0,
       "loop": true
+    },
+    "nocapeRun": {
+      "source": "Animations/Diana/No Cape/nocape-running.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeRun",
+          "frame": 0
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "nocapeRun",
+          "frame": 1
+        },
+        {
+          "time": 0.16666667,
+          "sheet": "nocapeRun",
+          "frame": 2
+        },
+        {
+          "time": 0.25,
+          "sheet": "nocapeRun",
+          "frame": 3
+        },
+        {
+          "time": 0.33333334,
+          "sheet": "nocapeRun",
+          "frame": 4
+        },
+        {
+          "time": 0.41666666,
+          "sheet": "nocapeRun",
+          "frame": 5
+        },
+        {
+          "time": 0.5,
+          "sheet": "nocapeRun",
+          "frame": 6
+        },
+        {
+          "time": 0.5833333,
+          "sheet": "nocapeRun",
+          "frame": 7
+        },
+        {
+          "time": 0.6666667,
+          "sheet": "nocapeRun",
+          "frame": 8
+        },
+        {
+          "time": 0.75,
+          "sheet": "nocapeRun",
+          "frame": 9
+        }
+      ],
+      "duration": 0.8333333333333334,
+      "fps": 12.0,
+      "loop": true
+    },
+    "nocapeIdle": {
+      "source": "Animations/Diana/No Cape/nocape-idle.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeIdle",
+          "frame": 0
+        }
+      ],
+      "duration": 0.08333333333333333,
+      "fps": 12.0,
+      "loop": true
+    },
+    "nocapeAir": {
+      "source": "Animations/Diana/No Cape/nocape-airbourne.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeAir",
+          "frame": 0
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "nocapeAir",
+          "frame": 1
+        }
+      ],
+      "duration": 0.16666666933333332,
+      "fps": 12.0,
+      "loop": true
+    },
+    "nocapeDash": {
+      "source": "Animations/Diana/No Cape/nocape-dash.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "bodyDash",
+          "frame": 0
+        },
+        {
+          "time": 0.041666668,
+          "sheet": "bodyDash",
+          "frame": 1
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "bodyDash",
+          "frame": 2
+        },
+        {
+          "time": 0.125,
+          "sheet": "bodyDash",
+          "frame": 3
+        },
+        {
+          "time": 0.16666667,
+          "sheet": "bodyDash",
+          "frame": 4
+        },
+        {
+          "time": 0.25,
+          "sheet": "bodyDash",
+          "frame": 5
+        },
+        {
+          "time": 0.33333334,
+          "sheet": "bodyDash",
+          "frame": 6
+        },
+        {
+          "time": 0.41666666,
+          "sheet": "bodyDash",
+          "frame": 7
+        },
+        {
+          "time": 0.5,
+          "sheet": "bodyDash",
+          "frame": 8
+        },
+        {
+          "time": 0.5833333,
+          "sheet": "bodyDash",
+          "frame": 9
+        },
+        {
+          "time": 0.6666667,
+          "sheet": "bodyDash",
+          "frame": 10
+        },
+        {
+          "time": 0.75,
+          "sheet": "bodyDash",
+          "frame": 11
+        },
+        {
+          "time": 0.8333333,
+          "sheet": "bodyDash",
+          "frame": 12
+        },
+        {
+          "time": 0.9166667,
+          "sheet": "bodyDash",
+          "frame": 13
+        }
+      ],
+      "duration": 0.9583333666666666,
+      "fps": 24.0,
+      "loop": true
+    },
+    "nocapeDive": {
+      "source": "Animations/Diana/No Cape/nocape-drop-roll.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeDrop",
+          "frame": 0
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "nocapeDrop",
+          "frame": 1
+        },
+        {
+          "time": 0.16666667,
+          "sheet": "nocapeDrop",
+          "frame": 2
+        },
+        {
+          "time": 0.25,
+          "sheet": "nocapeDrop",
+          "frame": 3
+        },
+        {
+          "time": 0.33333334,
+          "sheet": "nocapeDrop",
+          "frame": 4
+        },
+        {
+          "time": 0.41666666,
+          "sheet": "nocapeDrop",
+          "frame": 5
+        }
+      ],
+      "duration": 0.49999999333333334,
+      "fps": 12.0,
+      "loop": true
+    },
+    "nocapeJump": {
+      "source": "Animations/Diana/No Cape/nocape-jump1.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeJumpLanding",
+          "frame": 0
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "nocapeJumpLanding",
+          "frame": 1
+        },
+        {
+          "time": 0.16666667,
+          "sheet": "nocapeJumpLanding",
+          "frame": 2
+        },
+        {
+          "time": 0.25,
+          "sheet": "nocapeJumpLanding",
+          "frame": 3
+        },
+        {
+          "time": 0.33333334,
+          "sheet": "nocapeJumpLanding",
+          "frame": 4
+        }
+      ],
+      "duration": 0.4166666733333333,
+      "fps": 12.0,
+      "loop": true
+    },
+    "nocapeSoftLanding": {
+      "source": "Animations/Diana/No Cape/nocape-soft-landing.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeSoftLanding",
+          "frame": 0
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "nocapeSoftLanding",
+          "frame": 1
+        },
+        {
+          "time": 0.16666667,
+          "sheet": "nocapeSoftLanding",
+          "frame": 2
+        },
+        {
+          "time": 0.25,
+          "sheet": "nocapeSoftLanding",
+          "frame": 3
+        },
+        {
+          "time": 0.33333334,
+          "sheet": "nocapeSoftLanding",
+          "frame": 4
+        },
+        {
+          "time": 0.41666666,
+          "sheet": "nocapeSoftLanding",
+          "frame": 5
+        },
+        {
+          "time": 0.5,
+          "sheet": "nocapeSoftLanding",
+          "frame": 6
+        },
+        {
+          "time": 0.5833333,
+          "sheet": "nocapeSoftLanding",
+          "frame": 7
+        },
+        {
+          "time": 0.6666667,
+          "sheet": "nocapeSoftLanding",
+          "frame": 8
+        },
+        {
+          "time": 0.75,
+          "sheet": "nocapeSoftLanding",
+          "frame": 9
+        }
+      ],
+      "duration": 0.8333333333333334,
+      "fps": 12.0,
+      "loop": true
+    },
+    "nocapeHardLanding": {
+      "source": "Animations/Diana/No Cape/nocape-hard-landing.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeJumpLanding",
+          "frame": 5
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "nocapeJumpLanding",
+          "frame": 6
+        },
+        {
+          "time": 0.16666667,
+          "sheet": "nocapeJumpLanding",
+          "frame": 7
+        },
+        {
+          "time": 0.25,
+          "sheet": "nocapeJumpLanding",
+          "frame": 8
+        },
+        {
+          "time": 0.33333334,
+          "sheet": "nocapeJumpLanding",
+          "frame": 9
+        },
+        {
+          "time": 0.41666666,
+          "sheet": "nocapeJumpLanding",
+          "frame": 10
+        },
+        {
+          "time": 0.5,
+          "sheet": "nocapeJumpLanding",
+          "frame": 11
+        },
+        {
+          "time": 0.5833333,
+          "sheet": "nocapeJumpLanding",
+          "frame": 12
+        },
+        {
+          "time": 0.6666667,
+          "sheet": "nocapeJumpLanding",
+          "frame": 13
+        },
+        {
+          "time": 0.75,
+          "sheet": "nocapeJumpLanding",
+          "frame": 14
+        },
+        {
+          "time": 0.8333333,
+          "sheet": "nocapeJumpLanding",
+          "frame": 15
+        },
+        {
+          "time": 0.9166667,
+          "sheet": "nocapeJumpLanding",
+          "frame": 16
+        },
+        {
+          "time": 1.0,
+          "sheet": "nocapeJumpLanding",
+          "frame": 17
+        },
+        {
+          "time": 1.0833334,
+          "sheet": "nocapeJumpLanding",
+          "frame": 18
+        }
+      ],
+      "duration": 1.1666667333333332,
+      "fps": 12.0,
+      "loop": true
+    },
+    "nocapeStart": {
+      "source": "Animations/Diana/No Cape/nocape-start.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeStartStop",
+          "frame": 0
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "nocapeStartStop",
+          "frame": 1
+        },
+        {
+          "time": 0.16666667,
+          "sheet": "nocapeStartStop",
+          "frame": 2
+        },
+        {
+          "time": 0.25,
+          "sheet": "nocapeStartStop",
+          "frame": 3
+        }
+      ],
+      "duration": 0.3333333333333333,
+      "fps": 12.0,
+      "loop": true
+    },
+    "nocapeStop": {
+      "source": "Animations/Diana/No Cape/nocape-stop.anim",
+      "frames": [
+        {
+          "time": 0.0,
+          "sheet": "nocapeStartStop",
+          "frame": 5
+        },
+        {
+          "time": 0.083333336,
+          "sheet": "nocapeStartStop",
+          "frame": 6
+        },
+        {
+          "time": 0.16666667,
+          "sheet": "nocapeStartStop",
+          "frame": 7
+        },
+        {
+          "time": 0.25,
+          "sheet": "nocapeStartStop",
+          "frame": 8
+        },
+        {
+          "time": 0.33333334,
+          "sheet": "nocapeStartStop",
+          "frame": 9
+        },
+        {
+          "time": 0.41666666,
+          "sheet": "nocapeStartStop",
+          "frame": 10
+        },
+        {
+          "time": 0.5,
+          "sheet": "nocapeStartStop",
+          "frame": 11
+        },
+        {
+          "time": 0.5833333,
+          "sheet": "nocapeStartStop",
+          "frame": 12
+        },
+        {
+          "time": 0.6666667,
+          "sheet": "nocapeStartStop",
+          "frame": 13
+        },
+        {
+          "time": 0.75,
+          "sheet": "nocapeStartStop",
+          "frame": 14
+        }
+      ],
+      "duration": 0.8333333333333334,
+      "fps": 12.0,
+      "loop": true
     }
   },
   "music": {
@@ -3188,13 +4453,29 @@
       "tailStar": "updraft wind streaks and Great Star tails",
       "font": "assets/solarum.ttf for every label",
       "music": "soundtrack after the wake gesture",
-      "sound": "every effect is synthesised in audio.mjs (D major, the soundtrack key); no sample files are loaded"
+      "sound": "every effect is synthesised in audio.mjs (D major, the soundtrack key); no sample files are loaded",
+      "nocapeRun": "Diana running before the cape is hers (a level whose verbs lack the cape)",
+      "nocapeIdle": "no-cape rest and the no-cape emergence from the soil",
+      "nocapeAir": "no-cape airborne",
+      "nocapeDrop": "no-cape dive roll (only if a level grants the dive before the cape)",
+      "nocapeJumpLanding": "no-cape takeoff and hard landing",
+      "nocapeSoftLanding": "no-cape soft landing",
+      "nocapeStartStop": "no-cape wake / respawn start and victory stop",
+      "breathDisc": "HUD breath bar: the disc at the bar's left end while the cape is charging",
+      "breathFrame": "HUD breath bar: the hand-drawn frame",
+      "breathFill": "HUD breath bar: the fill, clipped to the cape's charge",
+      "meteor": "HUD breath bar: the disc once the cape is full (the gift is ready), with one ring pulse"
     },
     "archiveOnly": {
       "title": "fulltitle composition; the title is rebuilt from its own logo and ground layers so the sprout can animate",
       "undercape": "no original clip references it",
       "jump-landing.png": "byte-identical duplicate of jumpLanding.png left by an earlier pass; not referenced and excluded from the itch ZIP",
-      "sfx": "assets/sfx/*.wav (Jump, Dash, star, death, successLevel, select): kept for provenance; replaced by procedural cues and excluded from the itch ZIP"
+      "sfx": "assets/sfx/*.wav (Jump, Dash, star, death, successLevel, select): kept for provenance; replaced by procedural cues and excluded from the itch ZIP",
+      "No Cape/running.anim": "a stray copy of nocape-running.anim in the sprite folder (not referenced by the override controller); not extracted"
+    },
+    "meaningsNotUsed": {
+      "meteor": "In the original HUD the full meteor marked the star quota (a flight cost collected stars). Here it only means \"the cape is full\"; stars never gate a flight (RESEARCH_PROGRESSION 3.1, C4)",
+      "breathDisc": "DianaCooldownCircle was the original cooldown timer disc; the bar now fills by running (breath), not by a timer"
     }
   }
 }

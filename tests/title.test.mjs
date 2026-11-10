@@ -44,21 +44,22 @@ test("reduced motion: a short rise without shiver, hop or crumbs", () => {
     assert.ok(e.depth >= 0, "no hop above the soil");
   }
 });
-test("the sprite set is a parameter; the no-cape set falls back to the cape clips until it is extracted", () => {
+test("the sprite set is a parameter; the extracted no-cape set is used, and falls back to the cape clips if missing", () => {
   const cape = resolveSet(manifest, "cape");
   assert.equal(cape.fallback, false);
   for (const role of ["body", "start", "run"]) assert.ok(manifest.animations[cape[role]], `cape ${role}`);
-  // Today the manifest has no no-cape sheets: the emergence still draws real clips.
+  // The archive's no-cape sheets are extracted: the emergence draws them.
   const now = resolveSet(manifest, "nocape");
-  assert.equal(now.name, "cape");
-  assert.equal(now.fallback, true);
-  // Once extracted under the names the set expects, it is used as is.
-  const withNoCape = { ...manifest, animations: { ...manifest.animations } };
-  for (const clip of Object.values(SPRITE_SETS.nocape)) withNoCape.animations[clip] = manifest.animations.idle;
-  const later = resolveSet(withNoCape, "nocape");
-  assert.equal(later.name, "nocape");
-  assert.equal(later.fallback, false);
-  assert.equal(later.body, "nocapeIdle");
+  assert.equal(now.name, "nocape");
+  assert.equal(now.fallback, false);
+  assert.equal(now.body, "nocapeIdle");
+  for (const role of ["body", "start", "run"]) assert.ok(manifest.animations[now[role]], `no-cape ${role}`);
+  // A manifest without them (an older extraction) still draws real clips.
+  const without = { ...manifest, animations: { ...manifest.animations } };
+  for (const clip of Object.values(SPRITE_SETS.nocape)) delete without.animations[clip];
+  const old = resolveSet(without, "nocape");
+  assert.equal(old.name, "cape");
+  assert.equal(old.fallback, true);
 });
 
 /* ---------- title, pause and victory UI (static contract) ---------- */

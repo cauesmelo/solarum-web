@@ -17,7 +17,20 @@ const SCALE = 0.42;
  * clips keep their stride bob. The flight body (`dash`, sheet bodyDash) draws
  * its toe 2.5-3.8 px above the feet in frames 4-12 (MOVEMENT_AUDIT C1: more
  * than the 2 px allowed), so it is baked too; its cape layer moves with it. */
-export const AIRBORNE = { jump: "all", air: "all", hardLanding: [0], dash: "all" };
+export const AIRBORNE = {
+  jump: "all",
+  air: "all",
+  hardLanding: [0],
+  dash: "all",
+  // The no-cape set (level I): the same poses on their own sheets. Its hard
+  // landing starts one frame earlier (sheet frame 5, still in the air), so
+  // its first two frames are airborne; its drop roll lifts the toe 2.5-3.8 px
+  // in frames 3-4 (the caped roll only 0.8-1.3), so the whole roll is baked.
+  nocapeJump: "all",
+  nocapeAir: "all",
+  nocapeHardLanding: [0, 1],
+  nocapeDive: "all",
+};
 
 export async function measure(manifest) {
   const out = {};
@@ -38,7 +51,7 @@ export async function measure(manifest) {
 export function airborneFrames(manifest) {
   const set = new Map();
   for (const [clip, which] of Object.entries(AIRBORNE)) {
-    const frames = manifest.animations[clip].frames;
+    const frames = manifest.animations[clip]?.frames ?? [];
     frames.forEach((q, i) => {
       if (which === "all" || which.includes(i)) set.set(`${q.sheet}:${q.frame}`, { sheet: q.sheet, frame: q.frame, clip });
     });
