@@ -32,16 +32,22 @@
         ></canvas>
       </section>
 
-      <!-- Title: the original logo above the original title ground (canvas). -->
+      <!-- Title: the original logo above the original title ground (canvas),
+           the sprout in the soil, and one opaque ink panel on the ground: wake,
+           the orbit line of levels (built from LEVELS) and the selected level. -->
       <div class="title-ui" id="title-ui">
         <img class="logo" src="./assets/logo.png" alt="Solarum" width="1217" height="254" />
-        <div class="wake-block">
-          <button id="start" class="wake" type="button" disabled>
-            <span id="start-label">Gathering the stars…</span>
-          </button>
-          <p class="keys" id="title-keys" aria-hidden="true">↑ jump · → cape · ↓ dive</p>
-          <!-- The orbit map: four levels, opened in order (progress is saved). -->
-          <nav class="level-map" id="level-map" aria-label="Levels"></nav>
+        <div class="wake-block" id="wake-block">
+          <div class="title-panel" id="title-panel">
+            <button id="start" class="wake" type="button" disabled>
+              <span id="start-label">Gathering the stars…</span>
+            </button>
+            <nav class="level-map" id="level-map" aria-label="Levels">
+              <ol class="stations" id="stations"></ol>
+              <p class="station-info" id="station-info" aria-live="polite"></p>
+            </nav>
+            <p class="keys" id="title-keys" aria-hidden="true">↑ jump · → cape · ↓ dive</p>
+          </div>
           <p class="load-error" id="load-error" hidden>
             The stars could not be gathered.
             <button id="reload" class="ink-btn small" type="button">Try again</button>
@@ -98,6 +104,7 @@
               <button id="resume" class="ink-btn primary" type="button">Continue</button>
               <button id="back-to-light" class="ink-btn" type="button">Back to last light</button>
               <button id="restart-chapter" class="ink-btn" type="button">Restart level</button>
+              <button id="main-menu" class="ink-btn" type="button">Main menu</button>
             </div>
             <div class="row">
               <button id="pause-sound" class="ink-btn small" type="button" aria-pressed="true">♫ Sound</button>
@@ -140,7 +147,6 @@
         <div class="row">
           <button id="continue" class="ink-btn primary" type="button">Continue</button>
           <button id="again" class="ink-btn" type="button">Retry</button>
-          <button id="to-title" class="ink-btn" type="button">Title</button>
         </div>
       </div>
 

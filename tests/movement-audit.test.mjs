@@ -219,7 +219,8 @@ test("A3: presses at landing, respawn, pause and level start are honoured or ign
   // The browser layer: auto-repeat never jumps again; the wake press only wakes.
   const js = await read("game.js");
   assert.match(js, /if \(e\.repeat\) return;/);
-  assert.match(js, /state\.status === "ready" && \["Space", "Enter", "ArrowUp", "KeyW"\]\.includes\(e\.code\)\) return wake\(\)/);
+  // (The wake press starts Diana's emergence; a second press only skips it.)
+  assert.match(js, /state\.status === "ready" && \["Space", "Enter", "ArrowUp", "KeyW"\]\.includes\(e\.code\)\) return pressWake\(\)/);
   assert.match(js, /addEventListener\("blur", \(\) => \{[^}]*releaseJump\(state\)/);
 });
 

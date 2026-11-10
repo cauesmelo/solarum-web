@@ -216,6 +216,12 @@ button:disabled {
 }
 
 /* ---------- title ---------- */
+/* Hierarchy: the logo in the sky, Diana's sprout on the soil line, and one
+ * opaque ink panel on the cream ground (wake, the orbit line of levels, the
+ * selected level). game.js frames the soil at --title-soil of the stage
+ * height for every level, so the composition never moves with the level,
+ * and the world (stars, glyphs, beacons) is hidden on the title: nothing in
+ * the sky can draw over or show through the options. */
 .title-ui {
   position: absolute;
   left: 0;
@@ -225,12 +231,13 @@ button:disabled {
   z-index: 6;
   pointer-events: none;
   text-align: center;
+  --title-soil: 0.6;
 }
 .title-ui .logo {
   position: absolute;
   left: 50%;
-  top: 13%;
-  width: min(60%, 600px);
+  top: 11%;
+  width: min(60%, 600px, calc(var(--stage-h) * 1.1));
   height: auto;
   transform: translateX(-50%);
   transition:
@@ -242,97 +249,228 @@ button:disabled {
   position: absolute;
   left: 0;
   right: 0;
-  top: 47%;
+  top: calc(var(--stage-h) * var(--title-soil) + 18px);
   display: grid;
   justify-items: center;
   gap: 6px;
+  padding: 0 16px;
   transition: opacity 0.3s ease;
 }
-.wake {
+.title-panel {
   pointer-events: auto;
-  min-height: 48px;
-  padding: 6px 22px;
-  border: 0;
-  border-radius: 24px;
-  background: none;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(100%, 680px);
+  padding: 14px 22px 12px;
+  background: var(--ink);
   color: var(--paper);
-  font-size: 24px;
-  text-shadow:
-    0 0 6px var(--ink),
-    0 0 2px var(--ink);
-  animation: pulse 1.2s ease-in-out infinite alternate;
+  border-radius: 22px 26px 20px 24px / 24px 20px 26px 22px;
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 6px 0 rgba(119, 119, 113, 0.55);
+}
+.title-panel::before {
+  /* The paper frame: the same hand-drawn wobble as the cards, inverted. */
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 2px solid var(--paper);
+  border-radius: 18px 22px 16px 20px / 20px 16px 22px 18px;
+  filter: var(--wobble);
+  pointer-events: none;
+}
+.wake {
+  position: relative;
+  min-height: 48px;
+  padding: 6px 26px 7px;
+  border: 0;
+  border-radius: 24px 26px 22px 25px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--paper);
+}
+.wake::after {
+  /* A slow breath of light around the button instead of fading its text. */
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(251, 251, 234, 0.5);
+  animation: breathe 1.6s ease-in-out infinite alternate;
+  pointer-events: none;
 }
 .wake:disabled {
-  animation: none;
   opacity: 0.75;
 }
-@keyframes pulse {
+.wake:disabled::after {
+  animation: none;
+}
+@keyframes breathe {
   from {
-    opacity: 0.5;
+    box-shadow: 0 0 0 0 rgba(251, 251, 234, 0.45);
   }
   to {
-    opacity: 1;
+    box-shadow: 0 0 0 7px rgba(251, 251, 234, 0);
   }
 }
 .keys {
   margin: 0;
   color: var(--mute);
-  font-size: 18px;
-  text-shadow: 0 0 4px var(--ink);
+  font-size: 16px;
 }
-/* The orbit map on the title: four ink stations on one line, each with its
- * numeral, name and three Great Star slots. Locked stations are faint. */
+/* The orbit line: one numbered station per level (built from LEVELS, so it
+ * holds 8-10 as well as 4), joined by the dotted orbit and ending at Earth.
+ * The selected level's name and Great Star slots are shown once, below. */
 .level-map {
-  pointer-events: auto;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+.stations {
+  --link: 14px;
+  /* Rows wrap at the width game.js sets (whole stops per row, plus room for
+   * Earth after the last), each row centred. */
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px 10px;
-  margin-top: 6px;
-  max-width: min(92vw, 760px);
+  row-gap: 16px;
+  max-width: 100%;
+  margin: 0;
+  padding: 14px 0 0;
+  list-style: none;
 }
-.station {
+.stations li {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+/* The dotted orbit between stations; solid where both ends are done. */
+.stations li + li:not(.row-start)::before {
+  content: "";
+  width: var(--link, 14px);
+  border-top: 2px dotted var(--dim);
+  margin: 0 2px;
+}
+.stations li.travelled:not(.row-start)::before {
+  border-top-style: solid;
+  border-top-color: var(--hill);
+}
+.earth-end {
+  display: flex;
+  align-items: center;
+}
+.earth-end::before {
+  content: "";
+  width: 12px;
+  border-top: 2px dotted var(--dim);
+  margin: 0 2px;
+}
+.earth-end i {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--earth);
+  box-shadow: 0 0 0 2px var(--paper);
+}
+.stop {
+  position: relative;
   display: grid;
-  justify-items: center;
-  gap: 0;
-  min-width: 120px;
-  min-height: 48px;
-  padding: 4px 10px 2px;
-  border: 2px solid rgba(251, 251, 234, 0.45);
-  border-radius: 14px;
-  background: rgba(12, 12, 15, 0.55);
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2.5px solid var(--paper);
+  border-radius: 50%;
+  background: var(--ink);
   color: var(--paper);
-  font: inherit;
-  cursor: pointer;
-}
-.station .numeral {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
 }
-.station .name {
+.stop[aria-pressed="true"] {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--paper);
+}
+/* Diana's two leaves above the selected station (the HUD's marker). */
+.stop .leaves {
+  position: absolute;
+  left: 50%;
+  top: -15px;
+  width: 22px;
+  height: 14px;
+  transform: translateX(-50%);
+  fill: var(--paper);
+  visibility: hidden;
+}
+.stop[aria-pressed="true"] .leaves {
+  visibility: visible;
+}
+/* A finished level keeps a small filled star at its rim. */
+.stop.done::after {
+  content: "";
+  position: absolute;
+  right: -7px;
+  bottom: -6px;
+  width: 22px;
+  height: 22px;
+  background: url("./assets/star.png") no-repeat;
+  background-size: 88px 44px;
+  background-position: -44px 0;
+}
+/* Locked: a dashed dim ring and a muted numeral. Still readable (--mute on
+ * ink is 8.6:1) and focusable, so its name can be previewed, but it does not
+ * open. */
+.stop[aria-disabled="true"] {
+  border-style: dashed;
+  border-color: var(--dim);
+  color: var(--mute);
+  cursor: default;
+}
+.stop:focus-visible {
+  outline: 3px solid var(--hill);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  .stop:not([aria-disabled="true"]):not([aria-pressed="true"]):hover {
+    background: #26262a;
+  }
+}
+.station-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 10px;
+  min-height: 30px;
+  margin: 2px 0 0;
+  font-size: 20px;
+  line-height: 1.15;
+}
+.station-info .numeral {
+  color: var(--mute);
+}
+.station-info .lock {
   font-size: 16px;
   color: var(--mute);
 }
-.station .slot {
-  width: 22px;
-  height: 22px;
-  margin: -2px;
-  background-size: 88px 44px;
+.station-info.locked .name {
+  color: var(--hill);
 }
-.station .slot.filled {
-  background-position: -44px 0;
+.station-info .slot {
+  width: 28px;
+  height: 28px;
+  margin: -3px;
+  background-size: 112px 56px;
 }
-.station[aria-pressed="true"] {
-  border-color: var(--paper);
-  background: rgba(251, 251, 234, 0.12);
-}
-.station:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-.station:focus-visible {
-  outline: 3px solid var(--paper);
-  outline-offset: 2px;
+.station-info .slot.filled {
+  background-position: -56px 0;
 }
 /* The orbit map between levels: ink stations on the orbit arc, the line
  * travelled so far, and the two-leaf marker moving to the next station. */
@@ -416,6 +554,9 @@ button:disabled {
 }
 .solarum.waking .wake-block {
   opacity: 0;
+}
+.solarum.waking .title-panel {
+  pointer-events: none;
 }
 .sound-btn.off::before {
   content: "";
@@ -744,7 +885,8 @@ button:disabled {
   top: 6px;
 }
 .solarum[data-layout="portrait"][data-state="title"] .itch-fullscreen {
-  top: auto;
+  top: 6px;
+  bottom: auto;
 }
 .solarum[data-layout="portrait"] .hud .pause-btn {
   top: 6px;
@@ -799,10 +941,20 @@ button:disabled {
   top: 84px;
   bottom: auto;
 }
-/* On the portrait title the hint sits low, clear of the wake prompt. */
+/* On the portrait title the hint sits at the very bottom, under the panel
+ * (and is dropped where the deck is too short to hold both). */
 .solarum[data-layout="portrait"][data-state="title"] .turn-hint {
   top: auto;
-  bottom: 84px;
+  bottom: 10px;
+}
+@media (max-height: 700px) and (max-aspect-ratio: 1/1) {
+  .solarum[data-layout="portrait"][data-state="title"] .turn-hint,
+  .solarum[data-layout="portrait"] .title-panel .keys {
+    display: none;
+  }
+  .solarum[data-layout="portrait"] .stations {
+    row-gap: 10px;
+  }
 }
 .solarum[data-layout="portrait"] .story-line {
   top: calc(var(--stage-top) + var(--stage-h) + 56px);
@@ -843,13 +995,27 @@ button:disabled {
   bottom: 0;
 }
 .solarum[data-layout="portrait"] .title-ui .logo {
-  top: calc(var(--stage-h) * 0.1);
+  top: calc(var(--stage-h) * 0.12);
   width: 78%;
 }
+/* Portrait: the panel stands on the sky's strip of ground and runs on into
+ * the deck, full width; the sound and fullscreen buttons move up into the
+ * empty HUD bar so the deck is the panel's. */
 .solarum[data-layout="portrait"] .wake-block {
-  top: calc(var(--stage-h) + 48px);
-  gap: 12px;
-  padding: 0 16px;
+  padding: 0 12px;
+}
+.solarum[data-layout="portrait"] .title-panel {
+  width: 100%;
+  gap: 10px;
+  padding: 16px 10px 14px;
+}
+.solarum[data-layout="portrait"] .stations {
+  --link: 10px;
+}
+.solarum[data-layout="portrait"][data-state="title"] .sound-btn,
+.solarum[data-layout="portrait"][data-state="loading"] .sound-btn {
+  top: 6px;
+  bottom: auto;
 }
 .solarum[data-layout="portrait"] .movement-card .name {
   font-size: 30px;
@@ -1066,6 +1232,46 @@ button:disabled {
 @media (max-height: 460px) {
   .solarum {
     --hud-h: 50px;
+  }
+  /* The title panel goes compact: wake and the orbit line share one row
+   * where they fit, the info line below, the key hint hidden (touch hints
+   * are on the controls themselves). */
+  .title-panel {
+    grid-template-columns: auto auto;
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 2px;
+    padding: 10px 16px 8px;
+  }
+  .title-panel .level-map {
+    grid-row: span 2;
+  }
+  /* Many levels: the orbit line takes the first row, wake and the level's
+   * name share the second. */
+  .title-panel.wide-line .level-map {
+    display: contents;
+  }
+  .title-panel.wide-line .stations {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    padding-top: 16px;
+  }
+  .title-panel.wide-line .wake {
+    grid-row: 2;
+  }
+  .title-panel.wide-line .station-info {
+    grid-row: 2;
+    grid-column: 2;
+  }
+  .title-panel .keys {
+    display: none;
+  }
+  .wake {
+    font-size: 20px;
+    padding: 5px 18px 6px;
+  }
+  .title-ui .logo {
+    top: 7%;
   }
   .movement-card .name {
     font-size: 32px;

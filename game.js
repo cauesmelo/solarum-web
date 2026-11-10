@@ -28,6 +28,7 @@ import {
 } from "./geometry.mjs";
 import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetting, writeGentleSetting } from "./audio.mjs";
 import { createFrameClock } from "./frame-clock.mjs";
+import { emergenceAt, emergenceSeconds, resolveSet } from "./emergence.mjs";
 
 /* Renderer, input and UI. All gameplay rules live in model.mjs / level.mjs;
  * this file only draws the simulation, forwards input and plays sound. */
@@ -79,7 +80,12 @@ let manifest = null,
   wonAt = -99,
   pace = 1, // Gentle pace multiplies every level's own clock (0.8)
   shake = 0,
-  turnHintShown = false;
+  turnHintShown = false,
+  // The title's wake: Diana emerging from the earth under the sprout
+  // (emergence.mjs). null on the plain title and once she runs.
+  emergence = null,
+  // A QA / next-phase override of the level's sprite set ("cape" | "nocape").
+  spriteSetOverride = null;
 const held = { glide: false };
 const camera = { x: 0, y: 0, snap: true };
 const fx = []; // short-lived particles in world space
@@ -195,8 +201,19 @@ function resize() {
     $("turn-hint").hidden = false;
     setTimeout(() => ($("turn-hint").hidden = true), 4000);
   }
+  $("title-ui").style.setProperty("--title-soil", String(titleSoil()));
+  layoutStations();
   camera.snap = true;
   if (ready) draw();
+}
+/** Where the title frames the soil line, as a fraction of the stage height:
+ * the same composition for every level (their start heights differ by 220
+ * px). Portrait skies hold only the logo and the sprout (the panel is in the
+ * deck); short landscape screens lift the soil to leave the panel room. */
+function titleSoil() {
+  // (Short phones lift it a little so the panel and its levels fit below.)
+  if (layout === "portrait") return root.clientHeight < 700 ? 0.72 : 0.8;
+  return canvas.clientHeight && canvas.clientHeight < 460 ? 0.5 : 0.6;
 }
 new ResizeObserver(resize).observe(root);
 
@@ -900,10 +917,12 @@ function drawPrompts() {
     }
   }
 }
-function drawFx(dt) {
+function drawFx(dt, only = null) {
   for (let i = fx.length - 1; i >= 0; i--) {
     const q = fx[i];
+    if (only && !only(q)) continue; // each particle advances in the pass that draws it
     q.life -= dt / q.span;
+    if (q.floor != null && q.vy > 0 && q.y > q.floor) q.life = 0;
     if (q.life <= 0) {
       fx.splice(i, 1);
       continue;
@@ -930,6 +949,24 @@ function drawFx(dt) {
       ctx.lineTo(5, -5);
       ctx.lineTo(7, 4);
       ctx.lineTo(-4, 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else if (q.kind === "crumb") {
+      // A soil crumb: a small paper chip with an ink edge (the title ground).
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      ctx.rotate((1 - q.life) * q.spin);
+      ctx.globalAlpha = Math.min(1, q.life * 2);
+      ctx.fillStyle = PAPER;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-q.size, -q.size * 0.6);
+      ctx.lineTo(q.size, -q.size);
+      ctx.lineTo(q.size * 0.8, q.size * 0.7);
+      ctx.lineTo(-q.size * 0.7, q.size);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -963,6 +1000,7 @@ function drawPlayer() {
   const spent = !capeReady(state) && state.dashRemaining <= 0.08;
   tint += ((spent ? 1 : 0) - tint) * 0.25;
   if (state.status === "ready") {
+    if (emergence) return drawEmergence(p);
     // Title: Diana is still the two leaves in the soil (the original sprout).
     const f = frameForClip(manifest, "sprout", clock);
     sprite(f.sheet, f.frame, p.x, p.y - 30, 0.42);
@@ -970,8 +1008,8 @@ function drawPlayer() {
   }
   if (state.status === "dead") return drawShards();
   const sinceWake = clock - wakeAt;
-  if (sinceWake < 0.16) {
-    // Wake: the leaves wiggle and Diana pops up out of them.
+  if (sinceWake < 0.16 && !wokeFromEarth) {
+    // A wake without the emergence (QA, Restart): the leaves pop at once.
     const f = frameForClip(manifest, "sprout", clock);
     sprite(f.sheet, f.frame, p.x, p.y - 30 + sinceWake * 60, 0.42, 1 - sinceWake / 0.16);
   }
@@ -1005,6 +1043,64 @@ function drawShards() {
       sy = r.fromY - 30 + (r.toY - 60 - (r.fromY - 30)) * ease + Math.sin(a) * spread * 0.7 - Math.sin(t * Math.PI) * 60;
     sprite("star", 2, sx, sy, 0.13, 1 - t * 0.3, a + t * 4);
   }
+}
+/* ---------- the wake: Diana emerges from the earth ---------- */
+let wokeFromEarth = false;
+/** The level's sprite set (a level that starts without the cape names
+ * `sprites: "nocape"`), resolved against the manifest (emergence.mjs). */
+function dianaSet() {
+  return resolveSet(manifest, spriteSetOverride ?? state.def.sprites ?? "cape");
+}
+/** Drawn in the world layer before the title ground, which then hides
+ * everything under the soil along its own contour. */
+function drawEmergence(p) {
+  const e = emergenceAt(clock - emergence.at, { reduced });
+  if (e.sprout.alpha > 0.01) {
+    const f = frameForClip(manifest, "sprout", (clock - emergence.at) * e.sprout.rate + emergence.phase0);
+    sprite(f.sheet, f.frame, p.x, p.y - 30 - e.sprout.lift, e.sprout.scale, e.sprout.alpha, e.sprout.shake);
+  }
+  if (e.phase !== "twitch") drawDiana(emergence.set.body, clock - emergence.at, p.x, p.y + e.depth);
+  if (e.phase !== emergence.phase) {
+    // Soil bits thrown up as the head breaks through and as she pops out.
+    emergence.phase = e.phase;
+    if (!reduced)
+      for (let i = 0; i < e.crumbs; i++)
+        fx.push({
+          kind: "crumb",
+          x: p.x + (Math.random() - 0.5) * (e.phase === "pop" ? 46 : 26),
+          y: p.y - 2,
+          vx: (Math.random() - 0.5) * (e.phase === "pop" ? 170 : 70),
+          vy: -(e.phase === "pop" ? 170 : 90) - Math.random() * 80,
+          g: 900,
+          spin: (Math.random() - 0.5) * 10,
+          size: 2 + Math.random() * 2.5,
+          floor: p.y + 3, // falls back onto the soil and is gone
+          life: 1,
+          span: 0.55 + Math.random() * 0.2,
+        });
+  }
+}
+/** Over the title ground: the soil parts around her (two short ink strokes
+ * that open while she rises and close once she is out). */
+function drawSoilMarks() {
+  if (!emergence || state.status !== "ready") return;
+  const e = emergenceAt(clock - emergence.at, { reduced });
+  const open = e.phase === "twitch" ? 0.25 : e.phase === "rise" || e.phase === "look" ? 1 : e.phase === "pop" ? 0.6 : 0;
+  if (open <= 0) return;
+  const p = state.player,
+    x = p.x - camera.x,
+    y = p.y - camera.y;
+  ctx.save();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(x + side * (10 + 6 * open), y + 1);
+    ctx.quadraticCurveTo(x + side * (20 + 8 * open), y - 4 * open, x + side * (30 + 8 * open), y + 1.5);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 function drawIris() {
   const r = state.respawn;
@@ -1083,7 +1179,7 @@ function updateCamera(dt) {
     screenX = W / 2 + (view.playerScreenX - W / 2) * e;
   }
   let targetX = p.x - screenX,
-    targetY = state.status === "ready" ? 0 : cameraTargetY(state.anchorY, state.fallTime);
+    targetY = state.status === "ready" ? WORLD().startY - titleSoil() * H : cameraTargetY(state.anchorY, state.fallTime);
   if (state.status === "dead" && state.respawn) {
     // Rewind: the view rides the star shards back to the last light.
     const r = state.respawn,
@@ -1124,22 +1220,37 @@ function draw() {
     sy = (Math.random() - 0.5) * shake * 2;
   }
   shake = Math.max(0, shake - dt * 12);
-  ctx.save();
-  ctx.translate(-camera.x + sx, -camera.y + sy);
-  drawUpdrafts();
-  for (const q of state.platforms) drawPlatform(q);
-  drawBeacons();
-  drawPortal();
-  drawConstellations();
-  drawStars();
-  drawPrompts();
-  drawPlayer();
-  drawFx(dt);
-  ctx.restore();
   // Wall time since waking, or simulation time when QA steps ahead of it.
   const sinceWake = Math.max(clock - wakeAt, state.time / (state.clock ?? 1));
+  // The title shows only the sky, the soil and the sprout: the level's
+  // stars, glyphs, beacons and islands appear as the title ground fades, so
+  // nothing in the world can sit over the title's options.
+  const worldAlpha = state.status === "ready" ? 0 : Math.min(1, sinceWake / 0.5);
+  ctx.save();
+  ctx.translate(-camera.x + sx, -camera.y + sy);
+  if (worldAlpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = worldAlpha;
+    drawUpdrafts();
+    for (const q of state.platforms) drawPlatform(q);
+    drawBeacons();
+    drawPortal();
+    drawConstellations();
+    drawStars();
+    drawPrompts();
+    ctx.restore();
+  }
+  drawPlayer();
+  drawFx(dt, (q) => q.kind !== "crumb");
+  ctx.restore();
   if (state.status === "ready") titleGround(1);
   else if (sinceWake < 0.7) titleGround(1 - sinceWake / 0.6);
+  drawSoilMarks();
+  // Soil crumbs fly over the ground they came from.
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+  drawFx(dt, (q) => q.kind === "crumb");
+  ctx.restore();
   drawIris();
 }
 
@@ -1282,7 +1393,10 @@ function showVictory() {
   writeProgress();
   syncLevelMap();
   $("victory-title").textContent = `${state.def.numeral} · ${state.def.title}`;
-  $("continue").hidden = last;
+  // Continue is always the way on: the next level, or after the last level
+  // back to the title (the user disliked a separate Title button here).
+  $("continue").dataset.to = last ? "title" : "next";
+  $("continue").setAttribute("aria-label", last ? "Continue to the title" : `Continue to ${LEVELS[n].numeral} · ${LEVELS[n].title}`);
   const song = audio.stats().score?.song;
   $("result-song").textContent = song && song.total ? `${song.notes} / ${song.total}` : "—";
   const total = state.pickups.filter((q) => !q.great).length;
@@ -1300,7 +1414,7 @@ function showVictory() {
   };
   $("victory-line").lastChild.textContent = lines[n] ?? "The signal is stronger now.";
   $("victory-card").hidden = false;
-  (last ? $("again") : $("continue")).focus({ preventScroll: true });
+  $("continue").focus({ preventScroll: true });
   announce(`${state.def.title} complete. ${state.stars} of ${total} stars, ${state.greatBanked.length} of 3 Great Fallen Stars, ${state.deaths} falls.`);
 }
 
@@ -1419,22 +1533,45 @@ function processEvents(quiet = false) {
 }
 
 /* ---------- actions ---------- */
+/** Wake at once: the run (and the score's bar 1) begins now. The end of the
+ * emergence, a second press during it, QA's start() and Continue call this. */
+let wakingTimer = 0;
 function wake() {
   if (!ready || state.status !== "ready") return;
   unlockAudio();
+  wokeFromEarth = !!emergence;
+  emergence = null;
   // The score starts with the wake event (bar 1, the sky on Bm); a title
   // song that is playing fades out under it.
   start(state);
   wakeAt = clock;
   root.classList.add("waking");
-  setTimeout(() => root.classList.remove("waking"), 700);
+  clearTimeout(wakingTimer);
+  wakingTimer = setTimeout(() => root.classList.remove("waking"), 700);
   showMovement(state.def.movements[0].id, state.time + (state.def.cardDelay ?? CARD.wakeDelay));
   canvas.focus({ preventScroll: true });
   processEvents();
   sync();
 }
+/** The player's wake on the title (key, tap, the wake button): Diana first
+ * emerges from the earth under the sprout (about 1.2 s, 0.36 s with reduced
+ * motion), then the run starts with the original start clip. A second
+ * press skips straight to the run. The title UI fades at the press; the
+ * camera move and the title ground's fade begin with the run, as before. */
+function pressWake() {
+  if (!ready || state.status !== "ready") return;
+  if (emergence) return wake();
+  unlockAudio(); // inside the gesture
+  emergence = { at: clock, phase: "", phase0: clock, set: dianaSet() };
+  root.classList.add("waking");
+  clearTimeout(wakingTimer);
+  audio.fadeOutMusic(0.9);
+  audio.play("emerge");
+  announce("Diana wakes.");
+  canvas.focus({ preventScroll: true });
+}
 function doJump() {
-  if (state.status === "ready") return wake();
+  if (state.status === "ready") return pressWake();
   if (state.status === "paused" || state.status === "won") return;
   jump(state);
   processEvents();
@@ -1622,41 +1759,108 @@ function showMap(next) {
   // cancel: another level was opened directly (QA startLevel) meanwhile.
   map = { finish, next, cancel: () => ((done = true), (map = null), ($("map-veil").hidden = true)) };
 }
-/** The title's orbit map: four stations, open ones selectable. */
+/** The title's orbit line: one numbered stop per level, built from LEVELS so
+ * that 8-10 levels fit as well as four. Open stops select; locked ones stay
+ * focusable so their name can be previewed. The selected (or previewed)
+ * level's name and Great Star slots are shown once, below the line. */
+const LEAVES = '<svg class="leaves" viewBox="-11 -14 22 14" aria-hidden="true"><path d="M0 0 C-7 -2 -9 -9 -6 -13 C-1 -11 1 -5 0 0Z"/><path d="M0 0 C5 -1 9 -6 9 -11 C4 -11 0 -6 0 0Z"/></svg>';
+let preview = null; // a level hovered or focused on the title
 function syncLevelMap() {
-  const map = $("level-map");
-  if (!map) return;
-  for (const b of map.querySelectorAll(".station")) {
-    const n = Number(b.dataset.level),
+  const list = $("stations");
+  if (!list) return;
+  for (const li of list.querySelectorAll("li[data-level]")) {
+    const n = Number(li.dataset.level),
+      b = li.querySelector(".stop"),
       open = n <= progress.unlocked;
-    b.disabled = !open;
+    b.setAttribute("aria-disabled", String(!open));
     b.setAttribute("aria-pressed", String(n === state.level));
     b.classList.toggle("done", !!progress.done[n]);
+    // The orbit is solid from one finished level to the next.
+    li.classList.toggle("travelled", n > 1 && !!progress.done[n - 1]);
     const got = progress.great[n] ?? 0;
-    b.querySelectorAll(".slot").forEach((sl, i) => sl.classList.toggle("filled", i < got));
     b.setAttribute("aria-label", `${LEVELS[n - 1].numeral}. ${LEVELS[n - 1].title}${open ? `, ${got} of 3 Great Fallen Stars` : ", locked"}`);
   }
+  showStationInfo(preview ?? state.level);
+}
+function showStationInfo(n) {
+  const info = $("station-info"),
+    d = LEVELS[n - 1];
+  if (!info || !d) return;
+  const open = n <= progress.unlocked,
+    got = progress.great[n] ?? 0;
+  info.classList.toggle("locked", !open);
+  info.innerHTML = `<span class="numeral"></span><span class="name"></span>${
+    open ? `<span class="great-slots" role="img" aria-label="${got} of 3 Great Fallen Stars">${[0, 1, 2].map((i) => `<i class="slot${i < got ? " filled" : ""}"></i>`).join("")}</span>` : `<span class="lock">opens after ${LEVELS[n - 2]?.numeral ?? ""}</span>`
+  }`;
+  info.querySelector(".numeral").textContent = d.numeral;
+  info.querySelector(".name").textContent = d.title;
+}
+/** Lay the stops out in as few rows as the panel allows (one row for up to
+ * ten at 960 px; two balanced rows on a phone in portrait). */
+function layoutStations() {
+  const list = $("stations");
+  if (!list) return;
+  const items = [...list.children],
+    n = items.length,
+    panel = $("title-panel"),
+    compact = layout === "landscape" && canvas.clientHeight > 0 && canvas.clientHeight < 460,
+    link = parseFloat(getComputedStyle(list).getPropertyValue("--link")) || 14,
+    row = (cols) => cols * 44 + (cols - 1) * (link + 4), // stops and the dotted links between
+    earth = 34, // Earth's link and dot after the last stop
+    pad = layout === "portrait" ? 2 * 10 : 2 * 22,
+    full = Math.max(160, panel.parentElement.clientWidth - 24 - pad - 4);
+  panel.classList.remove("wide-line");
+  const beside = full - $("start").offsetWidth - 16;
+  // Short landscape: the line sits beside the wake button while it fits in
+  // one row there, otherwise it takes the whole first row of the panel.
+  const wide = compact && row(n) + earth > beside;
+  panel.classList.toggle("wide-line", wide);
+  const room = compact && !wide ? beside : full;
+  let cols = n;
+  while (cols > 1 && row(cols) + earth > room) cols--;
+  cols = Math.ceil(n / Math.ceil(n / cols)); // balance the rows
+  list.style.width = `${row(cols) + earth}px`;
+  list.dataset.cols = String(cols);
+  items.forEach((li, i) => li.classList.toggle("row-start", i % cols === 0));
 }
 function buildLevelMap() {
-  const map = $("level-map");
-  if (!map) return;
-  map.innerHTML = "";
+  const list = $("stations");
+  if (!list) return;
+  list.innerHTML = "";
   for (const d of LEVELS) {
+    const li = document.createElement("li");
+    li.dataset.level = String(d.id);
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "station";
-    b.dataset.level = String(d.id);
-    b.innerHTML = `<span class="numeral">${d.numeral}</span><span class="name">${d.title}</span><span class="great-slots"><i class="slot"></i><i class="slot"></i><i class="slot"></i></span>`;
+    b.className = "stop";
+    b.innerHTML = `${LEAVES}<span class="numeral"></span>`;
+    b.querySelector(".numeral").textContent = d.numeral;
     b.addEventListener("click", () => {
-      if (state.status !== "ready" || d.id > progress.unlocked) return;
+      if (state.status !== "ready" || emergence || d.id > progress.unlocked) return;
       audio.play("ui-select");
       loadLevel(d.id);
       sync();
       draw();
       $("start").focus({ preventScroll: true });
     });
-    map.append(b);
+    const peek = () => ((preview = d.id), showStationInfo(d.id));
+    const unpeek = () => ((preview = null), showStationInfo(state.level));
+    b.addEventListener("pointerenter", peek);
+    b.addEventListener("pointerleave", unpeek);
+    b.addEventListener("focus", peek);
+    b.addEventListener("blur", unpeek);
+    li.append(b);
+    if (d === LEVELS.at(-1)) {
+      // Earth closes the orbit (the only colour, as everywhere).
+      const earth = document.createElement("span");
+      earth.className = "earth-end";
+      earth.setAttribute("aria-hidden", "true");
+      earth.innerHTML = "<i></i>";
+      li.append(earth);
+    }
+    list.append(li);
   }
+  layoutStations();
   syncLevelMap();
 }
 /** Great Stars banked across the campaign (best per level, this run's level live). */
@@ -1666,6 +1870,11 @@ function paintedStars() {
   return n;
 }
 function toTitle() {
+  map?.cancel();
+  emergence = null;
+  wokeFromEarth = false;
+  clearTimeout(wakingTimer);
+  root.classList.remove("waking");
   const assist = { ...state.assist };
   Object.assign(state, createGame(state.seed, { level: state.level, ...assist }));
   syncLevelMap();
@@ -1679,10 +1888,12 @@ function toTitle() {
   audio.scoreReset();
   audio.hush(0.2);
   audio.clearMoments();
-  // The title song: keep it if the door already started it, else begin it.
-  if (!audio.stats().soundtrackPlaying) audio.playMusic({ fromStart: true, fadeIn: 1.2 });
+  // From the pause card the engine is still suspended: un-pause it first (the
+  // status is 'ready' now), so the title song below can fade in.
   resetShelfWatch();
   syncAudio();
+  // The title song: keep it if the door already started it, else begin it.
+  if (!audio.stats().soundtrackPlaying) audio.playMusic({ fromStart: true, fadeIn: 1.2 });
   sync();
   $("start").focus({ preventScroll: true });
 }
@@ -1724,12 +1935,13 @@ window.addEventListener("keydown", (e) => {
   if (onButton && ["Space", "Enter"].includes(e.code)) return; // native activation
   if (GAME_KEYS.includes(e.code)) e.preventDefault();
   if (e.repeat) return;
-  if (state.status === "ready" && ["Space", "Enter", "ArrowUp", "KeyW"].includes(e.code)) return wake();
+  if (state.status === "ready" && ["Space", "Enter", "ArrowUp", "KeyW"].includes(e.code)) return pressWake();
   if (state.status === "won") {
     if (e.code === "KeyR") restartChapter();
     return;
   }
   // On the title, ←/→ choose among the open levels of the orbit map.
+  if (state.status === "ready" && emergence) return; // she is waking: only a press skips
   if (state.status === "ready" && ["ArrowLeft", "ArrowRight"].includes(e.code) && ready) {
     const n = state.level + (e.code === "ArrowRight" ? 1 : -1);
     if (n >= 1 && n <= progress.unlocked) {
@@ -1752,7 +1964,7 @@ window.addEventListener("keydown", (e) => {
 // starts it; the wake fades it out under the sky anyway.
 function titleSong(e) {
   if (state.status !== "ready" || !sound.on || audio.stats().soundtrackPlaying) return;
-  const wakes = e.type === "keydown" ? ["Space", "Enter", "ArrowUp", "KeyW"].includes(e.code) : !!e.target?.closest?.("#start");
+  const wakes = e.type === "keydown" ? ["Space", "Enter", "ArrowUp", "KeyW"].includes(e.code) : !!e.target?.closest?.("#start, #game, .controls");
   if (!wakes) audio.playMusic({ fromStart: true, fadeIn: 0.8 });
 }
 window.addEventListener("pointerdown", titleSong, true);
@@ -1766,7 +1978,7 @@ window.addEventListener("keydown", () => audio.nudge(), true);
   // gameplay and already voiced). The pause card stays silent: the engine
   // refuses new sounds while paused, so its buttons need no exception.
   const canHover = matchMedia("(hover: hover)").matches;
-  const menu = "#again, #to-title, #sound, #pause, .itch-fullscreen";
+  const menu = "#again, #continue, #sound, #pause, .itch-fullscreen";
   document.addEventListener("pointerover", (e) => {
     const b = canHover && e.target instanceof Element ? e.target.closest(menu) : null;
     if (b && !b.contains(e.relatedTarget)) audio.play("ui-hover");
@@ -1775,7 +1987,7 @@ window.addEventListener("keydown", () => audio.nudge(), true);
     if (e.target instanceof Element && e.target.matches(menu) && e.target.matches(":focus-visible")) audio.play("ui-hover");
   });
   document.addEventListener("click", (e) => {
-    const b = e.target instanceof Element ? e.target.closest("#to-title, .itch-fullscreen") : null;
+    const b = e.target instanceof Element ? e.target.closest("#main-menu, .itch-fullscreen") : null;
     if (b) audio.play("ui-select");
   });
 }
@@ -1833,7 +2045,7 @@ bindTouch("touch-dive", doDive);
   let startY = null;
   zone.addEventListener("pointerdown", (e) => {
     startY = e.clientY;
-    if (state.status === "ready") wake();
+    if (state.status === "ready") pressWake();
   });
   zone.addEventListener("pointermove", (e) => {
     if (startY != null && e.clientY - startY > 36) {
@@ -1850,15 +2062,17 @@ canvas.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "mouse" || state.status === "ready") doJump();
 });
 canvas.addEventListener("pointerup", (e) => (atInput(e), releaseJump(state)));
-$("start").addEventListener("click", wake);
+$("start").addEventListener("click", pressWake);
 $("pause").addEventListener("click", openPause);
 $("resume").addEventListener("click", closePause);
 $("back-to-light").addEventListener("click", backToLight);
 $("restart-chapter").addEventListener("click", restartChapter);
 $("again").addEventListener("click", restartChapter);
-$("continue").addEventListener("click", () => showMap(state.level + 1));
+$("continue").addEventListener("click", () => (state.level >= LEVELS.length ? toTitle() : showMap(state.level + 1)));
 $("map-veil").addEventListener("pointerdown", () => map?.finish());
-$("to-title").addEventListener("click", toTitle);
+// Pause → Main menu: the level's score stops, the title song returns and the
+// saved progress (open levels, best Great Stars) is kept.
+$("main-menu").addEventListener("click", toTitle);
 $("reload").addEventListener("click", () => location.reload());
 $("sound").addEventListener("click", () => setSound(!sound.on));
 $("pause-sound").addEventListener("click", () => setSound(!sound.on));
@@ -1910,6 +2124,7 @@ function frame(now) {
   const real = advanceTo(now) + caughtUp;
   caughtUp = 0;
   if (ready) {
+    if (emergence && clock - emergence.at >= emergenceSeconds(reduced)) wake();
     processEvents();
     syncAudio();
     if (state.status === "won" && !ui.victoryShown && clock - wonAt > 1.5) showVictory();
@@ -1926,7 +2141,18 @@ function frame(now) {
 window.__game = {
   ready: false,
   model: state,
-  start: wake,
+  start: wake, // immediate (pilots); a real press plays the emergence first
+  // The title's wake as a player sees it: { emerging, phase, t, total, set,
+  // fallback, soil }. setSpriteSet("nocape" | "cape" | null) overrides the
+  // level's sprite set (the no-cape sheets fall back to the cape set until
+  // they are extracted).
+  pressWake,
+  getTitle: () => {
+    const e = emergence ? emergenceAt(clock - emergence.at, { reduced }) : null;
+    const set = emergence?.set ?? (manifest ? dianaSet() : null);
+    return { emerging: !!emergence, phase: e?.phase ?? null, t: e?.t ?? null, total: emergenceSeconds(reduced), set: set?.name ?? null, fallback: !!set?.fallback, body: set?.body ?? null, soil: titleSoil(), stops: $("stations")?.querySelectorAll(".stop").length ?? 0 };
+  },
+  setSpriteSet: (name) => ((spriteSetOverride = name || null), dianaSet()),
   restart: restartChapter,
   retry: backToLight,
   toTitle,
