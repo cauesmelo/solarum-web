@@ -381,27 +381,55 @@ export function createBackdrop({ makeCanvas, images, sprite, reduced = false }) 
     }
     ctx.restore();
   }
-  // I: the brightest star, the original star sprite with a slow halo and rays.
+  // I: the brightest star (GDD §5), the one that falls as the asteroid: a
+  // soft glow of stacked faint discs (fills, never stroked rings), a few
+  // short tapering flare rays of unequal length at uneven angles (no lines
+  // across it), and the original star sprite as its core. The owner read
+  // the old rings and full crosshair lines as a target. It brightens as the
+  // level runs toward the crash (`view.brightness`, 0-1) and is gone once
+  // it has fallen (`view.fallen`). Nothing like the Earth glint's ring.
+  const FLARES = [
+    [-0.42, 2.3],
+    [0.95, 1.35],
+    [2.05, 1.8],
+    [3.55, 1.1],
+    [4.6, 1.55],
+  ];
   function drawBrightStar(ctx, x, y, r, view) {
-    const pulse = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(view.clock * 1.6);
+    if (view.fallen) return;
+    const b = Math.max(0, Math.min(1, view.brightness ?? 0.4)),
+      pulse = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(view.clock * 1.6);
     ctx.save();
-    ctx.strokeStyle = rgba("paper", 0.1 + pulse * 0.08);
-    ctx.lineWidth = 1.2;
-    for (const k of [1.5, 2.3]) {
+    // The glow: one soft radial falloff (no edge to read as a ring).
+    const R = r * 3.4 * (1 + 0.3 * b) + pulse * 2,
+      glow = ctx.createRadialGradient(x, y, 0, x, y, R);
+    glow.addColorStop(0, rgba("paper", 0.12 + 0.12 * b));
+    glow.addColorStop(0.3, rgba("paper", 0.05 + 0.04 * b));
+    glow.addColorStop(1, rgba("paper", 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - R, y - R, 2 * R, 2 * R);
+    // The flares: thin wedges from the core, fading to their tips.
+    ctx.globalAlpha = 1;
+    for (const [a, len] of FLARES) {
+      const L = r * len * (0.85 + 0.45 * b) * (0.94 + 0.06 * pulse),
+        tx = x + Math.cos(a) * L,
+        ty = y + Math.sin(a) * L,
+        half = r * 0.2,
+        nx = -Math.sin(a) * half,
+        ny = Math.cos(a) * half;
+      const g = ctx.createLinearGradient(x, y, tx, ty);
+      g.addColorStop(0, rgba("paper", 0.3));
+      g.addColorStop(1, rgba("paper", 0));
+      ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(x, y, r * k + pulse * 3, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = rgba("paper", 0.22);
-    ctx.lineWidth = 1;
-    for (const [dx, dy] of [[1, 0], [0, 1]]) {
-      ctx.beginPath();
-      ctx.moveTo(x - dx * r * 3, y - dy * r * 3);
-      ctx.lineTo(x + dx * r * 3, y + dy * r * 3);
-      ctx.stroke();
+      ctx.moveTo(x + nx, y + ny);
+      ctx.lineTo(tx, ty);
+      ctx.lineTo(x - nx, y - ny);
+      ctx.closePath();
+      ctx.fill();
     }
     ctx.restore();
-    sprite(ctx, "star", 2, x, y, (r * 2.6) / 200, 0.5);
+    sprite(ctx, "star", 2, x, y, (r * 2.2) / 200, 0.55 + 0.35 * b);
   }
   let rings = null;
 

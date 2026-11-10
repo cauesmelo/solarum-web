@@ -92,7 +92,7 @@ function recorder() {
     {
       get(t, k) {
         if (k === "log") return log;
-        if (k === "createLinearGradient") return () => ({ addColorStop: () => {} });
+        if (k === "createLinearGradient" || k === "createRadialGradient") return () => ({ addColorStop: () => {} });
         return (...args) => log.push([k, ...args.map((a) => (typeof a === "number" ? Math.round(a * 1000) / 1000 : typeof a === "object" ? "obj" : a))]);
       },
       set(t, k, v) {
