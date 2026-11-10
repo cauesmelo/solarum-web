@@ -636,6 +636,18 @@ button {
     0 0 4px var(--ink),
     0 0 2px var(--ink);
 }
+/* Where the pause button used to be: the key that pauses, drawn like the others. */
+.hud-hint {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  margin: 0;
+  font-size: 16px;
+  color: var(--mute);
+  text-shadow:
+    0 0 4px var(--ink),
+    0 0 2px var(--ink);
+}
 .hud .count {
   font-size: 26px;
   min-width: 2ch;
