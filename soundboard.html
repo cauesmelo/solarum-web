@@ -132,6 +132,12 @@
       label {
         color: var(--mute);
       }
+      select {
+        font: inherit;
+        min-height: 44px;
+        border-radius: 10px;
+        padding: 0 8px;
+      }
       #log {
         color: var(--mute);
         min-height: 1.45em;
@@ -142,17 +148,26 @@
     <main>
       <h1>Solarum soundboard</h1>
       <p class="lede">
-        Every effect is synthesised in <code>audio.mjs</code> in D major (the soundtrack's key). Each button plays one cue through the
-        game's own bus, compressor, reverb and music ducking; turn the music on to judge the mix. Tab and Enter / Space play everything.
-        Dev only: this page is not in the itch.io ZIP.
+        The adaptive score and every body sound, synthesised in <code>audio.mjs</code> and <code>score.mjs</code> in the soundtrack's
+        D major at 107 BPM. Runs and stems are rendered offline from the real model and pilots (a few seconds), then played through
+        this page. Score voices play over the chord you pick. Tab and Enter / Space play everything. Dev only: this page is not in the
+        itch.io ZIP.
       </p>
       <div class="bar" role="toolbar" aria-label="Mix controls">
-        <button id="music" class="ghost" type="button" aria-pressed="false">♫ Music off</button>
+        <button id="music" class="ghost" type="button" aria-pressed="false">♫ Soundtrack off</button>
         <button id="pause" class="ghost" type="button" aria-pressed="false">Pause audio</button>
-        <label><input id="earth" type="checkbox" /> Earth is blue (win)</label>
+        <button id="stop" class="ghost" type="button">Stop</button>
+        <label>Chord <select id="chord"></select></label>
+        <label><input id="earth" type="checkbox" /> Earth is blue (door)</label>
         <span class="meter" aria-live="off"><i><b id="meter-bar"></b></i><span id="meter-text">-inf dBFS</span></span>
         <span id="log" aria-live="polite"></span>
       </div>
+      <h2>Runs: perfect, sloppy, Gentle</h2>
+      <div class="grid" id="runs"></div>
+      <h2>Stems of the score</h2>
+      <div class="grid" id="stems"></div>
+      <h2>Score voices</h2>
+      <div class="grid" id="voices"></div>
       <h2>Sequences</h2>
       <div class="grid" id="sequences"></div>
       <div id="groups"></div>

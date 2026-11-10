@@ -371,9 +371,9 @@ const mulberry = (seed) => {
 export const LAYERS = Object.freeze({
   sky: { bed: true, voices: ["pad"] },
   signal: { bed: true, voices: ["signal"] },
-  pulse: { bed: true, voices: ["pulse", "shaker"] },
+  pulse: { bed: true, voices: ["pulse", "shaker", "marimba"] },
   steps: { bed: false, voices: ["bass"] },
-  stars: { bed: false, voices: ["glass", "kalimba", "bloom"] },
+  stars: { bed: false, voices: ["glass", "kalimba", "bloom", "chime", "shards"] },
   choir: { bed: true, voices: ["choir"] },
   glass: { bed: true, voices: ["celesta"] },
   strings: { bed: false, voices: ["harmonica", "vowel"] },
