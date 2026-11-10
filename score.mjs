@@ -72,6 +72,8 @@ export const CHORDS = Object.freeze({
   "F#sus4": { name: "F#sus4", root: 6, bass: 42, tones: [6, 11, 1], safe: [6, 11, 1, 4], pad: [54, 59, 61, 66] },
   "F#": { name: "F#", root: 6, bass: 42, tones: [6, 1, 11], safe: [6, 11, 1, 4], pad: [54, 58, 61, 66] },
   A: { name: "A", root: 9, bass: 45, tones: [9, 1, 4], safe: [9, 11, 1, 4, 6], pad: [57, 61, 64, 69] },
+  // II's turnaround (A C# E F#): the sixth instead of the seventh keeps it calm.
+  A6: { name: "A6", root: 9, bass: 45, tones: [9, 1, 4], safe: [9, 11, 1, 4, 6], pad: [57, 61, 64, 66] },
   Bm7: { name: "Bm7", root: 11, bass: 47, tones: [11, 2, 6], safe: [11, 2, 4, 6, 9], pad: [57, 62, 66, 69] },
   "F#m/A": { name: "F#m/A", root: 6, bass: 45, tones: [6, 9, 1], safe: [6, 9, 11, 1, 4], pad: [57, 61, 64, 66] },
   // D Lydian: the chapter's only sustained G#, at the door with three Great Stars.
@@ -121,6 +123,17 @@ const L2_SECTIONS = [
   // The finale climbs to Bm and the theme's head sits on A: V, then home.
   { id: "finale", from: 20, to: 22, shaker: true, cycle: [C["Gmaj7#11"], C.Bm, C.A] },
   { id: "coda", from: 23, to: Infinity },
+];
+// II · The Gift: Bm7 Gmaj7 Dadd9 A6 laid over its sections (the heartbeat
+// rests while the gift arrives and over the long void).
+const GIFT_SECTIONS = [
+  { id: "gift", from: 1, to: 4, pulse: false, cycle: [C.Bm7, C.Bm7, C.Bm7, C.Gmaj7] },
+  { id: "voids", from: 5, to: 7, cycle: [C.Dadd9, C.A6, C.Bm7] },
+  { id: "breath", from: 8, to: 9, cycle: [C.Gmaj7, C.Dadd9] },
+  { id: "long", from: 10, to: 11, pulse: false, cycle: [C.A6, C.Bm7] },
+  { id: "steps", from: 12, to: 16, cycle: [C.Gmaj7, C.Dadd9, C.A6, C.Bm7, C.Gmaj7] },
+  { id: "plain", from: 17, to: 19, cycle: [C.Dadd9, C.Gmaj7, C.A6] },
+  { id: "coda", from: 20, to: Infinity },
 ];
 const L1_CYCLE = [C["Bm(add9)"], C["Bm(add9)"], C["F#m7"], C.Dmaj7, C["F#m7"], C.Dmaj7, C.Gmaj7, C.Gmaj7];
 const L3_CYCLE = [C.Em9, C.A7sus4, C["Dmaj9/F#"], C["Gmaj7#11"]];
@@ -204,7 +217,33 @@ export const SCORES = Object.freeze({
     },
   },
   2: {
-    level: 2, bpm: 107, bars: 24, pickup: 8,
+    level: 2, bpm: 94, bars: 20, pickup: 0,
+    // II · The Gift, calm with marked beats (RESEARCH_PROGRESSION 4.3): Bm7
+    // Gmaj7 Dadd9 A6, a felt heartbeat on 1 and 3 from bar 3 and nothing else
+    // in the bed. Restraint: no shaker (there is no wind in II), the
+    // heartbeat rests while the gift arrives and on the long void (bars 1-4
+    // and 10-11), so the cape's notes and the void-song carry those bars.
+    groove: "heartbeat", maxFlat: 14, space: { seconds: 5.5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
+    sections: GIFT_SECTIONS,
+    chordAt: mapOf(GIFT_SECTIONS, C.Dadd9),
+    // The gift (bar 1), the hearth void (bar 5), the long void (bar 10) and
+    // Pluto (bar 14); the theme closes from bar 18.
+    signalBars: [1, 5, 10, 14], closeFrom: 18,
+    phrases: {
+      // bar 3 (Bm7) into bar 4 (Gmaj7): the first flight, F#5 E5 D5 | B4.
+      "first-flight": [78, 76, 74, 71],
+      // bar 5 (Dadd9): the hearth void rises, A4 B4 D5 | F#5.
+      "flight-line": [69, 71, 74, 78],
+      // bar 11 (Bm7): the refill climbs, B4 D5 E5 F#5.
+      "void-song": [71, 74, 76, 78],
+      // bar 13 (Dadd9) into 14 (A6): the steps-song, D5 E5 F#5 A5.
+      "steps-song": [74, 76, 78, 81],
+      // bar 16 (Gmaj7): down to Pluto, D5 B4 A4 | G4.
+      "pluto-song": [74, 71, 69, 67],
+    },
+  },
+  3: {
+    level: 3, bpm: 107, bars: 24, pickup: 8,
     // floaty with marked beats: heartbeat on 1 and 3, a tick on 2 and 4,
     // shaker sixteenths at about -30 dB from the wind on; the twist lifts.
     groove: "heartbeat", maxFlat: 15, space: { seconds: 5.5, shimmer: 0.4 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
@@ -224,8 +263,8 @@ export const SCORES = Object.freeze({
       "finale-song": [71, 74, 78, 83],
     },
   },
-  3: {
-    level: 3, bpm: 118, bars: 24, pickup: 0,
+  4: {
+    level: 4, bpm: 118, bars: 24, pickup: 0,
     // call and response: half-time backbeat (beat 3), a 3+3+2 tresillo on
     // the rim and the marimba's low root, the world calling on the grid.
     groove: "clave", maxFlat: 20, space: { seconds: 3.5, shimmer: 0.3 }, tapeStop: 0.45, rewind: true, dropOnFall: false,
@@ -241,8 +280,8 @@ export const SCORES = Object.freeze({
       "split-song": [76, 74, 71, 69, 64],
     },
   },
-  4: {
-    level: 4, bpm: 128, bars: 26, pickup: 0,
+  5: {
+    level: 5, bpm: 128, bars: 26, pickup: 0,
     // agitated, tense: a felt kick on every beat, sixteenth ticks and an
     // eighth-note F# ostinato; after a fall the ostinato rests until the
     // next constellation or beacon.

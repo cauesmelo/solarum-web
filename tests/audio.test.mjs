@@ -626,7 +626,7 @@ test("the itch ZIP ships audio.js but not the soundboard, WAV renders or the arc
 // L3 by default: every layer of the bed (backbeat, tresillo marimba, the
 // smash's celesta) at 118 BPM, so the audio clock runs at 1/clock of the
 // simulation's, as in the game.
-function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true, level = 3 } = {}) {
+function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = true, level = 4 } = {}) {
   let now = 0;
   const r = rig({ gentle, enabled, level, clock: () => now });
   const music = mockMusic();

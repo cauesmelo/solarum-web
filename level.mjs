@@ -724,6 +724,192 @@ const WAKING = {
   },
 };
 
+/* ---- II · The Gift (94 BPM): calm, with marked beats; the cape and its breath ----
+ * RESEARCH_PROGRESSION 4.5 and 3. II opens in the crater where I's door
+ * left Diana: she runs through the asteroid's gift (the GET: the cape, the
+ * bar appears empty and fills over the next bar of running), uses the cape
+ * once over a short gap with a floor under it (safe), needs it over the
+ * hearth void and the same void again (charged by the gift and void
+ * beacons), learns that the bar breathes (after a flight two hop gaps look
+ * flight-sized but are double-jump-sized while the bar is not full, then a
+ * long stone fills it tick by tick), crosses the long void on a flight, the
+ * void-song (which refills the cape in midair) and a second flight, and
+ * descends Pluto's steps: three flights in four bars, charged by a long
+ * stone with its beacon, by the steps-song after a short rock, and by the
+ * Pluto beacon. 19 bars, the door on the downbeat of bar 20 (48.5 s real).
+ *
+ * Physics: II-VIII share the chapter's simulation physics (gravity 1500,
+ * jump 570, double 525, no hang, no fall cap), so every cell is the one in
+ * px and sixteenths that LEVEL_DESIGN lists; only the clock (94 / 107) and
+ * so the real windows change. Cells used here (scripts/arcs.mjs 2):
+ *   hold 4: -80 (80 up)  5: -26          double at 4: 10: +12 (12 lower)
+ *   flight at 3/16 (the apex): level at -105 for 0.5 s, then 9: -17 (17 up),
+ *   10: +70 (70 lower); two flights at 3 and 9 around a refill: 14: +15
+ * A full flight adds exactly 113.55 px (three sixteenths) to the run, so a
+ * grid x after F flights is 220 + 37.85 k + 113.55 F (gk below).
+ * Every required flight has a charge source (RESEARCH_PROGRESSION 3.4): the
+ * gift and void beacons for the hearth void and its repeat, the long stone's
+ * breath and beacon for the long void's first flight and Pluto's first step,
+ * the void-song and the steps-song (both completed before the press) for the
+ * second flights, and the Pluto beacon for the last. */
+const G_CLOCK = 94 / 107;
+const gk = (k, F = 0) => 220 + 37.85 * k + 113.55 * F;
+const gIsle = (id, landK, F, takeoffK, y, lead = 100) => [id, gk(landK, F) - lead, y, gk(takeoffK, F) + 10 - (gk(landK, F) - lead)];
+/** Stars along a flight opened at sixteenth dK (F flights before it) from a
+ * takeoff on ground y0: one entering the pickup box on each sixteenth of the
+ * level flight (69.69 px of run each), then one on the way down at 8/16. */
+const flightStars = (dK, F, y0, n = 3, down = true) => {
+  const x0 = gk(dK, F);
+  const out = Array.from({ length: n }, (_, i) => [x0 + 69.69 * (i + (n === 4 ? 0 : 1)) + 39.5, y0 - 141]);
+  if (down) out.push([x0 + 248.6 + (dK + 5 - (dK + 3.567)) * 37.85 + 39.5, y0 - 110]);
+  return out;
+};
+const GY = { crater: 300, step: 274, rim: 248, gift: 231, floor: 308, shore1: 301, hearth: 221, shore2: 291, hop: 303, long: 315, voidShore: 330, rock1: 400, rock2: 470, plain: 540, heart1: 514, heart2: 488, heart3: 462 };
+const G_MAIN = [
+  // The crater floor where I's door left her; the gift is on it.
+  ["crater", -700, GY.crater, gk(23) + 10 + 700],
+  // Out of the crater: two hops up 26 px (5/16 each) onto its rim, after
+  // the title card has gone.
+  gIsle("crater-step", 28, 0, 31, GY.step, 75),
+  gIsle("rim", 36, 0, 40, GY.rim, 75),
+  // The safe first use: a flight at the apex lands 17 px up 9/16 later; a
+  // double also makes it (it steps up); a plain jump comes down on the floor
+  // 60 px below and hops back up 77 px (4/16).
+  gIsle("gift-stone", 49, 1, 68, GY.gift, 100),
+  // The hearth void (382 px): a flight at the apex lands 70 px lower 10/16
+  // after the takeoff, along flight-line.
+  gIsle("hearth-shore", 78, 2, 82, GY.shore1, 100),
+  // A held hop up 80 px (4/16) onto the second hearth and its beacon.
+  gIsle("hearth-2", 86, 2, 100, GY.hearth, 80),
+  // The same void, without stars.
+  gIsle("void-shore-1", 110, 3, 112, GY.shore2, 100),
+  // The breath lesson: two short stones and gaps a double jump crosses
+  // (second press at 4/16, 12 px lower 10/16 later) while the bar shows a
+  // quarter, then the long stone where it fills (sixteenth 146).
+  gIsle("breath-1", 122, 3, 124, GY.hop, 100),
+  gIsle("long-stone", 134, 3, 164, GY.long, 100),
+  // The long void: jump, flight, the void-song refills the cape, flight;
+  // 15 px lower 14/16 after the takeoff.
+  gIsle("void-shore", 178, 5, 196, GY.voidShore, 110),
+  // Pluto's steps: three flights in four bars, each 70 px lower.
+  gIsle("step-rock", 206, 6, 208, GY.rock1, 90),
+  gIsle("pluto-rock", 218, 7, 236, GY.rock2, 100),
+  // Pluto's heart plain: three held hops up 26 px to the door (bar 20).
+  gIsle("heart-plain", 246, 8, 252, GY.plain, 100),
+  gIsle("heart-1", 257, 8, 262, GY.heart1, 75),
+  gIsle("heart-2", 267, 8, 272, GY.heart2, 75),
+  ["heart-door", gk(277, 8) - 75, GY.heart3, gk(304, 8) + 520 - (gk(277, 8) - 75)],
+];
+// The safe line: the floor under the first gap (a plain jump lands on it 60
+// px down and hops 77 px back up onto the gift stone, 4/16).
+const G_HIGH = [["crater-floor", gk(42), GY.floor, gk(50, 0) + 10 - gk(42)]];
+const G_CHAINS = [
+  { id: "first-flight", route: "low", stars: flightStars(43, 0, GY.rim) },
+  { id: "flight-line", route: "low", stars: flightStars(71, 1, GY.gift) },
+  // On the long void's first flight, one per sixteenth from the press: it
+  // completes on 170 (an eighth), so the second flight (173) has its cape.
+  { id: "void-song", route: "low", stars: flightStars(167, 3, GY.long, 4, false) },
+  // After the short rock: three on the jump's rise and one at its takeoff;
+  // complete on 210, before the second step's flight at 211.
+  { id: "steps-song", route: "low", stars: [[gk(207, 6) + 39.5, GY.rock1 - 40], [gk(208, 6) + 39.5, GY.rock1 - 40], [gk(209, 6) + 39.5, GY.rock1 - 101], [gk(210, 6) + 39.5, GY.rock1 - 135]] },
+  { id: "pluto-song", route: "low", stars: flightStars(239, 7, GY.rock2) },
+];
+const G_GREAT = [
+  { id: "great-1", x: gk(48, 1) + 20, y: GY.rim - 165 - 46, line: "over the first flight: jump, jump again, then the cape" },
+  { id: "great-2", x: gk(164, 3) + 486, y: GY.long - 249, line: "above the long void: a double jump between the flights" },
+  { id: "great-3", x: gk(244, 8) + 10, y: GY.rock2 - 165 - 46, line: "over Pluto's last step: jump, jump again, then the cape" },
+];
+const GJ = (k, F, when = "g") => [gk(k, F) - 0.3, "jump", when];
+const GD = (k, F) => [gk(k, F) - 0.3, "dash", "a"];
+const G_PLAN_MAIN = [
+  GJ(23, 0), GJ(31, 0),
+  GJ(40, 0), GD(43, 0),
+  GJ(68, 1), GD(71, 1),
+  GJ(82, 2),
+  GJ(100, 2), GD(103, 2),
+  GJ(112, 3), GJ(116, 3, "a"), GJ(124, 3), GJ(128, 3, "a"),
+  GJ(164, 3), GD(167, 3), GD(173, 4),
+  GJ(196, 5), GD(199, 5),
+  GJ(208, 6), GD(211, 6),
+  GJ(236, 7), GD(239, 7),
+  GJ(252, 8), GJ(262, 8), GJ(272, 8),
+];
+const GIFT = {
+  key: "gift",
+  title: "The Gift",
+  look: "pluto",
+  toward: "Pluto",
+  introduces: "cape",
+  bpm: 94,
+  clock: G_CLOCK,
+  physics: {},
+  verbs: { double: true, cape: false, glide: false, dive: false, super: false },
+  gets: [{ id: "asteroid-gift", verb: "cape", x: gk(4) }],
+  capeRule: "breath",
+  view: null,
+  level: { title: "The Gift", speed: 270, startX: 220, startY: GY.crater, finishX: gk(304, 8), finishY: GY.heart3, beat: BEAT },
+  movements: [{ id: "II", x: -1000, numeral: "II", name: "The Gift" }],
+  sections: [
+    { x: -1000, movement: "II", step: "get", name: "II · The Gift" },
+    { x: gk(36), movement: "II", step: "safe", name: "II · The Gift — the first flight" },
+    { x: gk(60, 1), movement: "II", step: "need", name: "II · The Gift — the hearth void" },
+    { x: gk(104, 2), movement: "II", step: "develop", name: "II · The Gift — the breath" },
+    { x: gk(152, 3), movement: "II", step: "twist", name: "II · The Gift — the long void" },
+    { x: gk(190, 5), movement: "II", step: "conclude", name: "II · The Gift — Pluto's steps" },
+    { x: gk(248, 8), movement: "II", step: "coda", name: "II · The Gift — the heart plain" },
+  ],
+  // Beacons on half bars 4½, 6½, 10, 12½ and 15 (≤ 10.2 s real apart).
+  checkpoints: [
+    { id: "gift", x: gk(56, 1) - 3, y: GY.gift, platform: "gift-stone", story: "Gather the falling stars, and it will carry you there.", tip: "Jump, then press the cape near the top of the jump." },
+    { id: "void", x: gk(88, 2) - 3, y: GY.hearth, platform: "hearth-2", story: "The same dark again. This time she knew how wide it was.", tip: "Jump at the edge, then press the cape near the top." },
+    { id: "long", x: gk(152, 3) - 3, y: GY.long, platform: "long-stone", story: "The gift breathes when she runs. A long stone is a full breath.", tip: "Take every star of the song on the first flight; it gives the cape back." },
+    { id: "steps", x: gk(184, 5) - 3, y: GY.voidShore, platform: "void-shore", story: "Below her the little world turned, cold and patient.", tip: "Short stones give no breath. The stars after them do." },
+    { id: "pluto", x: gk(224, 7) - 3, y: GY.rock2, platform: "pluto-rock", story: "On Pluto's heart the frost held still, as if it were listening.", tip: "Jump, then press the cape near the top, down to the plain." },
+  ],
+  startTip: "Run through the gift. Jump, then press the cape near the top.",
+  main: G_MAIN,
+  high: G_HIGH,
+  updrafts: [],
+  cascades: [],
+  chains: G_CHAINS,
+  great: G_GREAT,
+  moments: [],
+  // Decor: the glide lock (RESEARCH_PROGRESSION 2.1): a gently descending
+  // star line below the final ledge that a flight cannot follow (III's glide
+  // will); drawn, never collected.
+  decor: [{ id: "glide-lock", kind: "cluster", stars: [0, 1, 2, 3, 4].map((i) => [gk(282, 8) + 60 * i, GY.heart3 + 60 + 22 * i]) }],
+  prompts: [
+    // ↑ · →: [from, inputX] is the jump's window; `to` ends the cape's.
+    { id: "p-first-flight", glyph: ["up", "then", "right"], action: "dash", x: gk(40) + 20, y: GY.rim - 170, from: gk(40) - 30, to: gk(43) + 60, inputX: gk(40) + 14, optional: true, route: "main" },
+    { id: "p-cape", glyph: ["up", "then", "right"], action: "dash", x: gk(69, 1), y: GY.gift - 170, from: gk(68, 1) - 30, to: gk(71, 1) + 60, inputX: gk(68, 1) + 14 },
+    { id: "p-refill", glyph: ["right"], action: "dash", x: gk(172, 4), y: GY.long - 200, from: gk(171, 4), to: gk(175, 4), inputX: gk(173, 4) + 10 },
+  ],
+  stars: [
+    // The crater's two hops and the plain's three: a star on each rise.
+    ...[23, 31].map((k, i) => [`rim-star-${i}`, gk(k + 1) + 33.5, GY.crater - 26 * i - 64 - 36, "low"]),
+    ...[252, 262, 272].map((k, i) => [`plain-star-${i}`, gk(k + 1, 8) + 33.5, GY.plain - 26 * i - 64 - 36, "low"]),
+    // The breath lesson's hops (each at the second press's rise).
+    ...[116, 128].map((k, i) => [`breath-star-${i}`, gk(k + 1, 3) + 33.5, GY.shore2 + 12 * i - 120 - 36, "low"]),
+  ],
+  routes: {
+    main: G_PLAN_MAIN,
+    // The three Great Stars: jump, double and cape over the first gap and
+    // over Pluto's last step, and the double between the long void's flights.
+    upper: [
+      GJ(23, 0), GJ(31, 0), GJ(40, 0), GJ(44, 0, "a"), GD(47, 0),
+      ...G_PLAN_MAIN.filter(([x]) => x > gk(60, 1) && x < gk(160, 3)),
+      GJ(164, 3), GD(167, 3), GJ(171, 4, "a"), GD(175, 4),
+      ...G_PLAN_MAIN.filter(([x]) => x > gk(190, 5) && x < gk(230, 7)),
+      GJ(236, 7), GJ(240, 7, "a"), GD(243, 7),
+      ...G_PLAN_MAIN.filter(([x]) => x > gk(250, 8)),
+    ],
+    ability: G_PLAN_MAIN,
+    // The safe line: no cape over the first gap (a jump onto the floor, a
+    // hop back up), then the main route.
+    safe: [GJ(23, 0), GJ(31, 0), GJ(40, 0), GJ(46, 0), ...G_PLAN_MAIN.filter(([x]) => x > gk(60, 1))],
+  },
+};
+
 /**
  * Open a level at `cut` and insert a section (RESEARCH_LEVELS: content, not
  * padding). Everything at x >= cut moves by (dx, dy): platforms, wind,
@@ -1244,7 +1430,72 @@ const L4_S2 = insertSection(L4_S1, {
 });
 const L4 = L4_S2;
 
-export const LEVELS = Object.freeze([{ ...WAKING, id: 1, numeral: "I" }, L2, L3, L4].map((d) => Object.freeze(d)));
+/**
+ * The campaign (RESEARCH_PROGRESSION 4.1, 4.7): eight stages along the GDD's
+ * journey, one new thing each, BPM rising. A stage is playable once its level
+ * is built (`def`). LEVELS lists the built stages in order and then, until
+ * III-VIII replace them, the revision-five levels II-IV as interim levels
+ * (`interim: true`, stage null): they keep the campaign as long as before,
+ * the root QA's cape/dive/wind/cascade/super-jump checks and their own
+ * 'landing' cape rule, and they are renumbered after the built stages. Each
+ * stage's `look` keys its backdrop (RESEARCH_PROGRESSION 4.4).
+ */
+export const CAMPAIGN = Object.freeze(
+  [
+    { stage: 1, key: "waking", title: "Waking", toward: "Home", bpm: 88, introduces: "double", look: "home", def: WAKING },
+    { stage: 2, key: "gift", title: "The Gift", toward: "Pluto", bpm: 94, introduces: "cape", look: "pluto", def: GIFT },
+    { stage: 3, key: "still-water", title: "Still Water", toward: "Neptune", bpm: 100, introduces: "glide", look: "neptune", def: null },
+    { stage: 4, key: "way-down", title: "The Way Down", toward: "Uranus", bpm: 107, introduces: "dive", look: "uranus", def: null },
+    { stage: 5, key: "breaking", title: "The Breaking Constellation", toward: "Saturn", bpm: 112, introduces: "cracks", look: "saturn", def: null },
+    { stage: 6, key: "borrowed-wind", title: "Borrowed Wind", toward: "Jupiter", bpm: 118, introduces: "wind", look: "jupiter", def: null },
+    { stage: 7, key: "falling-road", title: "The Falling Road", toward: "Mars", bpm: 123, introduces: "cascade", look: "mars", def: null },
+    { stage: 8, key: "far-door", title: "The Far Door", toward: "the Moon, then Earth", bpm: 128, introduces: "super", look: "moon-earth", def: null },
+  ].map((q) => Object.freeze(q)),
+);
+const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+/** The interim levels, in tempo order, with the look of the stage that will
+ * take most of their content (VI, V and VIII). */
+const INTERIM = [
+  { ...L2, look: "jupiter", toward: "Jupiter" },
+  { ...L3, look: "saturn", toward: "Saturn" },
+  { ...L4, look: "moon-earth", toward: "the Moon, then Earth" },
+];
+function register(d, i, extra) {
+  const numeral = ROMAN[i];
+  return Object.freeze({
+    ...d,
+    ...extra,
+    id: i + 1,
+    numeral,
+    movements: d.movements.map((m) => ({ ...m, numeral: m.numeral ? numeral : "" })),
+    sections: d.sections.map((q) => ({ ...q, name: q.name.replace(/^[IVX]+ · /, `${numeral} · `) })),
+  });
+}
+const BUILT = [];
+for (const q of CAMPAIGN) {
+  if (!q.def) break;
+  BUILT.push({ ...q.def, stage: q.stage });
+}
+export const LEVELS = Object.freeze([...BUILT.map((d, i) => register(d, i, {})), ...INTERIM.map((d, i) => register(d, BUILT.length + i, { stage: null, interim: true }))]);
+/** Saved progress (game.js keeps it in guarded storage). Version 2 stores
+ * the furthest open numeral (`unlocked`, a count along LEVELS) and the best
+ * Great Stars by level key, so a later rebuild that inserts a level keeps
+ * them. A version-1 save (revision five's four levels) maps its unlocked
+ * count to the same numeral, and its Great Stars reset because I and II were
+ * rebuilt (RESEARCH_PROGRESSION 4.7). Anything unreadable starts fresh. */
+export const SAVE_VERSION = 2;
+export function readSave(raw, levels = LEVELS) {
+  const fresh = { unlocked: 1, great: {}, done: {} };
+  if (!raw || typeof raw !== "object" || !Number.isInteger(raw.unlocked)) return fresh;
+  const unlocked = Math.max(1, Math.min(levels.length, raw.unlocked));
+  if (raw.v !== SAVE_VERSION) return { ...fresh, unlocked };
+  const byKey = (o) => Object.fromEntries(levels.filter((d) => o?.[d.key] != null).map((d) => [d.id, o[d.key]]));
+  return { unlocked, great: byKey(raw.great), done: byKey(raw.done) };
+}
+export function writeSave(progress, levels = LEVELS) {
+  const byId = (o) => Object.fromEntries(levels.filter((d) => o?.[d.id] != null).map((d) => [d.key, o[d.id]]));
+  return { v: SAVE_VERSION, unlocked: progress.unlocked, great: byId(progress.great), done: byId(progress.done) };
+}
 export function levelDef(n = 1) {
   return LEVELS[Math.max(0, Math.min(LEVELS.length - 1, (n ?? 1) - 1))];
 }
