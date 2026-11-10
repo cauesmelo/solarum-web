@@ -30,7 +30,7 @@ The campaign now opens with the rebuilt **I · Waking** (88 BPM) and the new **I
 - **The hang ends at touch-down:** a key still held from the jump before no longer slows a walk-off (level I's lookout and crown edges drop onto the grid).
 - **Verbs per level:** before I's GET there is no air jump (a late press waits in the buffer, U2); II's cape breathes (C1–C6).
 
-## Per-level numbers, eight levels (2026-11-10, after VIII · The Far Door)
+## Per-level numbers, eight levels (2026-11-10, after VIII · The Far Door; I, II and VI re-measured after the human-proxy round)
 
 Re-measured with `node scripts/movement-audit.mjs arcs` and `windows` and `scripts/level-report.mjs` (main route, real units). VIII is the built Far Door (it replaced revision six's interim level).
 
@@ -39,18 +39,47 @@ Re-measured with `node scripts/movement-audit.mjs arcs` and `windows` and `scrip
 | BPM, run px/s | 88, 222 | 94, 237 | 100, 252 | 107, 270 | 112, 283 | 118, 298 | 123, 310 | 128, 323 |
 | B5 apex (held), held height | 0.507 s, 121 px | 0.427, 106 | 0.401, 106 | 0.375, 106 | 0.358, 106 | 0.340, 106 | 0.326, 106 | 0.313, 106 |
 | B6 0 ms tap / hold; 50 ms tap | 0.228; 0.432 | 0.236; 0.484 | 0.236; 0.484 | 0.236; 0.484 | 0.236; 0.522 | 0.236; 0.522 | 0.236; 0.522 | 0.236; 0.559 |
-| F required actions (of all) | 20 / 23 | 21 / 25 | 24 / 26 | 27 / 33 | 35 / 45 | 25 / 46 | 37 / 61 | 33 / 71 |
-| F narrowest window, smallest early side | 618 ms, 385 | 332, 104 | 321, 98 | 300, 92 | 263, 72 | 204, 38 | 203, 51 | 195, 56 |
+| F required actions (of all) | 20 / 23 | 33 / 35 | 24 / 26 | 27 / 33 | 35 / 45 | 25 / 46 | 37 / 61 | 33 / 71 |
+| F narrowest window, smallest early side | 618 ms, 385 | 370, 142 | 321, 98 | 300, 92 | 263, 72 | 204, 60 | 203, 51 | 195, 56 |
 | Median required window | 628 ms | 626 | 606 | 583 | 549 | 537 | 428 | 411 |
-| Edge lead (landscape / portrait) | 3.22 / 2.66 s | 2.54 / 2.03 | 2.40 / 1.92 | 2.25 / 1.80 | 2.23 / 1.74 | 2.06 / 1.78 | 2.06 / 1.56 | 2.45 / 1.94 |
-| Landing lead (landscape / portrait) | 2.60 / 2.06 s | 1.68 / 1.16 | 0.79 / 0.30 | 1.07 / 0.62 | 1.72 / 1.39 | 1.44 / 1.07 | 1.38 / 0.95 | 1.62 / 1.11 |
-| Inputs a bar (peak) | 1.21 (2) | 1.32 (3) | 1.55 (3) | 1.71 (4) | 1.96 (3) | 2.26 (3) | 2.52 (5) | 2.84 (4) |
-| Largest beacon gap | 13.6 s | 10.7 | 11.7 | 9.8 | 10.7 | 10.2 | 9.5 | 7.7 |
+| Edge lead (landscape / portrait) | 3.22 / 2.66 s | 2.15 / 1.73 | 2.40 / 1.92 | 2.25 / 1.80 | 2.23 / 1.74 | 2.06 / 1.78 | 2.06 / 1.56 | 2.45 / 1.94 |
+| Landing lead (landscape / portrait) | 2.66 / 2.11 s | 1.60 / 1.12 | 0.79 / 0.30 | 1.07 / 0.62 | 1.72 / 1.39 | 1.44 / 1.07 | 1.38 / 0.95 | 1.62 / 1.11 |
+| Inputs a bar (peak) | 1.21 (2) | 1.40 (3) | 1.55 (3) | 1.71 (4) | 1.96 (3) | 2.26 (3) | 2.52 (5) | 2.84 (4) |
+| Largest beacon gap | 13.6 s | 12.8 | 11.7 | 9.8 | 10.7 | 10.2 | 9.5 | 7.7 |
 
 - **VII:** the narrowest window is the double on the *gap-song*'s last star over the second missing tile (a double pressed early rises away under the star; a late one overshoots the small tile d4). Every route wins at 30/60/120/240 Hz with 0 falls and 0 step-ups. Both of its required refill stars (RESEARCH_REFILLS) are touched lit on every route and rate.
 - **VIII:** the narrowest window is the star road's double after its leaf star (an early super jump lowers the arc until the press would be a buffered ground jump onto the low floor; the double sits at 9/16, 234 px over the gate, to keep it clear); every route wins at 30/60/120/240 Hz with 0 falls and 0 step-ups; the road's three required refill stars are touched lit on main, upper and ability at every rate (the safe route is the low line under them). C1's shifted replay now moves the rest of a super jump's airtime at flight speed (a super ends its flight, so shifting it shifts the flight's end).
 - **The cape press buffer (the milestone-A critic's item 1):** a cape press that cannot fly yet (an empty bar or inside a solar-wind column) now waits 0.14 s real and flies the tick it can (a refill in the air, a lit cape star, the column's edge); a touch-down drops it. This widens the early side of flights charged by a song or a star, and C1 counts such a press as empty only if it never flies.
 - **Not measured this round:** L6's sloppy-bot ladder (σ 40 / 100 ms) for VII and VIII, and the critic's late-press rescue and death-curve findings (II-VI), which are queued for the next round (SHARED_MEMORY handoff).
+
+## Human proxies (2026-11-10, the round after VIII)
+
+The studio's lesson from the other two games: levels proven possible by near-perfect bots were impassable for a real person in one and too easy in the other. `scripts/human-proxy.mjs` flies each level's main route on the model as three people do; `tests/human-proxy.test.mjs` holds the bands below (10 seeds, deterministic, about 15 s of `npm test`).
+
+- **First-timer:** timing error σ 90 ms (real, Gaussian, clamped at ±2.5 σ), a 280 ms reaction to the stone a committing press lands on entering the narrowest landscape view (forgotten nothing after a fall: what was in view there is known), keys held through falls, no text read. **Casual:** σ 60 ms, 230 ms. **Expert:** σ 30 ms, 190 ms.
+- Timing: airborne presses keep the route's rhythm from the player's own previous press; a grounded press the route makes within 3/16 of a touch-down is timed from that touch-down (predicted before it) when it is the route's own, else at the stone's edge; any other press by position. Holds: a jump 250–500 ms, a tap 35–90 ms, a cape press 90–150 ms (or held when the route glides).
+- **Targets (falls a run, mean):** first-timer I ≤ 1, II ≤ 1.5, III ≤ 2, IV ≤ 2.5, V ≤ 3.5, VI ≤ 4.5, VII ≤ 6, VIII ≤ 8, and no spot that takes three falls in a row; casual 0.25 … 2.5; the expert clean everywhere, with mastery lines that pay.
+
+Falls a run, 20 seeds each (mean / max, worst spot in a row), before this round (161099b, harness at 092740d) → after (this round's tip):
+
+| | First-timer | Casual | Expert |
+| --- | --- | --- | --- |
+| I | 0.10 / 2, 2 → 0.10 / 2, 2 | 0 → 0 | 0 → 0 |
+| II | 0.70 / 3, 3 → **0.30 / 2, 2** | 0.35 / 2 → **0** | 0.10 / 1 → **0** |
+| III | 0.10 / 1, 1 → 0.10 / 1, 1 | 0.05 → 0.05 | 0 → 0 |
+| IV | 1.00 / 4, 4 → 1.00 / 4, 4 | 0.25 → 0.25 | 0.05 → 0.05 |
+| V | 1.40 / 6, 5 → 1.40 / 6, 5 | 0.30 → 0.30 | 0.05 → 0.05 |
+| VI | 2.40 / 8, 5 → **1.95 / 8, 4** | 0.50 → **0.30** | 0.15 → **0.05** |
+| VII | 4.80 / 14, 9 → 4.80 / 14, 9 | 1.60 → 1.60 | 0.20 → 0.20 |
+| VIII | 3.85 / 8, 4 → 3.85 / 8, 4 | 1.25 → 1.25 | 0.20 → 0.20 |
+
+(The "before" II row is the old II, which the re-solve replaced: its worst spot was Pluto's steps, a four-star song an early jump broke. Every first-timer and casual mean is inside its band; the expert is clean in I–III only at 20 seeds: one fall in 20 runs in IV, V and VI, four in VII and VIII.)
+
+What is left, by spot (first-timer): IV the broken well (14 of 20 falls; the dive through the long lid), V the split voids (15; the split-song), VI the finale's double (11; VI's narrowest window, kept for the ladder) and wind, dive, wind (4), VII the dive road (54; the dive onto the stone between tiles), VIII the storm void (13) and the road home. These, and the targets the table does not meet (no worst spot of 3 or more; a clean expert in IV–VIII), are the next round's queue (SHARED_MEMORY handoff).
+
+**Late-press rescue** (`node scripts/human-proxy.mjs rescue`, RESEARCH_PROGRESSION 4.2: required ground jumps that still survive when pressed more than 30 ms past their strict window, the press becoming the double): II 82% → **53%** (ceiling 75%), III 69% (70%), IV 86% (60%: over), V 75% (55%: over), VI 85% (50%: over), VII 38% (40%), VIII 31% (35%). IV–VI need the geometry fix of 4.2 (a required double after one in three required ground jumps) and are queued.
+
+**Chrome, real keys** (Playwright Chrome on port 4445, the real `game.js`, the critic's in-page human bot pressing `page.keyboard` at the bot's times; σ without the reaction model): II won with 0 falls at σ 0, 60 and 90 ms (the relic at x 6579, both refill stars taken, no console errors); VI won with 0 falls at σ 0 and 60 (the finale's cape star taken); I won with 0 falls at σ 90. At II's gift, `getHud().breath` goes from hidden (no cape) to shown and full (`charge 1`, disc `meteor`).
 
 ## Scorecard
 
