@@ -3633,10 +3633,15 @@ function oldBodyBox(f) {
   const u = f.oldBody.u;
   return { x: quad(s.x, (s.x + e.x) / 2, e.x, u), y: quad(s.y, cy, e.y, u), r: s.r + (e.r - s.r) * u, end: e };
 }
+function nextStartBox(id) {
+  return trans?.swapped ? bodyBox(id, backdropView()) : bodyBox(id, { W, H, progress: 0, driftX: 0, driftY: 0 });
+}
 /** The next body arrives on its arc from (1.15 W, its start y) at half its
  * radius and ends exactly at its level-start box (nothing jumps at bar 1). */
 function newBodyBox(f, id) {
-  const e = bodyBox(id, { W, H, progress: 0, driftX: 0, driftY: 0 }),
+  // After the swap the target is the box play draws on its first frame
+  // (its parallax drift at the run framing included), so bar 1 never jumps.
+  const e = nextStartBox(id),
     u = f.newBody.u;
   if (LOOKS[id]?.body === "moon") return { x: e.x, y: e.y + 0.5 * H * (1 - u), r: e.r };
   const s = { x: 1.15 * W, y: e.y, r: e.r * 0.5 },
@@ -4347,7 +4352,7 @@ window.__game = {
       zoom: trans.swapped ? f.push : f.zoom,
       world: trans.swapped ? f.newWorld : f.world,
       motes: !!f.motes,
-      bodies: { old: trans.look && trans.endBox && f.oldBody ? oldBodyBox(f) : null, next: trans.nextLook && f.newBody ? newBodyBox(f, trans.nextLook) : null, nextStart: trans.nextLook ? bodyBox(trans.nextLook, { W, H, progress: 0 }) : null },
+      bodies: { old: trans.look && trans.endBox && f.oldBody ? oldBodyBox(f) : null, next: trans.nextLook && f.newBody ? newBodyBox(f, trans.nextLook) : null, nextStart: trans.nextLook ? nextStartBox(trans.nextLook) : null },
       tally: { opacity: Number($("tally").style.opacity), level: trans.tally.level, journey: trans.after, before: trans.before, text: $("tally").innerText, say: $("tally-say").textContent },
       countIn: trans.countIn ? { scheduled: trans.countIn.scheduled, cancelled: trans.countIn.cancelled, beats: trans.countIn.beats.map((b) => +(b - trans.at).toFixed(3)) } : null,
       frames: trans.frames.length ? frameStats(trans.frames) : null,
