@@ -53,3 +53,13 @@ test("style.css crops the breath bar's PNGs at their measured bounds (tests/art.
   assert.ok(near(bw, (1080 * tw) / 822, 0.01) && near(bh, (1080 * th) / 102, 0.02), "fill size");
   assert.ok(near(bx, (-129 * tw) / 822, 0.01) && near(by, (-453 * th) / 102, 0.02), "fill position");
 });
+
+test("looks are drawn only in the run, fading in with the world, and leave the HUD band's sky as it was", async () => {
+  const js = await read("game.js");
+  assert.match(js, /const lookAlpha = state\.status === "ready" \? 0 : /, "no body or accent on the title");
+  assert.match(js, /if \(look && lookAlpha > 0\)/);
+  assert.match(js, /\} else if \(!look && images\.saturn\) \{/, "no look: revision seven's faint rings");
+  // Star density and Neptune's wobble apply below the band only.
+  assert.match(js, /band = sy - reach < HUD_BAND;/);
+  assert.match(js, /const wob = !band && density\.wobble/);
+});

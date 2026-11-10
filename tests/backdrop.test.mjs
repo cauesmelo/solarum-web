@@ -108,7 +108,7 @@ const fakeCanvas = (w, h) => ({ width: w, height: h, getContext: () => recorder(
 test("each look draws; under reduced motion every accent is still; Earth's crescent only in the last", () => {
   for (const reduced of [false, true]) {
     const sprites = [];
-    const b = createBackdrop({ makeCanvas: fakeCanvas, images: { saturn: { width: 1920, height: 1080 } }, sprite: (...a) => sprites.push(a), reduced });
+    const b = createBackdrop({ makeCanvas: fakeCanvas, images: { saturn: { width: 1920, height: 1080 } }, sprite: (ctx, ...a) => sprites.push(a), reduced });
     for (const id of LOOK_IDS) {
       const frame = (clock) => {
         const ctx = recorder();

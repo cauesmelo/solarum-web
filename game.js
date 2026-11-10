@@ -30,7 +30,7 @@ import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetti
 import { createFrameClock } from "./frame-clock.mjs";
 import { emergenceAt, emergenceSeconds, resolveSet } from "./emergence.mjs";
 import { owns, spriteSetName, capeMeter, capeTint, doubleInHand } from "./hud.mjs";
-import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, earthBox, ringsCrop } from "./backdrop.mjs";
+import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, earthBox, ringsCrop, HUD_BAND } from "./backdrop.mjs";
 import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt } from "./moments.mjs";
 
 /* Renderer, input and UI. All gameplay rules live in model.mjs / level.mjs;
@@ -250,15 +250,19 @@ function frameRect(sheet, index) {
   return data?.frames[Math.max(0, Math.floor(index)) % data.frames.length];
 }
 function sprite(sheet, index, x, y, scale, alpha = 1, rotation = 0) {
+  spriteOn(ctx, sheet, index, x, y, scale, alpha, rotation);
+}
+/** One manifest frame centred at (x, y) on any 2D context. */
+function spriteOn(c, sheet, index, x, y, scale, alpha = 1, rotation = 0) {
   const img = images[sheet],
     f = frameRect(sheet, index);
   if (!img || !f) return;
-  ctx.save();
-  ctx.globalAlpha *= alpha;
-  ctx.translate(x, y);
-  if (rotation) ctx.rotate(rotation);
-  ctx.drawImage(img, f.x, f.y, f.w, f.h, (-f.w * scale) / 2, (-f.h * scale) / 2, f.w * scale, f.h * scale);
-  ctx.restore();
+  c.save();
+  c.globalAlpha *= alpha;
+  c.translate(x, y);
+  if (rotation) c.rotate(rotation);
+  c.drawImage(img, f.x, f.y, f.w, f.h, (-f.w * scale) / 2, (-f.h * scale) / 2, f.w * scale, f.h * scale);
+  c.restore();
 }
 /** RESEARCH_LEVELS F1: airborne frames leave empty space under the toe, so
  * drawn bottom-anchored they float 15-36 px above the collider's feet and
@@ -398,18 +402,21 @@ function drawSky() {
   ctx.fillRect(0, 0, W, H);
   const look = currentLook(),
     density = skyDensity(look);
+  // A look's accents never enter the HUD band: the band's dust and stars
+  // stay exactly as revision seven drew them.
   for (const [i, d] of dust.entries()) {
     // Pluto's emptiness keeps half the dust; the Moon's sky has more.
-    if (density.dust < 1 && i % Math.round(1 / density.dust) !== 0) continue;
+    if (density.dust < 1 && d.y > HUD_BAND + 4 && i % Math.round(1 / density.dust) !== 0) continue;
     let sx = (d.x * W * 1.4 - camera.x * 0.015) % (W * 1.4);
     if (sx < 0) sx += W * 1.4;
     ctx.fillStyle = `rgba(251,251,234,${d.a})`;
     ctx.beginPath();
     ctx.arc(sx, d.y, d.r, 0, Math.PI * 2);
     ctx.fill();
-    if (density.dust > 1 && i < dust.length * (density.dust - 1)) {
+    const ey = ((d.y + 170) % 580) + 20;
+    if (density.dust > 1 && i < dust.length * (density.dust - 1) && ey > HUD_BAND + 4) {
       ctx.beginPath();
-      ctx.arc((sx + W * 0.37) % (W * 1.4), (d.y + 170) % 580 + 20, d.r * 0.8, 0, Math.PI * 2);
+      ctx.arc((sx + W * 0.37) % (W * 1.4), ey, d.r * 0.8, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -419,22 +426,28 @@ function drawSky() {
   const passes = density.stars > 1 ? 2 : 1;
   for (let pass = 0; pass < passes; pass++)
     for (const [i, s] of sky.entries()) {
-      if (pass === 0 && density.stars < 1 && i % Math.round(1 / density.stars) !== 0) continue;
       if (pass === 1 && i >= sky.length * (density.stars - 1)) break;
       const ox = pass ? 0.43 : 0,
-        oy = pass ? 233 : 0;
+        oy = pass ? 233 : 0,
+        sy = ((s.y + oy - 30) % 520) + 30 - camera.y * 0.05,
+        // The tallest frame of its twinkle group (long sparkles reach far
+        // above their centre), plus the wobble: does it touch the band?
+        reach = Math.max(...[0, 1, 2, 3].map((k) => frameRect("background", s.group + k)?.h ?? 0)) * s.size * 0.8 + 3,
+        band = sy - reach < HUD_BAND;
+      if (!band && pass === 0 && density.stars < 1 && i % Math.round(1 / density.stars) !== 0) continue;
+      if (band && pass === 1) continue;
       let sx = ((s.x + ox) * (W + 200) - camera.x * s.depth) % (W + 200);
       if (sx < 0) sx += W + 200;
       const f = s.group + (reduced ? 2 : Math.floor(clock * 3 + s.phase) % 4);
-      const wob = density.wobble && !reduced ? Math.sin(Math.PI * 2 * density.wobble * clock + s.phase * 1.7) * 2.2 : 0;
-      sprite("background", f, sx - 100, ((s.y + oy - 30) % 520) + 30 - camera.y * 0.05 + wob, s.size * 1.6, 0.8);
+      const wob = !band && density.wobble && !reduced ? Math.sin(Math.PI * 2 * density.wobble * clock + s.phase * 1.7) * 2.2 : 0;
+      sprite("background", f, sx - 100, sy + wob, s.size * 1.6, 0.8);
     }
   // The level's body ahead and its sky accent (backdrop.mjs), behind the
   // world. Like the world, they are not drawn on the title (nothing may sit
   // near its options) and fade in with the run.
   const lookAlpha = state.status === "ready" ? 0 : Math.min(1, Math.max(clock - wakeAt, state.time / (state.clock ?? 1)) / 0.8);
   if (look && lookAlpha > 0) {
-    backdrop ??= createBackdrop({ makeCanvas, images, sprite, reduced });
+    backdrop ??= createBackdrop({ makeCanvas, images, sprite: spriteOn, reduced });
     const view = backdropView();
     ctx.save();
     ctx.globalAlpha = lookAlpha;
@@ -2560,6 +2573,34 @@ window.__game = {
     else startMoment(verb);
     return { verb, bar: barSeconds(), seconds: momentSeconds(verb, barSeconds()), pending: previewGets.length };
   },
+  // A look's own layer (body and accent) alone, on a transparent canvas the
+  // size of the view at this moment: the alpha it puts in the 56 px HUD
+  // band (must be 0) and inside its body's visible part (must not be).
+  lookLayer: (id) => {
+    const look = lookOf(null, id);
+    if (!look || !manifest) return null;
+    backdrop ??= createBackdrop({ makeCanvas, images, sprite: spriteOn, reduced });
+    const w = Math.ceil(W),
+      c = makeCanvas(w, H),
+      g = c.getContext("2d", { willReadFrequently: true }),
+      view = backdropView();
+    backdrop.drawBody(g, look, view);
+    backdrop.drawAccent(g, look, view);
+    const alpha = (x, y, bw, bh) => {
+      const x0 = Math.max(0, Math.floor(x)),
+        y0 = Math.max(0, Math.floor(y)),
+        x1 = Math.min(w, Math.ceil(x + bw)),
+        y1 = Math.min(H, Math.ceil(y + bh));
+      if (x1 <= x0 || y1 <= y0) return 0;
+      const d = g.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+      let a = 0;
+      for (let i = 3; i < d.length; i += 4) a += d[i];
+      return a;
+    };
+    const b = bodyBox(look, view),
+      top = Math.max(HUD_BAND, b.y - b.r);
+    return { look, band: alpha(0, 0, w, HUD_BAND), body: alpha(b.x - b.r * 0.7, top, b.r * 1.4, Math.min(H, b.y + b.r) - top), view: { W: w, H, progress: view.progress } };
+  },
   // What the HUD and Diana show: { breath: { shown, charge, full, disc,
   // window, fill }, glint, set, fallback, look, moments, verbs }.
   getHud: () => {
@@ -2571,6 +2612,7 @@ window.__game = {
       breath: { shown: !bar.hidden, charge: ui.breath, full: bar.classList.contains("full"), disc: getComputedStyle($("breath-disc")).backgroundImage.includes("meteor") ? "meteor" : "disc", window: track.width, fill: fill.width },
       rim: { charge: Number(getComputedStyle($("touch-cape")).getPropertyValue("--charge")) || 0, full: $("touch-cape").classList.contains("full") },
       tint: Math.round(tint * 1000) / 1000,
+      clock, // the renderer's real-time clock (frozen while paused)
       glint: { shown: glint.shown, inHand: doubleInHand(state), x: glint.x, y: glint.y },
       set: set?.name ?? null,
       fallback: !!set?.fallback,

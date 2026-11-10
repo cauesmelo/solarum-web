@@ -322,8 +322,8 @@ const PAINT = {
 };
 
 /** The renderer's backdrop. `images` holds the decoded manifest sheets (the
- * original saturn.png and star sheet); `sprite(sheet, frame, x, y, scale,
- * alpha)` draws one manifest frame (game.js). */
+ * original saturn.png and star sheet); `sprite(ctx, sheet, frame, x, y,
+ * scale, alpha)` draws one manifest frame on a context (game.js). */
 export function createBackdrop({ makeCanvas, images, sprite, reduced = false }) {
   const cache = new Map();
   function cached(id, r) {
@@ -401,7 +401,7 @@ export function createBackdrop({ makeCanvas, images, sprite, reduced = false }) 
       ctx.stroke();
     }
     ctx.restore();
-    sprite("star", 2, x, y, (r * 2.6) / 200, 0.5);
+    sprite(ctx, "star", 2, x, y, (r * 2.6) / 200, 0.5);
   }
   let rings = null;
 
