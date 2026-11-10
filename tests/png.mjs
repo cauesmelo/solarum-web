@@ -1,6 +1,34 @@
-/** Read-only RGBA8 / Adam7 PNG inspector for the unchanged original portal. */
+/** Read-only RGBA8 / Adam7 PNG inspector for the unchanged original art
+ * (portal bounds, and each animation frame's lowest drawn pixel). */
 import { inflateSync } from "node:zlib";
 export function visibleBounds(buffer) {
+  const { width, height, pixels } = decodePNG(buffer);
+  let minX = width,
+    minY = height,
+    maxX = -1,
+    maxY = -1;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (
+        pixels[i + 3] > 64 &&
+        Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 170
+      ) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+/** The lowest opaque row (alpha > 64) inside a frame rect, or -1. */
+export function lowestOpaqueRow({ width, pixels }, f) {
+  for (let y = f.y + f.h - 1; y >= f.y; y--)
+    for (let x = f.x; x < f.x + f.w; x++) if (pixels[(y * width + x) * 4 + 3] > 64) return y - f.y;
+  return -1;
+}
+export function decodePNG(buffer) {
   const width = buffer.readUInt32BE(16),
     height = buffer.readUInt32BE(20);
   if (buffer[24] !== 8 || buffer[25] !== 6)
@@ -63,22 +91,5 @@ export function visibleBounds(buffer) {
             rows[y * stride + x * 4 + c];
     }
   }
-  let minX = width,
-    minY = height,
-    maxX = -1,
-    maxY = -1;
-  for (let y = 0; y < height; y++)
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      if (
-        pixels[i + 3] > 64 &&
-        Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 170
-      ) {
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
-    }
-  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  return { width, height, pixels };
 }

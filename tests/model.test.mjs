@@ -740,6 +740,27 @@ test("portal crop matches actual visible original PNG pixels and stands on the f
 });
 
 /* ---------- core movement and animation (kept from earlier revisions) ---------- */
+test("what you see is what collides: airborne frames are drawn at the feet (F1)", async () => {
+  const { measure, airborneFrames } = await import("../scripts/measure-feet.mjs");
+  const lifts = await measure(manifest);
+  const air = airborneFrames(manifest);
+  assert.ok(air.length >= 12, `${air.length} airborne frames`);
+  for (const { sheet, frame, clip } of air) {
+    const foot = manifest[sheet].frames[frame].foot;
+    assert.ok(Number.isFinite(foot), `${sheet}[${frame}] has a baked foot`);
+    assert.ok(Math.abs(lifts[sheet][frame] - foot) <= 3, `${clip} ${sheet}[${frame}]: drawn ${(lifts[sheet][frame] - foot).toFixed(1)} px off the feet`);
+  }
+  // The air pose floated 34 px before; ground frames keep only their bob.
+  assert.ok(lifts.air.every((v) => v > 30), "the source art really is lifted");
+  for (const clip of ["run", "idle", "softLanding", "dive"]) {
+    for (const q of manifest.animations[clip].frames) {
+      const v = lifts[q.sheet][q.frame];
+      if (v < 60) assert.ok(v <= 8 && !manifest[q.sheet].frames[q.frame].foot, `${clip} ${q.sheet}[${q.frame}] ${v}`);
+    }
+  }
+  const js = await read("game.js");
+  assert.match(js, /p\.y \+ footOffset\(/, "the renderer applies the offset");
+});
 test("body and cape are separate source layers; transition clips hold and loops repeat", () => {
   const l = characterLayers(manifest, "dash", 0.2);
   assert.equal(l.length, 2);

@@ -198,6 +198,24 @@ function sprite(sheet, index, x, y, scale, alpha = 1, rotation = 0) {
   ctx.drawImage(img, f.x, f.y, f.w, f.h, (-f.w * scale) / 2, (-f.h * scale) / 2, f.w * scale, f.h * scale);
   ctx.restore();
 }
+/** RESEARCH_LEVELS F1: airborne frames leave empty space under the toe, so
+ * drawn bottom-anchored they float 15-36 px above the collider's feet and
+ * promise height the physics never gives. manifest.json bakes each such
+ * frame's measured lift as `foot` (scripts/measure-feet.mjs); Diana's frames
+ * are drawn that much lower, eased over about 50 ms so pose changes never
+ * jump. Ground clips keep their stride bob; PNGs, pivots and timing are
+ * unchanged. */
+let footDraw = 0,
+  footAt = 0;
+function footOffset(name, age) {
+  const body = characterLayers(manifest, name, age)[0];
+  const target = manifest[body.sheet]?.frames[body.frame]?.foot ?? 0;
+  const dt = Math.min(0.1, Math.max(0, clock - footAt));
+  footAt = clock;
+  footDraw += (target - footDraw) * Math.min(1, dt / 0.017);
+  if (reduced || Math.abs(target - footDraw) < 0.3) footDraw = target;
+  return footDraw;
+}
 function drawDianaLayers(c, name, age, x, feet) {
   for (const layer of characterLayers(manifest, name, age)) {
     const f = manifest[layer.sheet].frames[layer.frame],
@@ -934,7 +952,7 @@ function drawPlayer() {
   }
   if (state.dashRemaining > 0 && !reduced)
     for (let i = 3; i >= 1; i--) drawDiana("dash", state.animation.age, p.x - i * 22, p.y, 0.07 + (3 - i) * 0.03);
-  drawDiana(state.animation.name, state.animation.age, p.x, p.y, 1, tint);
+  drawDiana(state.animation.name, state.animation.age, p.x, p.y + footOffset(state.animation.name, state.animation.age), 1, tint);
   // A Great Star taken but not yet banked circles Diana until she lands.
   for (const [i, id] of state.greatPending.entries()) {
     const a = clock * 4 + i * 2;
