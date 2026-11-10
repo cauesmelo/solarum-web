@@ -18,3 +18,14 @@ export function characterLayers(manifest, name, age) {
   // renderer with a custom .8 horizontal pivot. Drawing only capedash loses Diana.
   return name === "dash" ? [body, frameForClip(manifest, "cape", age)] : [body];
 }
+/** RESEARCH_LEVELS F1, MOVEMENT_AUDIT C1: how much lower to draw Diana's
+ * current frame so that its lowest drawn pixel sits on the collider's feet:
+ * the body frame's baked `foot` (px at the 0.42 draw scale, measured by
+ * scripts/measure-feet.mjs). It applies in full on the frame the pose
+ * changes. (It used to ease over about 50 ms, which at 144-240 Hz left the
+ * toe up to 26 px off the feet for 2-4 frames after a pose change and drew
+ * it through tops she was only flying over.) */
+export function footFor(manifest, name, age) {
+  const body = characterLayers(manifest, name, age)[0];
+  return manifest[body.sheet]?.frames[body.frame]?.foot ?? 0;
+}

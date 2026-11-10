@@ -14,8 +14,10 @@ import { decodePNG, lowestOpaqueRow } from "../tests/png.mjs";
 const SCALE = 0.42;
 /** Clips whose poses are airborne (or, for hardLanding's first frame, a
  * landing pose drawn as if still airborne): these get a foot offset. Ground
- * clips keep their stride bob. */
-export const AIRBORNE = { jump: "all", air: "all", hardLanding: [0] };
+ * clips keep their stride bob. The flight body (`dash`, sheet bodyDash) draws
+ * its toe 2.5-3.8 px above the feet in frames 4-12 (MOVEMENT_AUDIT C1: more
+ * than the 2 px allowed), so it is baked too; its cape layer moves with it. */
+export const AIRBORNE = { jump: "all", air: "all", hardLanding: [0], dash: "all" };
 
 export async function measure(manifest) {
   const out = {};

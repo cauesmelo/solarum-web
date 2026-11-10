@@ -22,9 +22,13 @@ export function visibleBounds(buffer) {
     }
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
-/** The lowest opaque row (alpha > 64) inside a frame rect, or -1. */
-export function lowestOpaqueRow({ width, pixels }, f) {
-  for (let y = f.y + f.h - 1; y >= f.y; y--)
+/** The lowest opaque row (alpha > 64) inside a frame rect, or -1. Unity's
+ * rects are sometimes fractional (y -0.00003, h 200.333): the browser samples
+ * the rounded cell, so it is rounded here too (unrounded, such cells read as
+ * empty and their lift as 84 px). */
+export function lowestOpaqueRow({ width, height, pixels }, f0) {
+  const f = { x: Math.round(f0.x), y: Math.max(0, Math.round(f0.y)), w: Math.round(f0.w), h: Math.round(f0.h) };
+  for (let y = Math.min(height, f.y + f.h) - 1; y >= f.y; y--)
     for (let x = f.x; x < f.x + f.w; x++) if (pixels[(y * width + x) * 4 + 3] > 64) return y - f.y;
   return -1;
 }

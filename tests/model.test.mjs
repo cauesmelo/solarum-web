@@ -941,7 +941,7 @@ test("what you see is what collides: airborne frames are drawn at the feet (F1)"
     }
   }
   const js = await read("game.js");
-  assert.match(js, /p\.y \+ footOffset\(/, "the renderer applies the offset");
+  assert.match(js, /p\.y \+ footFor\(manifest, anim\.name, anim\.age\)/, "the renderer applies the offset");
 });
 test("body and cape are separate source layers; transition clips hold and loops repeat", () => {
   const l = characterLayers(manifest, "dash", 0.2);
