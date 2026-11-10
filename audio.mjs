@@ -197,18 +197,32 @@ function thump(from, to, sweep, o = {}) {
     filter: o.filter,
   };
 }
+/** The highest frequency any oscillator is asked for: Nyquist of a 44.1 kHz
+ * context, the lowest rate in common use. Web Audio clamps a frequency beyond
+ * +-Nyquist and logs a warning each time ("Oscillator.frequency.setValueAtTime
+ * value 27660 outside nominal range"); on a 44.1 kHz device that clamp turned
+ * the faint star bell two octaves above a high melody note (B6 + 24 = B8 =
+ * 7.9 kHz, its modulator at 3.5 x = 27.7 kHz) into a modulator pinned at 22 kHz with a
+ * depth still sized for 27.7 kHz. Nothing at or under this limit changes. */
+export const OSC_MAX_HZ = 22050;
 /** Two-operator FM: a sine carrier whose frequency is modulated by a sine at
  * `ratio` x carrier, with depth `index` x modulator frequency over time.
- * Integer ratios read as glass / music box; 3.5 reads as a soft bell. */
+ * Integer ratios read as glass / music box; 3.5 reads as a soft bell.
+ * A modulator that would pass OSC_MAX_HZ drops by octaves until it fits: the
+ * index (the sideband strength, depth / modulator) stays, only the modulator
+ * and with it the depth move, and the engine reads `ratio` for both. */
 function fm(midi, o = {}) {
-  const c = o.cents ?? 0;
+  const c = o.cents ?? 0,
+    hz = midiHz(midi + c / 100);
+  let ratio = o.ratio ?? 4;
+  while (hz * ratio > OSC_MAX_HZ && ratio > 1 / 16) ratio /= 2; // the floor only keeps an absurd carrier from looping
   return {
     kind: "fm",
     tonal: true,
     midi,
     cents: c,
-    hz: midiHz(midi + c / 100),
-    ratio: o.ratio ?? 4,
+    hz,
+    ratio,
     index: o.index ?? [[0, 1], [0.1, 0.1, "exp"]],
     env: o.env ?? env.perc(0.003, 0.5),
     gain: o.gain ?? 0.2,
