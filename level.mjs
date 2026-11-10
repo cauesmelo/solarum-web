@@ -527,8 +527,11 @@ const W_MAIN = [
   // the key cluster over it, the beacon at 136 and the leap's edge at 152.
   wIsle("glint-field", 109, 152, WY.field, 70),
   // The leap: a late double (second press 5/16 after the first) lands 12/16
-  // after the takeoff, 65 px lower, 374 px across.
-  wIsle("far-shore", 164, 168, WY.shore, 80),
+  // after the takeoff, 65 px lower, 320 px across. The shore reaches back
+  // so that a quick second press, 200 ms after the first (1.2/16, the
+  // critic's double-tap, landing 8.3/16 on), lands too; a jump alone still
+  // comes down 50 px short (6.7/16).
+  wIsle("far-shore", 164, 168, WY.shore, 134),
   // The climb: second press at 4/16, up 148 px 9/16 after the takeoff.
   ["climb-crown", gx(177) - 90, WY.crown, gx(180) - 16 - (gx(177) - 90)],
   // Walking off the crown drops 64.5 px and lands 2/16 later, on the grid.
