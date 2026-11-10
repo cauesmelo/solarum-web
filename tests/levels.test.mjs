@@ -11,7 +11,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createGame, start, update, jump, releaseJump, dash, dive, snapshot, retry, restart, setAssist, capeReady, TICK } from "../model.mjs";
+import { createGame, start, update, jump, releaseJump, dash, dive, snapshot, retry, restart, setAssist, capeReady, TICK, RULES } from "../model.mjs";
 import { CAMPAIGN, LEVELS, levelDef, createLevel, gx, readSave, writeSave, SAVE_VERSION } from "../level.mjs";
 import { playRoute, chooseAction, createRouteMemory } from "./routes.mjs";
 import { nominalRun, replayShifted, timingWindow, inputsOf } from "../scripts/movement-audit.mjs";
@@ -132,7 +132,7 @@ test("U5: level I opened with every stage unlocked has no cape and no double jum
   assert.match(js, /function loadLevel\(n\) \{\s*const assist = \{ \.\.\.state\.assist \};\s*Object\.assign\(state, createGame\(state\.seed, \{ level: n, \.\.\.assist \}\)\);/);
 });
 test("GETs (RESEARCH_PROGRESSION 7): no required input within a bar of one; the first required use comes 2+ bars later, a bar after a beacon, with a glyph", () => {
-  const KIND = { double: "double-jump", cape: "dash", glide: "glide", dive: "dive" };
+  const KIND = { double: "double-jump", cape: "dash", glide: "glide", dive: "dive", super: "super-jump" };
   for (const d of BUILT) {
     const n = d.id;
     const nom = nominalRun(n);
@@ -233,11 +233,15 @@ function c1(d) {
       // A person who presses early or late keeps the rhythm of the presses
       // that follow in the same airtime (replayShifted's rule): they move by
       // the same time, which is dt ticks of plain running in x.
+      // A super jump is pressed during a flight: moving it by dt ticks also
+      // moves the flight's end, so she is dt ticks of flight speed (run plus
+      // cape) ahead or behind for the rest of that airtime (VIII).
       const t0 = nom.steps[i].tick;
-      const x = dt <= 0 ? xs[t0 + dt] : xs[t0] + dt * 270 * TICK;
+      const speed = nom.steps[i].kind === "super-jump" ? 270 + RULES.dashSpeed : 270;
+      const x = dt <= 0 ? xs[t0 + dt] : xs[t0] + dt * speed * TICK;
       let group = i + 1;
       while (group < nom.plan.length && nom.plan[group][2] !== "g") group++;
-      const plan = nom.plan.map((q, j) => (j === i ? [x - 0.01, q[1], "*"] : j > i && j < group ? [q[0] + dt * 270 * TICK, q[1], q[2]] : q));
+      const plan = nom.plan.map((q, j) => (j === i ? [x - 0.01, q[1], "*"] : j > i && j < group ? [q[0] + dt * speed * TICK, q[1], q[2]] : q));
       const empty = [];
       const s = game({ ...d, routes: { ...d.routes, main: plan } });
       const m = createRouteMemory("main");
@@ -368,7 +372,7 @@ test("C4: loose stars never gate: with every non-constellation star removed, eac
 });
 
 /* ---------- levels ---------- */
-test("L2: every beacon's story line is unique across the built stages, and none repeats an interim level's", () => {
+test("L2: every beacon's story line is unique across the campaign, and none repeats an interim level's", () => {
   const built = BUILT.flatMap((d) => d.checkpoints.map((c) => c.story));
   assert.equal(new Set(built).size, built.length, "unique among I and II");
   const interim = new Set(LEVELS.filter((d) => d.interim).flatMap((d) => d.checkpoints.map((c) => c.story)));

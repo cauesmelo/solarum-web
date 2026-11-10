@@ -263,7 +263,9 @@ test("B9/B10: coyote and jump buffer are the same real time in every level, with
 });
 test("B13: air resources refresh only by the documented rules", () => {
   // Rising through a one-way top never refreshes the double jump or the cape.
+  // (VIII's world with its super jump owned, as after its GET.)
   const s = world(LEVEL_ID.door, [["floor", -400, 600, 5000], ["thin", 0, 520, 3000]]);
+  s.verbs.super = true;
   Object.assign(s.player, { x: 300, y: 600, grounded: true });
   jump(s);
   update(s, 0.1);
@@ -279,6 +281,7 @@ test("B13: air resources refresh only by the documented rules", () => {
   // Cracked stone never gives the cape back; stable stone and beacons do.
   const c = world(LEVEL_ID.door, [["crack", -400, 540, 3000, "crumble"]]);
   c.capeCharges = 0;
+  c.capeCharge = 0;
   update(c, 0.05);
   assert.equal(capeReady(c), false);
   // In wind the cape does not dash.
@@ -399,6 +402,7 @@ test("D1: the optional techniques measurably change outcomes", () => {
   const apex = (n, acts) => {
     const s = world(n, [["floor", -400, 540, 3000]]);
     s.verbs.double = true; // (owned from I's GET on)
+    s.verbs.super = n === LEVEL_ID.door; // (VIII's, from its GET on)
     s.physics = { ...s.physics, fallLimit: 1e9 };
     let min = 540;
     for (let t = 0; t < 240; t++) {
@@ -471,7 +475,7 @@ test("E1/E2: every movement action has a sound and a visual on its own tick; the
 
 /* ---------- F. Solarum: windows, leads ---------- */
 test("F: every required action in every level has a press window of at least 120 ms (real) and a readable cue", () => {
-  const minimum = { 1: 600, 2: 330, [LEVEL_ID["still-water"]]: 315, [LEVEL_ID["way-down"]]: 290, [LEVEL_ID.breaking]: 240, [LEVEL_ID["borrowed-wind"]]: 190, [LEVEL_ID["falling-road"]]: 190, [LEVEL_ID.door]: 280 };
+  const minimum = { 1: 600, 2: 330, [LEVEL_ID["still-water"]]: 315, [LEVEL_ID["way-down"]]: 290, [LEVEL_ID.breaking]: 240, [LEVEL_ID["borrowed-wind"]]: 190, [LEVEL_ID["falling-road"]]: 190, [LEVEL_ID.door]: 150 };
   for (const n of IDS) {
     const nom = nominalRun(n);
     assert.equal(nom.status, "won");

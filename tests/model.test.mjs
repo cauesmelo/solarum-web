@@ -40,9 +40,12 @@ const read = (name) => readFile(new URL(`../${name}`, import.meta.url), "utf8");
 /** Real (audio) seconds of run between two x on level n's lattice, ignoring
  * flights (which only shorten it). */
 const t = (x, from, n = 2) => (x - from) / 270 / levelDef(n).clock;
-/** A game of level n (the interim Far Door owns every verb under the old
- * one-flight-per-airtime cape rule: the default for rule fixtures). */
-const game = (n = LEVEL_ID.door, o = {}) => createGame(2021, { level: n, ...o });
+/** Rule fixtures: VIII's world with every verb owned from the start (the
+ * super jump too) under the old one-flight-per-airtime cape rule, the kit
+ * of revision six's Far Door, which VIII replaced. game() is that fixture;
+ * game(n) is level n as built. */
+const RULE_DEF = Object.freeze({ ...levelDef(LEVEL_ID.door), verbs: { double: true, cape: true, glide: true, dive: true, super: true }, gets: [], capeRule: undefined });
+const game = (n = null, o = {}) => createGame(2021, n == null ? { def: RULE_DEF, ...o } : { level: n, ...o });
 
 function adapter(s, block) {
   return {
@@ -140,7 +143,10 @@ test("each main route reaches every beacon and uses its level's kit through publ
     // VII: the dives land on stable stones (a dive smashes a tile), so it smashes nothing.
     [LEVEL_ID["falling-road"]]: { dash: 4, "double-jump": 7, constellations: 6, cascade: true },
     [LEVEL_ID.breaking]: { dash: 2, dive: 1, "double-jump": 2, constellations: 7 },
-    [LEVEL_ID.door]: { dash: 4, "super-jump": 2, constellations: 1, cascade: true },
+    // VIII: seven super jumps (the school's, the storm void, out of the
+    // wind, off the falling road, the cracked launch, the star road, the
+    // summit) and the road's two flights.
+    [LEVEL_ID.door]: { dash: 9, "super-jump": 7, constellations: 8, cascade: true },
   };
   for (const n of IDS) {
     const { s, result } = traverse("main", 1 / 120, null, null, n);
@@ -225,18 +231,22 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
   const built = CAMPAIGN.filter((q) => q.def);
   const interim = LEVELS.filter((d) => d.interim);
-  // V and VI took revision six's Breaking Constellation and Borrowed Wind;
-  // the Far Door waits for VIII.
-  assert.deepEqual(interim.map((d) => d.key), ["door"]);
+  // V, VI and VIII took revision six's Breaking Constellation, Borrowed
+  // Wind and Far Door: no interim level is left.
+  assert.deepEqual(interim.map((d) => d.key), []);
   assert.equal(CAMPAIGN.length, 8);
+  assert.equal(built.length, 8, "every stage is built");
   assert.deepEqual(CAMPAIGN.map((q) => q.bpm), [88, 94, 100, 107, 112, 118, 123, 128]);
-  assert.deepEqual(LEVELS.map((d) => d.bpm), [...built.map((q) => q.bpm), 128]);
+  assert.deepEqual(LEVELS.map((d) => d.bpm), built.map((q) => q.bpm));
   assert.deepEqual(LEVELS.map((d) => d.numeral), ROMAN.slice(0, LEVELS.length));
   assert.deepEqual(LEVELS.map((d) => d.id), LEVELS.map((_, i) => i + 1));
   assert.deepEqual(interim.map((d) => d.id), interim.map((_, i) => built.length + 1 + i));
   assert.deepEqual(LEVELS.filter((d) => !d.interim).map((d) => d.key), CAMPAIGN.filter((q) => q.def).map((q) => q.key));
-  assert.ok(LEVELS.findIndex((d) => d.interim) === LEVELS.filter((d) => !d.interim).length, "interim levels come after every built stage");
-  assert.deepEqual(LEVELS.map((d) => d.look), [...built.map((q) => q.look), "moon-earth"]);
+  assert.ok(LEVELS.every((d, i) => !d.interim || LEVELS.slice(i).every((q) => q.interim)), "interim levels come after every built stage");
+  assert.deepEqual(LEVELS.map((d) => d.look), built.map((q) => q.look));
+  assert.equal(LEVELS.at(-1).look, "moon-earth");
+  assert.equal(LEVELS.at(-1).level.earth, true, "Earth waits behind the last door only");
+  assert.ok(LEVELS.slice(0, -1).every((d) => !d.level.earth));
   assert.equal(new Set(LEVELS.filter((d) => !d.interim).map((d) => d.look)).size, built.length, "one look per built stage");
   for (const d of LEVELS) {
     assert.ok(Math.abs(d.clock - d.bpm / 107) < 1e-12, `L${d.id} clock`);
@@ -250,11 +260,13 @@ test("the campaign: built stages in order, then the interim levels; each faster,
     assert.ok(floor && d.level.finishX - floor.x > 400, `L${d.id}: a long calm island before the door`);
   }
   // I: the jump only, then the double jump (GET); II: the cape (GET); III:
-  // the glide (GET). The interim levels keep revision five's kit and cape rule.
+  // the glide (GET). Every stage breathes the cape.
   assert.deepEqual(LEVELS[0].verbs, { double: false, cape: false, glide: false, dive: false, super: false });
   assert.deepEqual(LEVELS[1].verbs, { double: true, cape: false, glide: false, dive: false, super: false });
   assert.ok(LEVELS.filter((d) => !d.interim).every((d) => d.capeRule === "breath"));
-  assert.ok(interim.every((d) => d.interim && d.verbs.cape && d.verbs.dive && d.verbs.glide && !d.capeRule));
+  const viii = levelDef(LEVEL_ID.door);
+  assert.deepEqual(viii.verbs, { double: true, cape: true, glide: true, dive: true, super: false });
+  assert.deepEqual(viii.gets.map((g) => g.verb), ["super"]);
   const kinds = (d) => new Set(createLevel(d).platforms.map((q) => q.type).filter(Boolean));
   assert.equal(kinds(LEVELS[0]).size, 0, "I: stable stone only");
   assert.equal(kinds(LEVELS[1]).size, 0, "II: stable stone only");
@@ -266,9 +278,10 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   assert.ok(LEVELS.filter((d) => d.id < LEVEL_ID["borrowed-wind"]).every((d) => !createLevel(d).updrafts.length), "no wind before VI");
   assert.deepEqual([...kinds(levelDef(LEVEL_ID["falling-road"]))].sort(), ["cascade", "crumble"], "VII: the falling road and its cracks");
   assert.ok(LEVELS.filter((d) => d.id < LEVEL_ID["falling-road"]).every((d) => !kinds(d).has("cascade")), "no cascade before VII");
-  assert.ok(kinds(interim[0]).has("crumble") && kinds(interim[0]).has("cascade"));
-  assert.ok(interim[0].prompts.some((q) => q.action === "super-jump" && !q.optional));
-  assert.ok(!LEVELS.filter((d) => d !== interim[0]).some((d) => d.prompts.some((q) => q.action === "super-jump")));
+  assert.deepEqual([...kinds(viii)].sort(), ["cascade", "crumble"], "VIII: everything (no lid: the dives land on stable stone)");
+  assert.ok(createLevel(viii).updrafts.length >= 4, "VIII: the wind");
+  assert.ok(viii.prompts.some((q) => q.action === "super-jump" && !q.optional));
+  assert.ok(!LEVELS.filter((d) => d !== viii).some((d) => d.prompts.some((q) => q.action === "super-jump")));
   // Human-time forgiveness is constant in real seconds (RESEARCH_LEVELS 3).
   for (const d of LEVELS) {
     const ph = levelPhysics(d);
@@ -279,7 +292,7 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   // lower terminal speed (560 px/s real).
   const f = levelPhysics(LEVELS[0]);
   assert.ok(f.apexHang && Math.abs(f.apexHang.below * LEVELS[0].clock - 54.28) < 0.01 && Math.abs(f.maxFall * LEVELS[0].clock - 560) < 1e-9);
-  for (const d of [levelDef(LEVEL_ID.breaking), levelDef(LEVEL_ID["borrowed-wind"]), levelDef(LEVEL_ID["falling-road"]), interim[0]]) assert.ok(Math.abs(levelPhysics(d).crumbleAfter - 5 * (15 / 107)) < 1e-12, `${d.numeral}: cracks break 5/16 after touch-down`);
+  for (const d of [levelDef(LEVEL_ID.breaking), levelDef(LEVEL_ID["borrowed-wind"]), levelDef(LEVEL_ID["falling-road"]), viii]) assert.ok(Math.abs(levelPhysics(d).crumbleAfter - 5 * (15 / 107)) < 1e-12, `${d.numeral}: cracks break 5/16 after touch-down`);
 });
 test("L1's float: a held jump hangs at the top and falls no faster than 560 px/s real", () => {
   const s = start(game(1));
@@ -513,24 +526,13 @@ test("no required crossing depends on a chain unless a beacon sits right before 
 
 /* ---------- M4 beat cascade ---------- */
 test("the beat cascade drops a tile on every beat (107 BPM of simulation) and closes in on the bouncing line", () => {
-  // L4's main route bounces all six tiles (L3's enters from the well on the second).
+  // VIII's main route bounces both of its falling roads (five tiles each).
   const s = start(game(LEVEL_ID.door));
   const tiles = s.platforms.filter((q) => q.cascade).sort((a, b) => a.x - b.x);
-  assert.ok(tiles.length >= 5 && tiles.length <= 7);
+  assert.equal(tiles.length, 10);
   assert.ok(Math.abs(BEAT - 60 / 107) < 1e-12, "the soundtrack's tempo, not the GDD's 88");
-  for (let i = 0; i < tiles.length; i++) {
-    assert.ok(tiles[i].width >= 140 && tiles[i].width <= 160, tiles[i].id);
-    if (i) {
-      // One tile per beat at a 207 px pitch: the wave travels 369 px/s and
-      // gains 55.6 px of run on Diana every beat (RESEARCH_MUSIC 5.3).
-      assert.ok(Math.abs(tiles[i].x - tiles[i - 1].x - 207) < 1, `${tiles[i].id} pitch`);
-      const gap = tiles[i].x - tiles[i - 1].x - tiles[i - 1].width;
-      assert.ok(gap >= 50 && gap <= 70, `${tiles[i].id} gap ${gap}`);
-    }
-  }
-  const wave = s.cascades[0];
-  assert.equal(wave.interval, BEAT);
-  // The main route bounces across; record when it leaves each tile.
+  for (const q of tiles) assert.ok(q.width >= 140 && q.width <= 160, q.id);
+  for (const c of s.cascades) assert.equal(c.interval, BEAT);
   const log = [];
   let seen = 0;
   const api = adapter(s);
@@ -549,21 +551,24 @@ test("the beat cascade drops a tile on every beat (107 BPM of simulation) and cl
     assert.ok(Math.abs(beats - Math.round(beats)) * BEAT < 0.02, `${d.platform} drops ${((beats - Math.round(beats)) * BEAT * 1000).toFixed(1)} ms off the beat`);
   }
   // Each touch-down on a tile is also the takeoff from it (a bounce), so the
-  // slack is the time from that landing until the tile falls.
-  const left = tiles.map((q) => log.find((e) => e.name === "land" && e.platform === q.id).time);
-  const slack = tiles.map((q, i) => drops[i].time - left[i]);
-  for (let i = 1; i < slack.length; i++) assert.ok(slack[i] < slack[i - 1], `the wave gains on tile ${i}`);
-  assert.ok(slack.at(-1) > 0.35 && slack.at(-1) < 0.75, `last tile falls ${slack.at(-1).toFixed(3)} s after Diana leaves it`);
+  // slack is the time from that landing until the tile falls: it shrinks
+  // along each road (the road closes in), and the last tile falls under a
+  // second after she leaves it.
+  for (const c of s.cascades) {
+    const slack = c.tiles.map((id) => log.find((e) => e.name === "tile-drop" && e.platform === id).time - log.find((e) => e.name === "land" && e.platform === id).time);
+    for (let i = 1; i < slack.length; i++) assert.ok(slack[i] < slack[i - 1], `${c.id}: the road gains on tile ${i}`);
+    assert.ok(slack.at(-1) > 0.5 && slack.at(-1) < 1, `${c.id}: the last tile falls ${slack.at(-1).toFixed(3)} s after Diana leaves it`);
+  }
 });
-test("hopping at each tile edge survives the wave; late coyote hops are caught", () => {
-  for (const n of [LEVEL_ID.door]) assert.equal(traverse("main", 1 / 120, null, null, n).s.status, "won");
+test("hopping at each tile edge survives the road; late coyote hops are caught", () => {
+  assert.equal(traverse("main", 1 / 120, null, null, LEVEL_ID.door).s.status, "won");
   const late = start(game(LEVEL_ID.door));
-  const tiles = late.platforms.filter((q) => q.cascade).sort((a, b) => a.x - b.x);
-  pilotTo(late, "main", tiles[1].x + 116);
+  const tiles = late.platforms.filter((q) => q.cascade === "storm-road").sort((a, b) => a.x - b.x);
+  pilotTo(late, "main", tiles[1].x + 60);
   // From here, hop 24 px after each edge (inside coyote time) and never use
-  // the second jump as a rescue: the wave catches this runner on the last tiles.
-  let next = 0;
-  const end = late.platforms.find((q) => q.id === "cascade-end");
+  // the second jump as a rescue: the falling road catches this runner.
+  let next = 1;
+  const end = late.platforms.find((q) => q.id === "cascade-shore");
   for (let i = 0; i < 2400 && late.status === "running" && late.player.x < end.x + 600; i++) {
     const p = late.player;
     if (next < tiles.length && p.x >= tiles[next].x + tiles[next].width + 24) {
@@ -573,7 +578,7 @@ test("hopping at each tile edge survives the wave; late coyote hops are caught",
     update(late, 1 / 120);
   }
   assert.equal(late.status, "dead");
-  assert.ok(late.player.x > tiles[3].x && late.player.x < end.x + 580, `caught at ${late.player.x}`);
+  assert.ok(late.player.x > tiles[2].x && late.player.x < end.x + 580, `caught at ${late.player.x}`);
 });
 
 /* ---------- M5 updrafts ---------- */
@@ -724,7 +729,15 @@ test("a beacon (or the level's start) sits right before the first required use o
     // V: the second crack (the first that must be left), the split voids'
     // first flight and song, the dive through the first stone.
     [LEVEL_ID.breaking]: { fragile: 220 + 37.85 * 73 - 80, flight: 220 + 37.85 * 182, constellation: 220 + 37.85 * 182 + 69.69 + 39.5, dive: 220 + 37.85 * 249.6 + 113.55 * 2 },
-    [LEVEL_ID.door]: { "super-jump": gx(68) + 63.67, cascade: createLevel(LEVEL_ID.door).platforms.find((q) => q.id === "tile-0").x, constellation: 16147 - 6988.46 },
+    // VIII: the storm void's super jump, the first falling road, the
+    // rise-song that charges the flight out of the wind, the star road's
+    // first cape star.
+    [LEVEL_ID.door]: {
+      "super-jump": createLevel(LEVEL_ID.door).platforms.find((q) => q.id === "storm-step-2").x + 400,
+      cascade: createLevel(LEVEL_ID.door).platforms.find((q) => q.id === "t0").x,
+      constellation: createLevel(LEVEL_ID.door).pickups.find((q) => q.id === "rise-song-0").x,
+      "refill star": levelDef(LEVEL_ID.door).refills[0].x,
+    },
   };
   for (const d of LEVELS)
     for (const [mechanic, x] of Object.entries(firstUse[d.id])) {
@@ -755,7 +768,7 @@ test("main-route gaps and rises respect each level's authoring limits", () => {
   // L2's long void is crossed by two flights around a refill constellation.
   // V: the split voids are two flights around the split-song. VII: the
   // leaf star's third jump climbs 185 px onto k2.
-  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.breaking]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["borrowed-wind"]]: { rise: 165, gap: 400, void: 800 }, [LEVEL_ID["falling-road"]]: { rise: 190, gap: 400, void: 700 }, [LEVEL_ID.door]: { rise: 235, gap: 400 } };
+  const limits = { 1: { rise: 180, gap: 400 }, 2: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["still-water"]]: { rise: 165, gap: 400, glide: 820 }, [LEVEL_ID["way-down"]]: { rise: 165, gap: 400, glide: 600 }, [LEVEL_ID.breaking]: { rise: 165, gap: 400, void: 700 }, [LEVEL_ID["borrowed-wind"]]: { rise: 165, gap: 400, void: 800 }, [LEVEL_ID["falling-road"]]: { rise: 190, gap: 400, void: 700 }, [LEVEL_ID.door]: { rise: 235, gap: 400, void: 1200, long: { "launch-crack": 460 } } };
   for (const n of IDS) {
     const chains = createLevel(n).pickups.filter((q) => q.chain);
     for (const [a, b] of mainPairs(n)) {
@@ -782,7 +795,8 @@ test("no blind landings: every required landing is in view when the input that c
     // VII: Great Star 1's double and flight off the dive road's last tile.
     [LEVEL_ID["falling-road"]]: [["c2", "dive-shore"]],
     [LEVEL_ID.breaking]: [["chain-c", "ridge-b"], ["crown-stair-2", "last-crack"]],
-    [LEVEL_ID.door]: [["school-shore", "storm-step"], ["lid", "well-floor"], ["finale-crack", "low-a"]],
+    // VIII: the low line under the star road climbs back onto the far shore.
+    [LEVEL_ID.door]: [["road-gate", "low-floor"], ["low-floor", "low-step"], ["low-step", "far-shore"]],
   };
   for (const d of LEVELS) {
     // The narrowest sky this level ever shows.

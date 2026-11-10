@@ -30,7 +30,8 @@ const CHALLENGE = {
   [LEVEL_ID.breaking]: { split: [220 + 37.85 * 181, 220 + 37.85 * 184] },
   // VII: the flight over the first missing tile after the dive beacon.
   [LEVEL_ID["falling-road"]]: { dive: [gx(218), gx(221)] },
-  [LEVEL_ID.door]: { storm: [gx(68), gx(76) + 130] },
+  // VIII: the storm void's super jump after the storm beacon.
+  [LEVEL_ID.door]: { storm: [gx(68) + 64.34, gx(76) + 2 * 64.34 + 130] },
 };
 const ACTIONS = { jump, releaseJump, dash, dive, tap: (s) => (jump(s), releaseJump(s)) };
 /** A sloppy run of each level: one fall, one broken constellation and a few
@@ -43,7 +44,7 @@ export const SLOPPY_RUNS = Object.freeze({
   [LEVEL_ID["borrowed-wind"]]: { level: LEVEL_ID["borrowed-wind"], failAt: ["bridge"], removeStars: ["storm-song-2"], late: [[220 + 37.85 * 228 + 113.55 - 1, 220 + 37.85 * 228 + 113.55 + 1, 8]] },
   [LEVEL_ID.breaking]: { level: LEVEL_ID.breaking, failAt: ["split"], removeStars: ["crack-song-2"], late: [[220 + 37.85 * 85 - 1, 220 + 37.85 * 85 + 1, 10]] },
   [LEVEL_ID["falling-road"]]: { level: LEVEL_ID["falling-road"], failAt: ["dive"], removeStars: ["wave-song-2"], late: [[gx(147) - 1, gx(147) + 1, 10]] },
-  [LEVEL_ID.door]: { level: LEVEL_ID.door, failAt: ["storm"], removeStars: ["finale-song-1"], late: [] },
+  [LEVEL_ID.door]: { level: LEVEL_ID.door, failAt: ["storm"], removeStars: ["road-song-1"], late: [] },
 });
 export const SLOPPY = SLOPPY_RUNS[LEVEL_ID["borrowed-wind"]];
 

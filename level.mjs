@@ -2182,231 +2182,340 @@ const FALLING_ROAD = {
     safe: R_PLAN_MAIN,
   },
 };
-/**
- * Open a level at `cut` and insert a section (RESEARCH_LEVELS: content, not
- * padding). Everything at x >= cut moves by (dx, dy): platforms, wind,
- * constellations, stars, Great Stars, glyphs, beacons, sections, the door
- * and the pilots' steps. dx is a whole number of sixteenths of run (plus
- * three per inserted flight, 63.67 px per super jump), so the rest of the
- * level keeps its grid; a whole number of bars keeps its music too.
- * `content` holds the new section in final coordinates; `drop` removes
- * chain or star ids from the moved part (a void repeated without stars).
- */
-function insertSection(def, { cut, dx, dy = 0, content = {}, drop = [] }) {
-  const moveX = (x) => (x >= cut ? x + dx : x);
-  const moved = (x) => x >= cut;
-  const plat = (list) => list.map(([id, x, y, w, t, e]) => (moved(x) ? [id, x + dx, y + dy, w, t, e] : [id, x, y, w, t, e]));
-  const out = {
-    ...def,
-    level: { ...def.level, finishX: def.level.finishX + dx, finishY: def.level.finishY + dy },
-    main: [...plat(def.main), ...(content.main ?? [])],
-    high: [...plat(def.high), ...(content.high ?? [])],
-    updrafts: [...def.updrafts.map((u) => (moved(u.x) ? { ...u, x: u.x + dx, top: u.top + dy, bottom: u.bottom + dy } : u)), ...(content.updrafts ?? [])],
-    cascades: [...def.cascades, ...(content.cascades ?? [])],
-    chains: [
-      ...def.chains.filter((c) => !drop.includes(c.id)).map((c) => ({ ...c, stars: c.stars.map(([x, y]) => (moved(x) ? [x + dx, y + dy] : [x, y])) })),
-      ...(content.chains ?? []),
-    ],
-    great: [...def.great.map((g) => (moved(g.x) ? { ...g, x: g.x + dx, y: g.y + dy } : g)), ...(content.great ?? [])],
-    prompts: [...def.prompts.map((q) => (moved(q.x) ? { ...q, x: q.x + dx, y: q.y + dy, from: moveX(q.from), to: moveX(q.to), inputX: moveX(q.inputX) } : q)), ...(content.prompts ?? [])],
-    stars: [...def.stars.filter(([id]) => !drop.includes(id)).map(([id, x, y, r]) => (moved(x) ? [id, x + dx, y + dy, r] : [id, x, y, r])), ...(content.stars ?? [])],
-    checkpoints: [...def.checkpoints.map((c) => (moved(c.x) ? { ...c, x: c.x + dx, y: c.y + dy } : c)), ...(content.checkpoints ?? [])].sort((a, b) => a.x - b.x),
-    sections: [...def.sections.map((q) => ({ ...q, x: moveX(q.x) })), ...(content.sections ?? [])].sort((a, b) => a.x - b.x),
-    routes: {},
-  };
-  for (const [name, plan] of Object.entries(def.routes)) {
-    const add = content.routes?.[name] ?? content.routes?.main ?? [];
-    // Steps keep their order; inserted ones sit between the two parts.
-    out.routes[name] = [...plan.filter(([x]) => x < cut), ...add, ...plan.filter(([x]) => x >= cut).map(([x, a, w]) => [x + dx, a, w])];
-  }
-  return out;
-}
-
-/* Revision six's level II, Borrowed Wind (interim until VI was built), is
- * retired: VI took its breeze, its first wind and lifted shore, its glide
- * bridge and its finale (re-solved at 118 BPM, with breath), IV re-solved
- * its currents (the cut). */
-
-/* Revision five's level III, The Breaking Constellation (interim until V
- * was built), is retired: V took its cracks and floor, the ridge and its
- * chain, the split voids, the last crack and the crown, and the cracked
- * stair (re-solved at 112 BPM), IV its broken well. The interim Far Door
- * below keeps its crack timing: 5/16 of simulation after the touch-down. */
-const L3_SIX = 15 / 107;
-
-/* ---- L4 · The Far Door (128 BPM): agitated and tense, precise but fair ----
- * New: the super jump (a jump during a flight), taught over a stable floor
- * and then required once. Then everything at 128: Movement II's well and
- * cascade and Movement III's finale with its cracked launch, translated by
- * whole sixteenths. A super jump 2/16 into a flight keeps 2/16 of the
- * flight's extra run (63.67 px), so everything after the two required ones
- * is shifted by that much as well. Super jump arc (scripts/arcs.mjs): apex
- * 267 px up at 7/16; 233 px up at 9/16. */
-const SUPER = 227.1 * 2 * (15 / 107);
-// The well beacon island: chapter sixteenth 264 lands on L4 sixteenth 88, a
-// whole number of bars earlier, so the cascade still drops on the beat.
-const L4_DX_B = gx(88) + 2 * SUPER - gx(264);
-const L4_DY_B = -120;
-// The finale: the hearth's takeoff at L4 sixteenth 206 is the chapter's 490;
-// with the voids inserted after it (76 sixteenths) the door is on bar 23.
-const L4_DX_C = gx(206) + 2 * SUPER - (gx(490) + 3 * 113.55);
-const L4_DY_C = -161;
-// Jump on the grid, open the cape 2/16 later and jump again 2/16 into the
-// flight (where the flight has added one SUPER of extra run).
-const superAt = (k, shifts) => [[gx(k) + shifts * SUPER - 0.3, "jump", "g"], [gx(k + 2) + shifts * SUPER - 0.3, "dash", "a"], [gx(k + 4) + (shifts + 1) * SUPER - 0.3, "jump", "a"]];
-const inX = (from, to) => (q) => q[1] >= from && q[1] < to;
-// The hearth ends 78.5 px after its takeoff (sixteenth 206), as Movement
-// III's did after the hearth void's.
-const L4_B_PLAT = MAIN.filter(inX(10100, 15100)).map((q) => (q[0] === "hearth" ? [q[0], q[1], q[2], gx(206) + 2 * SUPER + 78.5 - (q[1] + L4_DX_B)] : q));
-// (The high shore 3 px lower: at 128 its landing came 36 ms early.)
-const L4_C_PLAT = MAIN.filter(inX(19300, 23000)).map((q) => (q[0] === "finale-high" ? [q[0], q[1], q[2] + 3, q[3]] : q));
-const L4_BASE = {
-  id: 4,
+/* ---- VIII · The Far Door (128 BPM, toward the Moon, then Earth): tense but fair ----
+ * RESEARCH_PROGRESSION 4.5 VIII and RESEARCH_REFILLS 3: the super jump (a
+ * jump during a flight, once per flight) is the GET, the rising star at
+ * sixteenth 24, right after the title card. Then revision six's super-jump
+ * school and storm void at the same sixteenths, and new content built on
+ * everything: a super out of a wind column's top, a super off a cascade's
+ * last tile, the gauntlet (a cracked launch and a super across its void, a
+ * dive stair), the required star road over a stable low line, the rising
+ * stair, a super onto the summit, a dive stair down and a short last road
+ * to Earth's door. Shared physics (V-VII's cells hold); clock 1.196.
+ * Units: a grid x is ex(k, s, f) = 220 + 37.85 k + 63.67 s + 113.55 f (k
+ * sixteenths, s super jumps opened 2/16 into a flight, f full flights).
+ * Cells (scratch probe on the real model, dy at n/16 after a ground jump,
+ * up < 0): super (jump, cape 2, jump 4) 9: -233.8, 10: -173, 11: -82.7,
+ * 12: +37.1; jump into a column, cape 6, jump 8: 16: -94.2; the star road
+ * (jump, cape 2, a cape star, jump 4, a leaf star, jump 10, cape 13, a cape
+ * star, cape 17) 23: -163.8 and +290.77 px; V-VII's hop, tap, double and
+ * jump-and-dive cells. Heights follow the main route's landings (EY). */
+const E_CLOCK = 128 / 107;
+const E_SIX = 15 / 107;
+/** A super jump opened 2/16 into a flight keeps 2/16 of its extra run. */
+const SUP = 64.34;
+/** Grid x on sixteenth k after s super jumps and f full flights. */
+const ex = (k, s = 0, f = 0) => 220 + 37.85 * k + SUP * s + 113.55 * f;
+const EY = (() => {
+  const y = {};
+  let at = 0;
+  for (const [id, dy] of [
+    ["floor", 560], ["school", -233], ["school2", 18], ["step", 149.3], ["stepB", 18], ["step2", 18], ["high", -233], ["windGate", 16.1], ["windShore", -94.2], ["windShore2", 18], ["windShore3", 18],
+    ["t0", -84], ["t1", 51], ["t2", -31], ["t3", 51], ["t4", -31], ["cascShore", -82.7], ["cascShore2", 18],
+    ["crack", -31], ["gShore", 37.1], ["s1", 149.3], ["s2", 149.3], ["roadShore", -135.1], ["gate", 18],
+    ["far", -199], ["far2", 149.3], ["stair1", -135.1], ["stair2", -135.1], ["summit", 37.1], ["summit2", 18],
+    ["d1", 149.3], ["d2", 149.3], ["f0", -31], ["f1", 51], ["f2", -31], ["f3", 51], ["f4", -31], ["lastStone", 57.3], ["plain", -135.1],
+  ])
+    y[id] = at = +(at + dy).toFixed(1);
+  // The low line under the star road: a tap down off the gate, a hop up and
+  // a double up onto the far shore (only jumps; never 240 px under the road).
+  y.lowFloor = +(y.gate + 6).toFixed(1);
+  y.lowStep = +(y.lowFloor - 84).toFixed(1);
+  return y;
+})();
+/** Super jumps and full flights before each stretch of the main route. */
+const SF = { start: [0, 0], school: [1, 0], storm: [2, 0], wind: [3, 0], casc: [4, 0], launch: [5, 0], road: [6, 0], far: [6, 2], summit: [7, 2] };
+const eIsle = (id, landK, takeoffK, y, [s, f], lead = 80, type, edge = 10) => {
+  const a = ex(landK, s, f) - lead;
+  const q = [id, a, y, ex(takeoffK, s, f) + edge - a];
+  return type ? [...q, type] : q;
+};
+/** A cascade tile landed on at sixteenth k and left at once (VII's rTile). */
+const eTile = (id, k, [s, f], y, lead = 80, width = 150) => [id, ex(k, s, f) - lead, y, width, "cascade"];
+const eCol = (id, k, [s, f], y) => ({ id, x: ex(k, s, f) + 30, width: 180, top: y - 307, bottom: y + 253 });
+/** A beacon's breeze: 160 px wide and 203 px tall (VI's are 200), so a hop
+ * into it lands on its stone 9/16 later at 60, 120 and 240 Hz (8.91 at 200). */
+const eBreeze = (id, k, [s, f], y) => ({ id, x: ex(k, s, f) + 30, width: 160, top: y - 203, bottom: y, gentle: true });
+const eAt = (y0, dy) => Math.round(y0 + dy - 36);
+const eRun = (k, [s, f], y) => [ex(k, s, f) + 39.5, y - 40];
+const eArc = (k, [s, f], y0, dy) => [ex(k, s, f) + 39.5, eAt(y0, dy)];
+const EJ = (k, [s, f], when = "g") => [ex(k, s, f) - 0.3, "jump", when];
+const ET = (k, [s, f]) => [ex(k, s, f) - 0.3, "tap", "g"];
+const ED = (k, [s, f]) => [ex(k, s, f) - 0.3, "dash", "a"];
+const EV = (k, [s, f]) => [ex(k, s, f) - 0.3, "dive", "a"];
+/** A hop into a beacon's breeze (optional; it lands on the beat 9/16 later). */
+const EB = (k, [s, f]) => [ex(k, s, f) - 0.3, "jump", "g"];
+/** Jump on the grid, open the cape 2/16 later and jump again 2/16 into the flight. */
+const eSuper = (k, [s, f]) => [EJ(k, [s, f]), ED(k + 2, [s, f]), EJ(k + 4, [s + 1, f], "a")];
+/** The star road from the gate (sixteenth 236): jump, cape (238), a cape
+ * star, the super jump (240), a leaf star at its top, the double (245),
+ * cape (249), a cape star, cape (253); down on the far shore on 259. */
+const ROAD_K = 236;
+// (The second flight is pressed 1.6 px early: the 60 Hz pilot, a sample
+// late, otherwise opened it 36 ms after the grid.)
+const eRoad = () => [EJ(ROAD_K, SF.launch), ED(ROAD_K + 2, SF.launch), EJ(ROAD_K + 4, SF.road, "a"), EJ(ROAD_K + 9, SF.road, "a"), [ex(ROAD_K + 13, ...SF.road) - 1.9, "dash", "a"], ED(ROAD_K + 17, [6, 1])];
+const E_MAIN = [
+  // The wake and the school: the floor runs under the school shore and ends
+  // 150 px before the step, so a missed super is only a jump up onto it.
+  ["moon-floor", -700, EY.floor, ex(44, 1) - 150 + 700],
+  // A tap down (38) onto the school's second stone; a jump and a dive at
+  // its top (43, 46) land 149 px down on the step (48); taps down (48, 53)
+  // onto the storm beacon's stone (56). (The second stone runs 40 px past
+  // its takeoff, so Great Star 1 is seen from it.)
+  eIsle("school-shore", 37, 38, EY.school, SF.school, 60),
+  eIsle("school-shore-2", 41, 43, EY.school2, SF.school, 60, undefined, 40),
+  eIsle("storm-step", 48, 48, EY.step, SF.school, 70, undefined, 30),
+  eIsle("storm-step-b", 51, 53, EY.stepB, SF.school, 60),
+  ["storm-step-2", ex(56, 1) - 60, EY.step2, ex(68, 1) + 10 - (ex(56, 1) - 60)],
+  // The need: across the storm void, a super jump onto a shore 233 px up
+  // (9/16 after the takeoff). (Its lip reaches 160 px back: a super opened
+  // late in the arc, as the glyph reads, flies shorter.)
+  ["storm-high", ex(77, 2) - 160, EY.high, ex(79, 2) - 6 - (ex(77, 2) - 160)],
+  // Develop: land and go, a double (79, 83) down onto the wind gate (89);
+  // jump into the column (92), the rise-song on its rise, the cape at its
+  // top (98) and the super jump (100): down on the wind shore (108).
+  eIsle("wind-gate", 89, 92, EY.windGate, SF.storm, 40),
+  eIsle("wind-shore", 108, 109, EY.windShore, SF.wind, 80),
+  ["wind-shore-2", ex(112, 3) - 60, EY.windShore2, ex(123, 3) + 10 - (ex(112, 3) - 60)],
+  eIsle("wind-shore-3", 126, 128, EY.windShore3, SF.wind, 60, undefined, 30),
+  // Develop: a tap (123) onto the wind shore's third stone and a hop (128)
+  // 84 px up onto the cascade, bounces of 6 and 5 sixteenths (down 51, up
+  // 31), and a super jump off its last tile (154, 156, 158) onto the
+  // cascade shore (165), 83 px up, a tap down onto the launch beacon's
+  // stone; the cascade-song on the bounces, complete on the last tile,
+  // gives the cape back for it.
+  eTile("t0", 132, SF.wind, EY.t0),
+  eTile("t1", 138, SF.wind, EY.t1),
+  eTile("t2", 143, SF.wind, EY.t2),
+  eTile("t3", 149, SF.wind, EY.t3),
+  eTile("t4", 154, SF.wind, EY.t4),
+  eIsle("cascade-shore", 165, 165, EY.cascShore, SF.casc, 50, undefined, 30),
+  ["cascade-shore-2", ex(168, 4) - 60, EY.cascShore2, ex(180, 4) + 10 - (ex(168, 4) - 60)],
+  // The gauntlet: a hop (180) onto the launch crack (185); jump (187), cape
+  // and super jump across the long void (12/16, 37 px down) onto the
+  // gauntlet shore (199); the launch-song on the crack and the jump's rise.
+  eIsle("launch-crack", 185, 187, EY.crack, SF.casc, 50, "crumble", -6),
+  eIsle("gauntlet-shore", 199, 201, EY.gShore, SF.launch, 80, undefined, -6),
+  // The dive stair: a jump and a dive at its top (201/204, 207/210) land
+  // 149 px down 5/16 later, on stable stones (a dive smashes cracks); a
+  // double (213, 217) up onto the road shore (221), a tap onto the gate.
+  eIsle("g-stone-1", 206, 207, EY.s1, SF.launch, 55, undefined, -6),
+  eIsle("g-stone-2", 212, 213, EY.s2, SF.launch, 55, undefined, -6),
+  eIsle("road-shore", 221, 221, EY.roadShore, SF.launch, 80, undefined, 30),
+  ["road-gate", ex(224, 5) - 60, EY.gate, ex(ROAD_K, 5) + 10 - (ex(224, 5) - 60)],
+  // The far shore starts where the road lands (259, 2 px high).
+  ["far-shore", ex(259, ...SF.far) - 80, EY.far, ex(261, ...SF.far) + 60 - (ex(259, ...SF.far) - 80)],
+  // A jump and a dive (261, 264) down onto the summit beacon's stone (266).
+  ["far-shore-2", ex(266, ...SF.far) - 55, EY.far2, ex(284, ...SF.far) + 10 - (ex(266, ...SF.far) - 55)],
+  // The rising stair: two doubles (284/288, 296/300), 135 px up each,
+  // along the stair-song; then a super jump (308) across onto the summit
+  // (12/16, 37 px down), charged by the summit-song on the second step.
+  eIsle("stair-1", 292, 296, EY.stair1, SF.far, 60),
+  eIsle("stair-2", 304, 308, EY.stair2, SF.far, 60),
+  // Down from the summit: a tap (320) onto its second stone, then a jump and
+  // a dive (325/328, 331/334) onto two stones; the home beacon on the second.
+  eIsle("summit", 320, 320, EY.summit, SF.summit, 80, undefined, 30),
+  eIsle("summit-2", 323, 325, EY.summit2, SF.summit, 60, undefined, 40),
+  eIsle("d-stone-1", 330, 331, EY.d1, SF.summit, 55, undefined, -6),
+  ["d-stone-2", ex(336, ...SF.summit) - 55, EY.d2, ex(347, ...SF.summit) + 10 - (ex(336, ...SF.summit) - 55)],
+  // The last road: five tiles (352 ... 374), down onto the last stone (380)
+  // and a double (380, 384) up onto Earth's plain (388).
+  eTile("f0", 352, SF.summit, EY.f0),
+  eTile("f1", 358, SF.summit, EY.f1),
+  eTile("f2", 363, SF.summit, EY.f2),
+  eTile("f3", 369, SF.summit, EY.f3),
+  eTile("f4", 374, SF.summit, EY.f4),
+  eIsle("last-stone", 380, 380, EY.lastStone, SF.summit, 55, undefined, 40),
+  ["earth-plain", ex(388, ...SF.summit) - 80, EY.plain, ex(400, ...SF.summit) + 520 - (ex(388, ...SF.summit) - 80)],
+];
+/** The road's takeoff (X0) and its landing on the far shore (X0 + 1161). */
+const ROAD_X0 = ex(ROAD_K, 5);
+const E_HIGH = [
+  // The low line under the star road: off the gate by a tap (236) down
+  // onto the low floor, a hop (410 px on) 84 px up onto the low step and a
+  // double from its far end (881 px on) 121 px up onto the far shore. The step reaches under the
+  // far shore's lip and the floor under the step's, so a miss anywhere on
+  // the road lands on one of them, never in the void.
+  ["low-floor", ROAD_X0 + 60, EY.lowFloor, 520],
+  ["low-step", ROAD_X0 + 520, EY.lowStep, 580],
+];
+const E_WIND = [
+  eCol("rise-wind", 92, SF.storm, EY.windGate),
+  eBreeze("wind-breeze", 113, SF.wind, EY.windShore2),
+  eBreeze("launch-breeze", 169, SF.casc, EY.cascShore2),
+  eBreeze("summit-breeze", 273, SF.far, EY.far2),
+  eBreeze("home-breeze", 337, SF.summit, EY.d2),
+  eBreeze("earth-breeze", 389, SF.summit, EY.plain),
+];
+const E_CASCADES = [
+  { id: "storm-road", tiles: ["t0", "t1", "t2", "t3", "t4"], lead: 37.85 * 12 + 80, interval: BEAT },
+  { id: "last-road", tiles: ["f0", "f1", "f2", "f3", "f4"], lead: 37.85 * 12 + 80, interval: BEAT },
+];
+const E_CHAINS = [
+  // Along the school's super jump (complete on 36, before its landing): the
+  // stable school shore does not breathe a whole bar, so this song is what
+  // gives the cape back for Great Star 1's second super jump.
+  { id: "school-song", route: "low", stars: [eArc(30, SF.start, EY.floor, -99.1), eArc(33, SF.school, EY.floor, -182.3), eArc(35, SF.school, EY.floor, -267), eArc(36, SF.school, EY.floor, -265)] },
+  // Required: the column's rise (complete on 96) gives the cape back for
+  // the flight out of its top (98).
+  { id: "rise-song", route: "low", stars: [eRun(90, SF.storm, EY.windGate), eArc(93, SF.storm, EY.windGate, -64), eArc(95, SF.storm, EY.windGate, -136), eArc(96, SF.storm, EY.windGate, -170)] },
+  // Required: the bounces (complete on the last tile, 150), so a flight
+  // spent between the tiles is given back before the super jump.
+  { id: "cascade-song", route: "low", stars: [eRun(138, SF.wind, EY.t1), eRun(143, SF.wind, EY.t2), eRun(149, SF.wind, EY.t3), eRun(154, SF.wind, EY.t4)] },
+  // Required: the crack and the launch's rise (complete on 188).
+  { id: "launch-song", route: "low", stars: [eRun(178, SF.casc, EY.cascShore2), eRun(185, SF.casc, EY.crack), eRun(186, SF.casc, EY.crack), eArc(188, SF.casc, EY.crack, -64.3)] },
+  // The climax phrase along the star road (complete on its landing).
+  { id: "road-song", route: "low", stars: [[ex(ROAD_K + 6, ...SF.road) + 39.5, eAt(EY.gate, -239)], [ex(ROAD_K + 12, ...SF.road) + 39.5, eAt(EY.gate, -318)], [ex(ROAD_K + 19, 6, 1) + 63.67 + 39.5, eAt(EY.gate, -286)], [ex(ROAD_K + 22, ...SF.far) + 39.5, eAt(EY.gate, -255)], eRun(ROAD_K + 24, SF.far, EY.far)] },
+  // The rising stair (the stair-song), complete on the second step.
+  { id: "stair-song", route: "low", stars: [eArc(286, SF.far, EY.far2, -99), eArc(290, SF.far, EY.far2, -165), eRun(292, SF.far, EY.stair1), eArc(298, SF.far, EY.stair1, -99), eArc(300, SF.far, EY.stair1, -80)] },
+  // Required: the second double's fall and the second step's run (complete
+  // on 308, the super jump's takeoff), so a flight spent on the stair is
+  // given back before it.
+  { id: "summit-song", route: "low", stars: [eArc(302, SF.far, EY.stair1, -165), eRun(304, SF.far, EY.stair2), eRun(306, SF.far, EY.stair2), eRun(308, SF.far, EY.stair2)] },
+  // Home: the last tiles and the double up onto Earth's plain.
+  { id: "home-song", route: "low", stars: [eRun(363, SF.summit, EY.f2), eRun(369, SF.summit, EY.f3), eRun(374, SF.summit, EY.f4), eRun(380, SF.summit, EY.lastStone), eArc(386, SF.summit, EY.lastStone, -164)] },
+];
+const E_GREAT = [
+  // A second super jump from the school shore (stable: the cape is back).
+  { id: "great-1", x: ex(50, 2), y: EY.school2 - 267 - 46, line: "high above the school: a second super jump" },
+  // A super jump in the road's second flight, right after its cape star.
+  { id: "great-2", x: ex(ROAD_K + 18.4, 7, 0), y: EY.gate - 289 - 173 - 36 + 38, line: "high over the star road: a super jump in its second flight" },
+  // A super jump off the last road's last tile, onto Earth's plain.
+  { id: "great-3", x: ex(381, 8, 2), y: EY.f4 - 267 - 46, line: "over the last tile: a flight and a super jump" },
+];
+const E_STARS = [
+  ...[[388, SF.summit], [391, SF.summit], [394, SF.summit]].map(([k, sf], i) => [`run-star-${i}`, ex(k + 4, ...sf) + 33.5, EY.plain - 40, "low"]),
+  // Over each land-and-go hop, on its rise.
+  ...[[79, SF.storm, EY.high], [207, SF.launch, EY.s1], [213, SF.launch, EY.s2], [261, SF.far, EY.far], [331, SF.summit, EY.d1]].map(([k, sf, y], i) => [`hop-star-${i}`, ex(k + 1, ...sf) + 33.5, eAt(y, -64.7), "low"]),
+  // At the top of each beacon breeze's lift.
+  ...[[113, SF.wind, EY.windShore2], [169, SF.casc, EY.cascShore2], [273, SF.far, EY.far2], [337, SF.summit, EY.d2], [389, SF.summit, EY.plain]].map(([k, sf, y], i) => [`breeze-star-${i}`, ex(k + 4, ...sf) + 33.5, eAt(y, -167.8), "low"]),
+  // At the top of each bounce between tiles.
+  ...[[132, SF.wind, EY.t0], [352, SF.summit, EY.f0], [358, SF.summit, EY.f1]].map(([k, sf, y], i) => [`bounce-star-${i}`, ex(k + 3, ...sf) + 33.5, eAt(y, -104.3), "low"]),
+  // At the apex of the storm void's and the falling road's super jumps.
+  ...[[75, SF.storm, EY.step2], [161, SF.casc, EY.t4]].map(([k, sf, y], i) => [`super-star-${i}`, ex(k, ...sf) + 33.5, eAt(y, -267), "low"]),
+  // On each tap down's rise (her own notes, not the bed's).
+  ...[[38, SF.school, EY.school], [48, SF.school, EY.step], [53, SF.school, EY.stepB], [109, SF.wind, EY.windShore], [123, SF.wind, EY.windShore2], [165, SF.casc, EY.cascShore], [221, SF.launch, EY.roadShore], [320, SF.summit, EY.summit]].map(([k, sf, y], i) => [`tap-star-${i}`, ex(k + 1, ...sf) + 33.5, eAt(y, -24), "low"]),
+  // On each jump-and-dive's rise, before the dive.
+  ...[[43, SF.school, EY.school2], [201, SF.launch, EY.gShore], [207, SF.launch, EY.s1], [261, SF.far, EY.far], [325, SF.summit, EY.summit2], [331, SF.summit, EY.d1]].map(([k, sf, y], i) => [`dive-star-${i}`, ex(k + 2, ...sf) + 33.5, eAt(y, -99), "low"]),
+  // At the top of the land-and-go doubles.
+  ...[[79, SF.storm, EY.high], [213, SF.launch, EY.s2]].map(([k, sf, y], i) => [`double-star-${i}`, ex(k + 6, ...sf) + 33.5, eAt(y, -164), "low"]),
+  // At the top of the bounces on both falling roads.
+  ...[[138, SF.wind, EY.t1], [143, SF.wind, EY.t2], [149, SF.wind, EY.t3], [363, SF.summit, EY.f2], [369, SF.summit, EY.f3], [374, SF.summit, EY.f4]].map(([k, sf, y], i) => [`tile-star-${i}`, ex(k + 3, ...sf) + 33.5, eAt(y, -104.3), "low"]),
+];
+const E_PLAN_MAIN = [
+  ...eSuper(28, SF.start), ET(38, SF.school), EJ(43, SF.school), EV(46, SF.school), ET(48, SF.school), ET(53, SF.school),
+  ...eSuper(68, SF.school),
+  EJ(79, SF.storm), EJ(83, SF.storm, "a"),
+  EJ(92, SF.storm), ED(98, SF.storm), EJ(100, SF.wind, "a"),
+  ET(109, SF.wind), EB(113, SF.wind),
+  ET(123, SF.wind), EJ(128, SF.wind), EJ(132, SF.wind), EJ(138, SF.wind), EJ(143, SF.wind), EJ(149, SF.wind), ...eSuper(154, SF.wind),
+  ET(165, SF.casc), EB(169, SF.casc),
+  EJ(180, SF.casc), ...eSuper(187, SF.casc),
+  EJ(201, SF.launch), EV(204, SF.launch), EJ(207, SF.launch), EV(210, SF.launch), EJ(213, SF.launch), EJ(217, SF.launch, "a"), ET(221, SF.launch),
+  ...eRoad(),
+  EJ(261, SF.far), EV(264, SF.far), EB(273, SF.far),
+  EJ(284, SF.far), EJ(288, SF.far, "a"), EJ(296, SF.far), EJ(300, SF.far, "a"),
+  ...eSuper(308, SF.far),
+  ET(320, SF.summit), EJ(325, SF.summit), EV(328, SF.summit), EJ(331, SF.summit), EV(334, SF.summit),
+  [ex(337, ...SF.summit) + 1.2, "jump", "g"],
+  EJ(347, SF.summit), EJ(352, SF.summit), EJ(358, SF.summit), [ex(363, ...SF.summit) + 0.7, "jump", "g"], EJ(369, SF.summit), EJ(374, SF.summit), EJ(380, SF.summit), EJ(384, SF.summit, "a"), [ex(389, ...SF.summit) + 2.5, "jump", "g"],
+];
+const FAR_DOOR = {
   key: "door",
-  numeral: "IV",
   title: "The Far Door",
+  look: "moon-earth",
+  toward: "the Moon, then Earth",
+  introduces: "super",
   bpm: 128,
-  clock: 128 / 107,
-  physics: { crumbleAfter: 5 * L3_SIX },
-  verbs: ALL_VERBS,
+  clock: E_CLOCK,
+  physics: { crumbleAfter: 5 * E_SIX },
+  verbs: { double: true, cape: true, glide: true, dive: true, super: false },
+  gets: [{ id: "rising-star", verb: "super", x: ex(24) }],
+  capeRule: "breath",
   view: { minWidth: 1050, portraitMinWidth: 840 },
-  level: { title: "The Far Door", speed: 270, startX: 220, startY: 470, finishX: 21984 + L4_DX_C, finishY: 470 + L4_DY_C, beat: BEAT, earth: true },
-  movements: [{ id: "L4", x: -1000, numeral: "IV", name: "The Far Door" }],
+  level: { title: "The Far Door", speed: 270, startX: 220, startY: EY.floor, finishX: ex(400, ...SF.summit), finishY: EY.plain, beat: BEAT, earth: true },
+  movements: [{ id: "VIII", x: -1000, numeral: "VIII", name: "The Far Door" }],
   sections: [
-    { x: -1000, movement: "L4", step: "introduce", name: "IV · The Far Door" },
-    { x: 3300, movement: "L4", step: "develop", name: "IV · The Far Door — the wave" },
-    { x: 13000 + L4_DX_B, movement: "L4", step: "twist", name: "IV · The Far Door — the crown" },
-    { x: 19300 + L4_DX_C, movement: "L4", step: "conclude", name: "IV · The Far Door — everything" },
-    { x: 21440 + L4_DX_C, movement: "L4", step: "coda", name: "IV · The Far Door — Earth" },
+    { x: -1000, movement: "VIII", step: "warm", name: "VIII · The Far Door" },
+    { x: ex(24), movement: "VIII", step: "safe", name: "VIII · The Far Door — the rising star" },
+    { x: ex(56, 1), movement: "VIII", step: "need", name: "VIII · The Far Door — the storm void" },
+    { x: ex(79, 2), movement: "VIII", step: "develop", name: "VIII · The Far Door — out of the wind" },
+    { x: ex(112, 3), movement: "VIII", step: "develop", name: "VIII · The Far Door — off the falling road" },
+    { x: ex(168, 4), movement: "VIII", step: "twist", name: "VIII · The Far Door — the gauntlet" },
+    { x: ex(224, 5), movement: "VIII", step: "twist", name: "VIII · The Far Door — the star road" },
+    { x: ex(272, ...SF.far), movement: "VIII", step: "conclude", name: "VIII · The Far Door — the rising stair" },
+    { x: ex(336, ...SF.summit), movement: "VIII", step: "conclude", name: "VIII · The Far Door — the last road" },
+    { x: ex(388, ...SF.summit), movement: "VIII", step: "coda", name: "VIII · The Far Door — Earth" },
   ],
+  // Beacons on half bars 3½, 7, 10½, 14, 17 and 21 (at most 9.5 s real
+  // apart), each lit by a landing on or before its own beat.
   checkpoints: [
-    { id: "storm", x: gx(56) + SUPER - 3, y: 407, platform: "storm-step", story: "The wind was hers now. So was the sky above it.", tip: "Jump, open the cape, then jump again during the flight." },
-    { id: "wave", x: 10211.2 + L4_DX_B, y: 464 + L4_DY_B, platform: "b3-isle", story: "The constellation was falling faster now.", tip: "Hop as soon as you land. The falling wave is catching up." },
-    { id: "crown", x: 13843.2 + L4_DX_B, y: 319 + L4_DY_B, platform: "hearth", story: "The little blue world was close enough to hear.", tip: "Jump at the edge, then press the cape at the top of the jump." },
-    { id: "finale", x: gx(212) + 2 * SUPER - 1, y: 412 + L4_DY_C, platform: "finale-gate", story: "Somewhere ahead, a little blue world is listening.", tip: "The low road is slower, but it is safe." },
+    { id: "storm", x: ex(56, 1) - 3, y: EY.step2, platform: "storm-step-2", story: "The Moon was near enough now to cast her shadow ahead of her.", tip: "Jump, press the cape, then jump again during the flight." },
+    { id: "wind", x: ex(112, 3) - 3, y: EY.windShore2, platform: "wind-shore-2", story: "Out of the Moon's thin wind she rose higher than any star she had caught.", tip: "Bounce on the beat, then super jump off the last stone of the road." },
+    { id: "launch", x: ex(168, 4) - 3, y: EY.cascShore2, platform: "cascade-shore-2", story: "Below her the old road ran on in the dark, the way she had come.", tip: "Jump from the crack and super jump across; jump and dive down the stones." },
+    { id: "road", x: ex(224, 5) - 3, y: EY.gate, platform: "road-gate", story: "Every star of the road was lit for her, and she did not touch the ground.", tip: "Fly, take the star, super jump, take the leaf, jump, fly and fly again." },
+    { id: "summit", x: ex(272, ...SF.far) - 3, y: EY.far2, platform: "far-shore-2", story: "The blue world filled half the sky, close enough to hear its oceans.", tip: "Jump twice up each step, then super jump to the summit." },
+    { id: "home", x: ex(336, ...SF.summit) - 1.5, y: EY.d2, platform: "d-stone-2", story: "One last road, and at its end a door left open, as if someone waited.", tip: "Bounce on the beat, then jump twice up onto the plain." },
   ],
-  startTip: "Jump, open the cape, then jump again in the air: the super jump.",
-  main: [
-    // The school: a super jump from the floor reaches a high shore; missing
-    // it only means running on, and a plain jump climbs back to the step.
-    ["storm-floor", -700, 470, 2550],
-    ["school-shore", gx(33) + SUPER - 60, 237, gx(40) + SUPER + 10 - (gx(33) + SUPER - 60)],
-    ["storm-step", gx(47) + SUPER - 60, 407, gx(68) + SUPER + 10 - (gx(47) + SUPER - 60)],
-    // Required: across a void to a shore 233 px up, 9/16 after the takeoff.
-    // (Its lip reaches 160 px back: a super jump opened late in the arc, as
-    // the glyph reads, flies shorter.)
-    ["storm-high", gx(77) + 2 * SUPER - 160, 174, gx(81) + 2 * SUPER + 10 - (gx(77) + 2 * SUPER - 160)],
-    ...shift(L4_B_PLAT, L4_DX_B, L4_DY_B, "plat"),
-    ...shift(L4_C_PLAT, L4_DX_C, L4_DY_C, "plat"),
+  startTip: "Jump, press the cape, then jump again during the flight: the super jump.",
+  main: E_MAIN,
+  high: E_HIGH,
+  updrafts: E_WIND,
+  cascades: E_CASCADES,
+  chains: E_CHAINS,
+  great: E_GREAT,
+  // RESEARCH_REFILLS 3: the star road's three required refills, over the
+  // low line (`low`: a miss lands on it, never in the void). Each cape star
+  // is 40 px ahead of the press that spends the bar, so it is lit and taken
+  // on that very tick, on the grid. The first
+  // flight spends the bar, so the first cape star is lit at its start; the
+  // super jump spends the air jumps, so the leaf star on its fall is lit; the
+  // second flight spends the bar the first star filled, so the second cape
+  // star is lit along it.
+  refills: [
+    { id: "cape-road-1", kind: "cape", x: ex(ROAD_K + 2, ...SF.launch) + 40, y: EY.gate - 100 - 36, required: true, low: true },
+    { id: "leaf-road", kind: "leaf", x: ex(ROAD_K + 7, ...SF.road) + 44, y: EY.gate - 267 - 36, required: true, low: true },
+    { id: "cape-road-2", kind: "cape", x: ex(ROAD_K + 13, ...SF.road) + 40, y: EY.gate - 289 - 36, required: true, low: true },
+    // Optional (C2): on the summit jump's rise, before its cape. Dormant on
+    // the main route (the summit-song filled the bar); lit only if a flight
+    // was spent on the stair, so that flight never dooms the summit.
+    { id: "cape-summit", kind: "cape", x: ex(308.5, ...SF.far), y: EY.stair2 - 60 - 36 },
   ],
-  high: [
-    ...shift(pick(HIGH, ["well-floor", "well-exit"]), L4_DX_B, L4_DY_B, "plat"),
-    ...shift(pick(HIGH, ["low-a", "low-b", "low-c"]), L4_DX_C, L4_DY_C, "plat"),
-  ],
-  updrafts: byId(UPDRAFTS, ["finale-wind"]).map((u) => ({ ...u, x: u.x + L4_DX_C, top: u.top + L4_DY_C, bottom: u.bottom + L4_DY_C })),
-  cascades: CASCADES,
-  chains: [
-    ...byId(CHAINS, ["well-song"]).map((c) => ({ ...c, stars: shift(c.stars, L4_DX_B, L4_DY_B, "xy") })),
-    ...byId(CHAINS, ["finale-song"]).map((c) => ({ ...c, stars: shift(c.stars, L4_DX_C, L4_DY_C, "xy") })),
-  ],
-  great: [
-    // A super jump off the cascade's end lands on the last crack 11/16 later.
-    { id: "great-1", x: 13340 + L4_DX_B, y: 227 + L4_DY_B, line: "above the last crack: a super jump off the wave's end" },
-    { id: "great-2", x: 11087.2 + L4_DX_B, y: 592 + L4_DY_B, line: "the star well under the lid" },
-    // The school shore is stable stone, so the cape is back for a second
-    // super jump; its apex (267 px up, 7/16 after the takeoff) is here.
-    { id: "great-3", x: gx(45) + 2 * SUPER, y: -76, line: "high above the school: a second super jump" },
-  ],
+  // The helper leaps out of a flight ahead as the rising star is taken.
+  moments: [{ id: "helper-leap", kind: "helper", k: 24, target: "rising-star" }],
+  decor: [],
   prompts: [
-    { id: "p-super", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: gx(22), y: 325, from: gx(23), to: gx(30), inputX: gx(25) },
-    { id: "p-storm", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: gx(66) + SUPER, y: 260, from: gx(67) + SUPER, to: gx(74) + SUPER, inputX: gx(68) + SUPER + 14 },
+    { id: "p-super", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", optional: true, x: ex(27), y: EY.floor - 235, from: ex(28) - 10, to: ex(34, 1), inputX: ex(28) + 8 },
+    { id: "p-storm", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: ex(66, 1), y: EY.step2 - 235, from: ex(67, 1), to: ex(74, 2), inputX: ex(68, 1) + 8 },
+    { id: "p-road", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: ex(ROAD_K - 2, 5), y: EY.gate - 235, from: ex(ROAD_K - 1, 5), to: ex(ROAD_K + 6, 6), inputX: ex(ROAD_K, 5) + 8 },
   ],
-  stars: [
-    // (The hearth's last loose stars lay beyond its trimmed end.)
-    ...shift(starsIn(10100, 14500).filter(([id]) => !id.startsWith("breeze")), L4_DX_B, L4_DY_B, "star"),
-    ...shift(starsIn(19300, 23000), L4_DX_C, L4_DY_C, "star"),
-  ],
+  stars: E_STARS,
   routes: {
-    main: [
-      ...superAt(24, 0),
-      [gx(40) + SUPER - 0.3, "jump", "g"],
-      ...superAt(68, 1),
-      [gx(81) + 2 * SUPER - 0.3, "jump", "g"],
-      ...shift([[10666.7, "jump", "g"], [11348.7, "jump", "g"], ...CP.wave, ...CP.crown], L4_DX_B, 0, "plan"),
-      [gx(206) + 2 * SUPER - 0.3, "jump", "g"],
-      ...shift(CP.finale, L4_DX_C, 0, "plan"),
-    ],
+    main: E_PLAN_MAIN,
     upper: null,
     ability: null,
     safe: null,
   },
 };
-L4_BASE.routes.upper = [
-  ...superAt(24, 0),
-  // Great Star 3: the school shore is stable, so the cape is back: again.
-  ...superAt(38, 1),
-  ...superAt(68, 1),
-  [gx(81) + 2 * SUPER - 0.3, "jump", "g"],
-  ...shift([[10666.7, "jump", "g"], [10947.2, "dive", "g"], [11337.2, "jump", "g"], [11384, "jump", "a"], [11597.2, "jump", "g"], ...CP.wave.slice(1, 4), ...CP.wave.slice(4)], L4_DX_B, 0, "plan"),
-  // Great Star 1: a super jump off the cascade's end.
-  ...shift([[13010, "jump", "g"], [13010 + 75.7, "dash", "a"], [13010 + 151.4 + 63.67, "jump", "a"], [13545, "jump", "g"], [13695.7, "jump", "a"]], L4_DX_B, 0, "plan"),
-  [gx(206) + 2 * SUPER - 0.3, "jump", "g"],
-  ...shift(CP.finale, L4_DX_C, 0, "plan"),
+// Great Stars 1, 2 and 3: a second super jump from the school shore (42);
+// a super jump in the road's second flight (251), then its last flight
+// (255) from the refilled bar; a super jump off the last tile (374).
+FAR_DOOR.routes.upper = [
+  ...eSuper(28, SF.start), ET(38, SF.school), ...eSuper(43, SF.school),
+  ...E_PLAN_MAIN.filter(([x]) => x > ex(60, 1) && x < ex(ROAD_K + 14, 6)),
+  EJ(ROAD_K + 15, [7, 0], "a"), ED(ROAD_K + 19, [7, 0]),
+  ...E_PLAN_MAIN.filter(([x]) => x > ex(ROAD_K + 24, ...SF.far) && x < ex(373, ...SF.summit)),
+  ...eSuper(374, SF.summit),
 ];
-L4_BASE.routes.ability = L4_BASE.routes.main;
-L4_BASE.routes.safe = [...L4_BASE.routes.main.slice(0, -5), ...shift(CP.safeFinale, L4_DX_C, 0, "plan")];
-/* L4 (1) The voids at 128, after the crown: Movement III's hearth void and
- * split voids (two voids around one cracked islet that never refills, so
- * the split-song's refill is required) translated so their first takeoff
- * is the hearth's (sixteenth 206, as the chapter's 390 sat in its bar),
- * then the hop onto a copy of the wind gate. 76 sixteenths, three flights;
- * the finale follows 159 px lower. */
-const L4_DX_V = gx(206) + 2 * SUPER - 14981.5;
-const L4_DY_V = -120;
-const L4_X1 = 37.85 * (76 + 9);
-const L4_S1 = insertSection(L4_BASE, {
-  cut: 8200,
-  dx: L4_X1,
-  dy: 159,
-  content: {
-    main: [
-      ...shift(pick(MAIN, ["wind-shore", "split-crack", "split-far"]), L4_DX_V, L4_DY_V, "plat"),
-      ["storm-gate", 17450 + L4_DX_V, 478 + L4_DY_V, gx(282) + 2 * SUPER + 3 * 113.55 + 10 - (17450 + L4_DX_V)],
-    ],
-    chains: byId(CHAINS, ["split-song"]).map((c) => ({ ...c, stars: shift(c.stars, L4_DX_V, L4_DY_V, "xy") })),
-    stars: shift(starsIn(15400, 16100), L4_DX_V, L4_DY_V, "star").map(([id, x, y, r]) => [`v-${id}`, x, y, r]),
-    checkpoints: [{ ...CHECKPOINTS.find((q) => q.id === "voids"), x: 15470 + L4_DX_V, y: 377 + L4_DY_V }],
-    sections: [{ x: 15000 + L4_DX_V, movement: "L4", step: "develop", name: "IV · The Far Door — the voids" }],
-    // (The hearth's own takeoff step stays; the flight follows it.)
-    routes: { main: [...shift([...CP.hearthVoid.slice(1), ...CP.splitVoids], L4_DX_V, 0, "plan"), [gx(282) + 2 * SUPER + 3 * 113.55 - 0.3, "jump", "g"]] },
-  },
-});
-/* L4 (2) The rising stair, before the door: two double jumps (second press
- * 4/16 after the first, landing 8/16 after it, 135 px up each), a
- * constellation along both, and the walk-off from the top step onto the
- * door island as from the finale's high shore. Three bars; the door sits
- * 140 px higher. Lattice: the door island's landing is sixteenth 340. */
-const sx = (k) => 13784.2 + 37.85 * (k - 340);
-const L4_X2 = 37.85 * 48;
-const L4_S2 = insertSection(L4_S1, {
-  cut: 13680,
-  dx: L4_X2,
-  dy: -140,
-  content: {
-    main: [
-      ["stair-0", 13694.5, 468, sx(356) + 10 - 13694.5],
-      ["stair-1", sx(364) - 60, 333, sx(368) + 10 - (sx(364) - 60)],
-      // Its end is where the finale's high shore ended relative to the door
-      // island: the walk-off lands 3.4/16 later, on the grid.
-      ["stair-2", sx(376) - 60, 198, sx(384.63) - (sx(376) - 60)],
-    ],
-    chains: [{ id: "stair-song", route: "low", stars: [[358, 333], [360, 352], [362, 267], [370, 198], [372, 217], [374, 132]].map(([k, y]) => [sx(k) + 40, y]) }],
-    checkpoints: [{ id: "stair", x: sx(344) - 1, y: 468, platform: "stair-0", story: "Up, and up. The blue was close enough to touch.", tip: "Jump, then jump again near the top, twice." }],
-    sections: [{ x: 13690, movement: "L4", step: "conclude", name: "IV · The Far Door — the rising stair" }],
-    routes: { main: [[sx(356) - 0.3, "jump", "g"], [sx(360) - 0.3, "jump", "a"], [sx(368) - 0.3, "jump", "g"], [sx(372) - 0.3, "jump", "a"]] },
-  },
-});
-const L4 = L4_S2;
+// No breeze hops and no taps: the beacons' runs walked.
+FAR_DOOR.routes.ability = E_PLAN_MAIN.filter(([x, a]) => !(a === "tap" || [[113, SF.wind], [169, SF.casc], [273, SF.far], [337, SF.summit], [389, SF.summit]].some(([k, sf]) => Math.abs(x - ex(k, ...sf) - 1) < 2)));
+// The low line under the star road: a tap down off the gate, a hop up onto
+// the low step and a double up onto the far shore.
+FAR_DOOR.routes.safe = [
+  ...E_PLAN_MAIN.filter(([x]) => x < ROAD_X0 - 30),
+  [ROAD_X0 - 0.3, "tap", "g"], [ROAD_X0 + 410 - 0.3, "jump", "g"], [ROAD_X0 + 881 - 0.3, "jump", "g"], [ROAD_X0 + 881 + 4 * 37.85 - 0.3, "jump", "a"],
+  ...E_PLAN_MAIN.filter(([x]) => x > ex(ROAD_K + 24, ...SF.far)),
+];
 
 /**
  * The campaign (RESEARCH_PROGRESSION 4.1, 4.7): eight stages along the GDD's
@@ -2427,15 +2536,13 @@ export const CAMPAIGN = Object.freeze(
     { stage: 5, key: "breaking", title: "The Breaking Constellation", toward: "Saturn", bpm: 112, introduces: "cracks", look: "saturn", def: BREAKING },
     { stage: 6, key: "borrowed-wind", title: "Borrowed Wind", toward: "Jupiter", bpm: 118, introduces: "wind", look: "jupiter", def: BORROWED_WIND },
     { stage: 7, key: "falling-road", title: "The Falling Road", toward: "Mars", bpm: 123, introduces: "cascade", look: "mars", def: FALLING_ROAD },
-    { stage: 8, key: "far-door", title: "The Far Door", toward: "the Moon, then Earth", bpm: 128, introduces: "super", look: "moon-earth", def: null },
+    { stage: 8, key: "door", title: "The Far Door", toward: "the Moon, then Earth", bpm: 128, introduces: "super", look: "moon-earth", def: FAR_DOOR },
   ].map((q) => Object.freeze(q)),
 );
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
-/** The interim levels, in tempo order, with the look of the stage that will
- * take most of their content (VI, V and VIII). */
-const INTERIM = [
-  { ...L4, look: "moon-earth", toward: "the Moon, then Earth" },
-];
+/** The interim levels (none since VIII replaced revision six's Far Door;
+ * kept so a stage that is rebuilt later can play an old level meanwhile). */
+const INTERIM = [];
 function register(d, i, extra) {
   const numeral = ROMAN[i];
   return Object.freeze({
