@@ -807,7 +807,7 @@ test("Music and Sounds volumes: guarded storage, defaults 1, clamped", async () 
 test("the map's count-in schedules one bar of felt beats; a door without the recording holds its chord until a reset", () => {
   const r = rig();
   r.engine.unlock();
-  assert.equal(r.engine.countIn({ bpm: 118, delay: 0.35 }), 4);
+  assert.equal(r.engine.countIn({ bpm: 118, delay: 0.35 }).beats, 4);
   const run = scoreRun();
   assert.equal(run.s.status, "won");
   // Level III's door (no recording): the closing chord is held after it.

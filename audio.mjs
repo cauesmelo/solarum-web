@@ -2902,10 +2902,16 @@ export function createAudioEngine(options = {}) {
     // Only the last level's door opens onto Earth and the original recording;
     // the others close on the score's own cadence (RESEARCH_LEVELS 4).
     const earth = !!LEVELS.find((d) => d.id === level)?.level.earth;
-    if (!earth && ctx) rest = { pad: fx.chord?.pad ?? CHORDS.Dadd9.pad, next: t() + 2 };
+    // The automatic transition (RESEARCH_TRANSITIONS 4): the closing chord's
+    // held pad enters on beat A2, two beats after the door at the finished
+    // level's tempo (it used to wait a fixed 2 s, after the count-in's A4 at
+    // 128 BPM), and the last level's recording begins two bars after the
+    // door, on the downbeat where the final tally appears.
+    const beat = BEAT / (sc.scale || 1);
+    if (!earth && ctx) rest = { pad: fx.chord?.pad ?? CHORDS.Dadd9.pad, next: t() + 2 * beat };
     if (offline || !musicEl || !earth) return;
     clearTimeout(doorTimer);
-    const wait = (BAR * SIXTEENTH) / sc.scale;
+    const wait = (2 * BAR * SIXTEENTH) / (sc.scale || 1);
     doorTimer = setTimeout(() => {
       doorTimer = null;
       musicWanted = true;
@@ -3325,18 +3331,42 @@ export function createAudioEngine(options = {}) {
     prepare,
     play,
     duck,
-    /** The map between levels: one bar of the next level's pulse at its
-     * tempo (felt beats, the first accented) under the held closing chord,
-     * with the Signal calling on the downbeat, so the next level does not
-     * start cold. `delay` seconds from now; returns the beats scheduled. */
+    /** The transition's count-in (B0-B3): one bar of the next level's pulse
+     * at its tempo (felt beats, the first accented) under the held closing
+     * chord, with the Signal calling on the downbeat, so the next level does
+     * not start cold. `delay` seconds from now. Returns a handle: `beats`
+     * (scheduled), `times` (audio seconds) and `cancel(fade = 0.015)`, which
+     * fades every beat not yet sounded in 15 ms (no click) so a skip, R or
+     * Main menu leaves the next level's bar 1 alone; it returns how many
+     * beats it cancelled, and a second call does nothing. */
     countIn({ bpm = 107, delay = 0, signal = 74 } = {}) {
-      if (!canPlay() || !score) return 0;
+      const handle = { beats: 0, times: [], cancelled: 0, cancel: () => 0 };
+      if (!canPlay() || !score) return handle;
       const beat = 60 / bpm,
         at0 = t() + LOOKAHEAD + Math.max(0, delay);
-      let n = 0;
-      for (let k = 0; k < 4; k++) if (renderMusic({ layer: "pulse", voice: "pulse", gain: k === 0 ? 0.9 : 0.5, t: 0 }, { at: at0 + k * beat })) n++;
-      renderMusic({ layer: "signal", voice: "signal", midi: signal, dur: 1.2, pan: 0.6, t: 0 }, { at: at0 });
-      return n;
+      const pending = [];
+      for (let k = 0; k < 4; k++) {
+        const v = renderMusic({ layer: "pulse", voice: "pulse", gain: k === 0 ? 0.9 : 0.5, t: 0 }, { at: at0 + k * beat });
+        if (v) (handle.beats++, handle.times.push(v.start), pending.push(v));
+      }
+      const call = renderMusic({ layer: "signal", voice: "signal", midi: signal, dur: 1.2, pan: 0.6, t: 0 }, { at: at0 });
+      if (call) pending.push(call);
+      let done = false;
+      handle.cancel = (fade = 0.015) => {
+        if (done) return 0;
+        done = true;
+        const now = t();
+        let n = 0;
+        for (const v of pending)
+          if (v.start > now + 0.002) {
+            fadeOut(v, fade, now);
+            if (v.voice === "pulse") n++;
+          }
+        handle.cancelled = n;
+        sc.countInCancelled = (sc.countInCancelled ?? 0) + n;
+        return n;
+      };
+      return handle;
     },
     /** The player's Music and Sounds settings (0-1 each), applied over 80 ms. */
     setVolumes({ music = vol.music, sounds = vol.sounds } = {}) {
