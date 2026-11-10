@@ -114,7 +114,7 @@ Option (a) keeps every approved clip, pivot and layer unchanged. `emergence.mjs`
 How it is drawn:
 - **The mask.** The soil is the original title ground, which the renderer already draws after the world. Diana is drawn in the world layer, so whatever is still below the soil is hidden along the ground's own hand-drawn contour: no clip path and no new art.
 - **The crumbs.** They are paper chips with an ink edge, drawn over the ground. Each one disappears when it falls back onto the soil line.
-- **The total.** 1.22 s + 0.33 s = 1.55 s from the press to running; the brief's ceiling was about 1.6 s.
+- **The total.** By design 1.22 s of emergence, then the 0.33 s start clip: about 1.55 s from the press to full stride; the brief's ceiling was about 1.6 s. The playtest critic measured `status: 'running'` 1.24 s after the press (the start clip plays after that, inside the run).
 - **Skipping.** A second press skips straight to the run.
 - **Reduced motion.** A 0.36 s rise with no shiver, hop or crumbs.
 
@@ -208,3 +208,36 @@ Drawn in code (ink and paper, Earth's blue only in the eye's pupil): the asteroi
 **Home's brightest star redrawn.** The owner read the old body (two stroked rings and full horizontal and vertical lines) as a sniper's crosshair. It is now a soft radial glow, five short tapering flares of unequal length at uneven angles, and the original star sprite as its core; it brightens toward its flash and is gone once it falls (it is the asteroid). Nothing about it resembles the Earth glint's ringed blue dot. Before / after: `common/artifacts/revision-4/solarum-brightstar-before.png`, `solarum-brightstar-after.png`.
 
 **Unchanged:** every Diana clip, pivot and layering; the GET moments of I, III and IV (now timed on the simulation clock); II's cape settle is the same crossfade, held back a beat by the eye.
+
+## Revision five (2026-11-10): still signs, the level transition, relics and refill stars
+
+Front-end squad, from [RESEARCH_TRANSITIONS.md](./RESEARCH_TRANSITIONS.md) and [RESEARCH_REFILLS.md](./RESEARCH_REFILLS.md). No new art: every picture below is an existing sprite, the palette tokens or a line drawn in code.
+
+### What is on screen, and from which asset
+
+| Moment | Assets | Motion and timing |
+| --- | --- | --- |
+| Glyph signs | Drawn in code (paper disc, ink arrow, hold diamonds), as before | **No motion** (the lift and the 2 px bob are gone). Opacity only, from the camera's window: in over 64 px (0.20–0.29 s at 222–323 px/s), out over 48 px |
+| Diana's keyline in a sign | Her current frame tinted to ink offscreen (`source-in`), stamped 8 × at 2 px | Only on frames where her drawn box meets a visible row, clipped to the discs' outer circles |
+| Step-up / lip catch | Her normal clips | The drawn feet ease up over 70 ms (easeOutQuad); the collider is exact |
+| Door bloom (A0–A1) | `portal.png`'s opening, measured: a rect from (0.12, 0.30) to (0.83, 1.0) with a half-ellipse cap to the crown at 0.17, mapped through `visibleBounds` | A paper front rising from the threshold over one beat (easeOutCubic), a radial glow (0.12 → 0 over 1.4 × the opening), two rings (24 → 220 px, 0.55 → 0, 1.2 beats); `--earth` at 0.9 at the journey's last door |
+| Diana becomes light (A1–A2) | Her standing frame | Alpha 1 → 0 over one beat in front of the light |
+| Motes (from A1) | `star.png` frames 0–2 (scale 0.06–0.12), `tailStar.png` | 12 stars one every b/12 rising 90–150 px/s with a ±6 px sway at 1.2 Hz, life 1.5 beats; 3 streaks at −80° ± 10°, life 1 beat; seeded by the level id |
+| Pull-back and push-in | The world | Zoom 1 → 0.55 about the door (A1–A3, easeInOutCubic; 0.35 over A1–A5 at the last door); the next level 1.12 → 1 about Diana's screen point (B2–B4, easeOutQuart), the identity at bar 1 |
+| Bodies (A2–B2) | `backdrop.mjs` bodies (cached, two looks) | The old body on a quadratic arc to (0.17 W, 0.36 H) at 0.4 × radius (easeInOutSine, top kept under the HUD band); the next from (1.15 W, its start y) at 0.5 × to exactly its level-start box (easeOutCubic); the Moon rises 0.5 H instead |
+| Orbit line and marker | Drawn in code; Diana's two-leaf path (the title's) × 1.6 | Dotted paper line drawn on A2–A3; the marker slides A3–B2 (easeInOutSine); both fade B3–B4 |
+| Arrival door (B2–B5) | `portal.png` at the start, 60 px behind her | Lit at 0.85 from B2; ebbs over the run's first beat; then scenery |
+| The ending | The Moon body, Earth drawn in code (the only colour), `logo.png` on the first credit card | The Moon sinks 0.5 H (easeInCubic, A2–A6); Earth grows to (0.5 W, 0.42 H), r 0.2 H, while the ink disc that made it a crescent slides off (0.42 r → 2.05 r: the spec's 1.6 r left the 0.94 r disc biting the limb; easeInOutCubic, A2–A8) |
+| Relics (ahead) | Double: `sprout.png` frame 0 at 60 px + `star.png` frame 2; cape: `meteor.png` at 64 px + `dash.png` frames 0–1 (6 fps); glide: the helper (`star.png` + `tailStar.png` + a ring); dive: a paper ring with `star.png` at 0.10 on a V of thread; super: `star.png` with `tailStar.png` turned straight up | A 40 px paper beam at 25% to the top of the view; three `star.png` frames at 0.08 circling once per bar; static under reduced motion |
+| Relic pickup | The relic's own art, `star.png` burst frames 4–7 | The beam collapses into Diana in 150 ms; the relic rises over her head (150 ms) and is held for one beat with two rings (120 / 80 px, 0.6 s), then fades in 0.25 s. The simulation never stops |
+| Cape star | `meteor.png` at 34 px, `star.png` frame 2 at 0.12 | A tenth of a turn per bar; lit 100% with a glow, dormant 40% without; one ring (0.25 s) when it lights; taken: a ring and burst frames, the breath bar pulses |
+| Leaf star | `sprout.png` frame 0 at 34 px, `star.png` frame 2 at 0.14 | As above; taken: the star flies to her head in 120 ms and becomes the glint; the leaves fade over 0.3 s |
+
+### Still archive-only
+
+Unchanged from the sections above; this round uses no further archive art. `logo.png` was already on the title; `dash.png` frames 0–1 now also flutter on the gift relic.
+
+### Verified (actual)
+
+Screenshots on the packaged build (root QA, `common/artifacts/revision-4/`): `solarum-transition-*.png` (A0.5, A1.5, A3 at four layouts, B2.5, B3.5), `solarum-ending-tally.png`, `solarum-relic-*.png`, `solarum-banner-double.png`, `solarum-refill-stars.png`, and every sign at full opacity at 960 × 640 and 390 × 844 (`solarum-signs/`, contact sheet of the moved ones `solarum-signs-moved.png`). Nobody has judged the keyline, the relic hold or the necklace's read yet.
+

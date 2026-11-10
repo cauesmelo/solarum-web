@@ -114,7 +114,8 @@ function endingFrame(plan, t, f) {
   const { A, bar } = plan;
   // The Moon's limb sinks 0.5 H (easeInCubic, A2-A6); Earth turns to face
   // her (A2-A8): it grows to (0.5 W, 0.42 H), r 0.2 H, and the ink disc
-  // that makes it a crescent slides off (0.42 r -> 1.6 r).
+  // that makes it a crescent slides off (0.42 r -> 2.05 r in game.js, so
+  // the 0.94 r disc clears the limb and Earth is whole).
   f.moonSink = f.reduced ? 1 : ease.inCubic(span(t, A[2], A[6]));
   f.earth = f.reduced ? 1 : ease.inOutCubic(span(t, A[2], A[8]));
   f.earthAlpha = f.reduced ? span(t, A[2], A[3]) : 1;

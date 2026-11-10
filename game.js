@@ -12,6 +12,8 @@ import {
   snapshot,
   setAssist,
   capeReady,
+  refillLit,
+  relicY as modelRelicY,
   RULES,
 } from "./model.mjs";
 import { LEVELS, CARD, checkpointIndex } from "./level.mjs";
@@ -1574,7 +1576,8 @@ function relicsAhead() {
   const list = Array.isArray(state.relics) ? state.relics.filter((r) => !r.taken) : (state.def.gets ?? []).filter((g) => !taken.includes(g.id));
   return [...list, ...previewGets.filter((g) => g.relic)];
 }
-const relicY = (g) => g.y ?? runLineAt(g.x) - 40;
+// (The model's own placement: its y, or 40 px over the run line's stone.)
+const relicY = (g) => (g.preview ? g.y : modelRelicY(state.def, g));
 /** The refill stars in this world: { id, kind, x, y, lit, taken }. */
 function refillsOf() {
   const s = state;
@@ -1583,15 +1586,12 @@ function refillsOf() {
   else if (Array.isArray(s.refillStars)) list = s.refillStars.map((q) => ({ ...q, lit: refillLitHere(q) }));
   return [...list, ...previewRefills];
 }
-/** The lit rule (RESEARCH_REFILLS 1.1), mirrored for a raw model state: a
+/** The lit rule (RESEARCH_REFILLS 1.1) is the model's own (refillLit): a
  * cape star is lit while the cape is owned and the bar is not full, a leaf
  * star while the double is owned, Diana airborne with no air jump left. */
 function refillLitHere(q) {
   if (q.preview) return q.lit;
-  if (q.taken || state.status !== "running") return false;
-  if (q.kind === "cape") return owns(state, "cape") && !state.assist.endlessCape && !capeReady(state);
-  const p = state.player;
-  return owns(state, "double") && !p.grounded && (state.coyote ?? 0) <= 0 && !doubleInHand(state);
+  return refillLit(state, q);
 }
 /** The soft paper beam (40 px at 25%) from the relic to the view's top, and
  * three tiny stars circling it once per bar. Static under reduced motion. */
@@ -1616,16 +1616,18 @@ function drawRelicArt(verb, x, y, alpha = 1, k = 1) {
   ctx.save();
   ctx.globalAlpha *= alpha;
   if (verb === "double") {
-    // The leaf relic: a resting star cradled by Diana's two leaves (sprout.png at 60 px).
-    sprite("sprout", 0, x, y + 8 * k, 0.3 * k);
-    sprite("star", 2, x, y - 6 * k + (reduced ? 0 : Math.sin(clock * 2.2) * 2), 0.36 * 0.45 * k);
+    // The leaf relic: a resting star (0.36) cradled by Diana's two leaves,
+    // 60 px tall (sprout frame 0's leaves are 143 of its 200 px).
+    sprite("sprout", 0, x, y + 10 * k, (60 / 143) * k);
+    sprite("star", 2, x, y - 8 * k + (reduced ? 0 : Math.sin(clock * 2.2) * 2), 0.36 * k);
   } else if (verb === "cape") {
     // The gift: the asteroid stone at 64 px with the cape fluttering over it.
     if (images.meteor) {
       const s = (64 * k) / images.meteor.width;
       ctx.drawImage(images.meteor, x - (images.meteor.width * s) / 2, y - (images.meteor.height * s) / 2, images.meteor.width * s, images.meteor.height * s);
     }
-    sprite("dash", reduced ? 0 : Math.floor(clock * 6) % 2, x + 4 * k, y - 4 * k, 0.16 * k);
+    // (dash.png's cape sits in the right of its 500 px frame, 134 px off centre.)
+    sprite("dash", reduced ? 0 : Math.floor(clock * 6) % 2, x - 134 * 0.3 * k, y + 2 * k, 0.3 * k);
   } else if (verb === "glide") {
     // The helper, perched and circling in place.
     const a = reduced ? 0 : clock * 2.4;
@@ -1647,7 +1649,7 @@ function drawRelicArt(verb, x, y, alpha = 1, k = 1) {
   } else if (verb === "super") {
     // The rising star: the only upward tail in the game.
     streak(x, y + 4 * k, -Math.PI / 2, 0.16 * k, 0.8);
-    sprite("star", 2, x, y, 0.36 * 0.45 * k, 1, reduced ? 0 : Math.sin(clock * 1.5) * 0.15);
+    sprite("star", 2, x, y, 0.36 * k, 1, reduced ? 0 : Math.sin(clock * 1.5) * 0.15);
   }
   ctx.restore();
 }
@@ -1754,7 +1756,8 @@ function drawRefills() {
         ctx.fillStyle = g;
         ctx.fillRect(q.x - 28, q.y + bob - 28, 56, 56);
       }
-      sprite("sprout", 0, q.x, q.y + bob + 6, 34 / 200);
+      // (34 px of leaves: sprout frame 0's leaves are 143 of its 200 px.)
+      sprite("sprout", 0, q.x, q.y + bob + 6, 34 / 143);
       sprite("star", 2, q.x, q.y + bob - 4, 0.14);
     }
     ctx.restore();
@@ -1791,7 +1794,7 @@ function drawRefillFx(p) {
       continue;
     }
     if (r.kind === "leaf") {
-      if (t < 0.3) sprite("sprout", 0, r.x, r.y + 6, 34 / 200, 1 - t / 0.3);
+      if (t < 0.3) sprite("sprout", 0, r.x, r.y + 6, 34 / 143, 1 - t / 0.3);
       const u = Math.min(1, t / 0.12),
         hx = p.x + ANCHORS.glint.dx,
         hy = p.y + ANCHORS.glint.dy;
@@ -3476,10 +3479,10 @@ function arrive(skipped) {
 /** End the transition's bookkeeping (arrival, skip, R, menu, QA). */
 function finishTransition(t = trans) {
   if (!t) return;
-  if (t.frames.length) lastTransition = { from: t.from, to: t.to, frames: frameStats(t.frames), warmMs: t.warmMs ?? warmedMs };
   // Fold the sky's extra travel into its offset so nothing jumps.
   skyOffset.x += (t.f?.skyTravel ?? 0) * W;
   cancelCountIn(t);
+  lastTransition = { from: t.from, to: t.to, skipped: t.skipAt != null, frames: t.frames.length ? frameStats(t.frames) : null, warmMs: t.warmMs ?? warmedMs, countIn: t.countIn ? { scheduled: t.countIn.scheduled, cancelled: t.countIn.cancelled } : null, ended: clock - t.at };
   trans = null;
   hideTally();
   delete root.dataset.controls;
@@ -3733,7 +3736,8 @@ function drawEnding(f, view) {
     x = e0.x + (0.5 * W - e0.x) * u,
     y = e0.y + (0.42 * H - e0.y) * u,
     r = e0.r + (0.2 * H - e0.r) * u,
-    off = 0.42 + (1.6 - 0.42) * u;
+    // (Past 1.6 r the 0.94 r ink disc still bit the limb: it slides to 2.05 r, clear.)
+    off = 0.42 + (2.05 - 0.42) * u;
   ctx.save();
   ctx.globalAlpha = f.earthAlpha;
   ctx.beginPath();
@@ -4354,6 +4358,8 @@ window.__game = {
   // save): previewTransition(n, { beat: "A3" | seconds }); hold(null) lets it run.
   previewTransition: (n, { beat = "A3" } = {}) => {
     startLevel(n);
+    clearTimeout(wakingTimer); // (no title UI fading behind the evidence)
+    root.classList.remove("waking");
     state.player.x = WORLD().finishX;
     state.player.y = WORLD().finishY;
     state.player.grounded = true;

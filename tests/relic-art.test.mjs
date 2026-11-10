@@ -38,7 +38,7 @@ test("refill stars: the cape star on the asteroid stone, the leaf star between t
   const draw = body("drawRefills");
   assert.match(draw, /const a = lit \? 1 : 0\.4/);
   assert.match(draw, /q\.kind === "cape"[\s\S]*images\.meteor[\s\S]*34 \/ images\.meteor\.width[\s\S]*sprite\("star", 2, q\.x, q\.y \+ bob, 0\.12\)/);
-  assert.match(draw, /sprite\("sprout", 0, q\.x, q\.y \+ bob \+ 6, 34 \/ 200\);\n      sprite\("star", 2, q\.x, q\.y \+ bob - 4, 0\.14\);/);
+  assert.match(draw, /sprite\("sprout", 0, q\.x, q\.y \+ bob \+ 6, 34 \/ 143\);\n      sprite\("star", 2, q\.x, q\.y \+ bob - 4, 0\.14\);/);
   // A dormant star has no glow; it pulses one ring (0.25 s) the instant it lights.
   assert.match(draw, /if \(lit\) \{\n        const g = ctx\.createRadialGradient/);
   assert.match(draw, /if \(lit && was === false\) refillWake\.set\(q\.id, clock\);/);
