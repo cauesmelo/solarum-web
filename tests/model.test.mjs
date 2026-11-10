@@ -1079,9 +1079,9 @@ test("cracked shelves collapse while Diana is still on them and keep coyote grac
 });
 
 /* ---------- forgiveness, glyphs, stars ---------- */
-test("lip catch: a jump that arrives up to 25 px below a lip pops onto it; walk-offs and deep misses do not", () => {
-  // The step-up needs 10 px of the collider over the top, so arriving at the
-  // lip it fires a few ticks in, while the feet are still within 25 px.
+test("lip catch: a jump that arrives up to 30 px below a lip pops onto it; walk-offs and deep misses do not", () => {
+  // The step-up needs 4 px of the collider over the top, so arriving at the
+  // lip it fires a tick or two in, while the feet are still within 30 px.
   const make = (below, opts = {}) => {
     const s = fixture([
       { id: "from", x: 0, y: 500, width: 300 },
@@ -1101,7 +1101,7 @@ test("lip catch: a jump that arrives up to 25 px below a lip pops onto it; walk-
   assert.equal(make(15, { launched: false }).player.grounded, false, "walking off never earns it");
   assert.equal(make(15, { vy: -300 }).player.grounded, false, "not while she can still clear it herself");
 });
-test("step-up: an approach from below that tops out within 20 px of the top lands; clearly short ones never do", () => {
+test("step-up: an approach from below that tops out within 30 px of the top lands; clearly short ones never do", () => {
   // User report: "it looks like you made it, but you don't go up". Sweep
   // shelves above a floor, takeoffs from well before the lip to deep under
   // the shelf, held, tapped and double jumps; track how close the feet came
@@ -1176,7 +1176,9 @@ test("step-up: an approach from below that tops out within 20 px of the top land
   // No main route needs it (their takeoffs and landings are on the grid).
   for (const n of IDS) assert.equal(traverse("main", 1 / 120, null, null, n).s.stepUps ?? 0, 0, `L${n}`);
 });
-test("step-up bounds: 20 px on the span, 25 at the lip, 24 in flight; never collapsing, noPop or right after a smash", () => {
+test("step-up bounds: 30 px on the span and at the lip, 24 in flight, 4 px of overlap; never collapsing, noPop or right after a smash", () => {
+  // RESEARCH_PROGRESSION 7 (no visible lip sink): an apex up to about 30 px
+  // under a top inside its span steps up, so the toe is never drawn through it.
   // Place Diana at her apex (vy = 0, so she cannot clear the top herself)
   // with her feet `depth` px under a top, `into` px past its left lip.
   const probe = (depth, into, opts = {}) => {
@@ -1190,13 +1192,14 @@ test("step-up bounds: 20 px on the span, 25 at the lip, 24 in flight; never coll
     update(s, 1 / 120);
     return s.player.grounded && Math.abs(s.player.y - 400) < 1e-6;
   };
-  for (const d of [1, 10, 19.5]) assert.ok(probe(d, 200), `span ${d}`);
-  assert.ok(!probe(21, 200), "21 px on the span is short");
-  assert.ok(probe(24.5, 20), "25 px within the lip's first 40 px");
-  assert.ok(!probe(26, 20), "26 px at the lip is short");
+  for (const d of [1, 10, 19.5, 29.5]) assert.ok(probe(d, 200), `span ${d}`);
+  assert.ok(!probe(31, 200), "31 px on the span is short");
+  assert.ok(probe(29.5, 20), "30 px within the lip's first 40 px");
+  assert.ok(!probe(31, 20), "31 px at the lip is short");
   assert.ok(probe(23.5, 200, { flight: true }), "24 px during a flight");
   assert.ok(!probe(25.5, 200, { flight: true }), "25 px in flight is short");
-  assert.ok(!probe(10, 5), "under 10 px of overlap is not over the top");
+  assert.ok(probe(10, 5), "5 px of overlap is over the top");
+  assert.ok(!probe(10, 3), "under 4 px of overlap is not over the top");
   assert.ok(!probe(10, 200, { platform: { type: "crumble", crumbleAfter: 0.65, triggeredAt: 0 } }), "never onto a breaking shelf");
   assert.ok(!probe(10, 200, { platform: { noPop: true } }), "never onto a platform authored noPop");
   assert.ok(!probe(10, 200, { smash: true }), "never right after a smash");

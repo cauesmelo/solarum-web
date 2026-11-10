@@ -927,7 +927,7 @@ const L3_BASE = {
     upper: [
       ...CP.breaking,
       [8536.6, "jump", "g"], [8608.6, "jump", "a"], [8908.6, "jump", "g"], [9238.6, "jump", "g"], [9568.6, "jump", "g"], [9935, "jump", "g"],
-      [10665.2, "jump", "g"], [10947.2, "dive", "g"], [11337.2, "jump", "g"], [11390, "jump", "a"], [11597.2, "jump", "g"],
+      [10665.2, "jump", "g"], [10947.2, "dive", "g"], [11337.2, "jump", "g"], [11384, "jump", "a"], [11597.2, "jump", "g"],
       ...CP.wave.slice(1), ...CP.crown,
       [gx(366) - 0.3, "jump", "g"], [gx(372) - 0.3, "jump", "g"], [gx(378) - 0.3, "jump", "g"],
       ...CP.hearthVoid, ...CP.splitVoids,
@@ -1093,7 +1093,7 @@ L4_BASE.routes.upper = [
   ...superAt(38, 1),
   ...superAt(68, 1),
   [gx(81) + 2 * SUPER - 0.3, "jump", "g"],
-  ...shift([[10666.7, "jump", "g"], [10947.2, "dive", "g"], [11337.2, "jump", "g"], [11390, "jump", "a"], [11597.2, "jump", "g"], ...CP.wave.slice(1, 4), ...CP.wave.slice(4)], L4_DX_B, 0, "plan"),
+  ...shift([[10666.7, "jump", "g"], [10947.2, "dive", "g"], [11337.2, "jump", "g"], [11384, "jump", "a"], [11597.2, "jump", "g"], ...CP.wave.slice(1, 4), ...CP.wave.slice(4)], L4_DX_B, 0, "plan"),
   // Great Star 1: a super jump off the cascade's end.
   ...shift([[13010, "jump", "g"], [13010 + 75.7, "dash", "a"], [13010 + 151.4 + 63.67, "jump", "a"], [13545, "jump", "g"], [13695.7, "jump", "a"]], L4_DX_B, 0, "plan"),
   [gx(206) + 2 * SUPER - 0.3, "jump", "g"],
