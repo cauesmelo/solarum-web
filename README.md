@@ -139,7 +139,7 @@ The **body** (breath, cloth, stone, sparkle, thump) plays at once and carries no
 
 ### Mistakes go gently out of tune
 
-A hidden tuning value H (0.4–1, starting at 1) moves only after visible errors: a fall (on respawn H ≤ 0.6; 0.8 after three falls at one beacon, 1 after five), a broken constellation (−0.15, and its last note sighs 50 cents down while the pad holds a sus4 to the next strong beat), and a score note taken more than 70 ms off its intended beat (−0.03, played loose). On-time notes (+0.05), stable landings (+0.03), error-free bars (+0.1), completed constellations (+0.3) and beacons (= 1) retune it. H shapes only the world's bed: pads detune ±(1 − H) × 30 cents and tape wow adds (1 − H) × 20, together never more than 20 cents; the lowpass closes to 2 kHz × 2^(3H); below 0.7 the choir rests and the shimmer thins. A clean main run stays at H = 1 and 0 cents throughout (tested).
+A hidden tuning value H (0.4–1, starting at 1) moves only after visible errors: a fall (on respawn H ≤ 0.6; 0.8 after three falls at one beacon, 1 after five), a broken constellation (−0.15, and its last note sighs 50 cents down while the pad holds a sus4 to the next strong beat), and a score note taken more than 70 ms off its intended beat (−0.03, played loose). Only clean play heals it, one bar at a time: +0.1 per error-free bar (a beacon counts as one), so a fall is heard for about four bars. H shapes only the world's bed, never Diana's voice: the whole bed drifts **flat** of her in-tune notes by (1 − H) × 40 cents (at most 20; 16 right after a fall), plus a small spread between paired pad oscillators and tape wow, at most 25 cents in all; the lowpass closes to 2 kHz × 2^(3H); below 0.7 the choir rests and the shimmer thins. (A first version spread the pads symmetrically around true pitch and healed in 2–5 s; the audio critic measured it as nearly inaudible.) A clean main run stays at H = 1 and 0 cents throughout (tested).
 
 **A fall** tape-stops the score (0–0.45 s: the music bus's delay ramps until the pitch is two octaves down, the lowpass closes from 8 kHz to 300 Hz, the level falls 12 dB), its last eight notes play backwards an octave up, 32 ms apart, while the shards fly home (0.45–0.70 s), the respawn shimmer rises, and when control returns the score restarts on the beacon's half bar. *Back to last light* restarts without the tape-stop or a penalty; *Restart chapter* goes back to bar 1 in tune. Re-entries vary the Signal's phrase.
 
@@ -152,8 +152,8 @@ All 62 intended stars on time, all five main constellations, no fall: the song i
 ### Clocks, scheduling and pause
 
 - The score never delays or drives gameplay: the simulation runs on its own clock and the engine follows it. `game.js` passes `{ simTime, x, y, status, timeScale, inWind, gliding, fallsHere }` every frame; events go to the conductor even in quiet QA steps so the song keeps its place.
-- Simulation seconds map to audio seconds through a clock that ignores the audio clock's 2.7 ms render-quantum steps (4 ms dead band), slews real drift at 1% of tempo and re-anchors after a hitch over 50 ms. Bed notes are scheduled from the rAF loop 120 ms ahead; a note whose grid point just went by sounds at once, never in the past. Gentle pace (0.8×) slows the transport to 85.6 BPM, so everything stays aligned.
-- **Pause freezes everything.** Every pause path suspends the AudioContext and the soundtrack; the score's clock and transport hold with the frozen simulation and nothing is scheduled until Continue, which resumes in place. Sound off creates no context and no nodes (the conductor still follows, so switching sound on mid-run joins the song where it is). Sound is on unless the player turned it off.
+- Simulation seconds map to audio seconds through a clock that ignores the audio clock's 2.7 ms render-quantum steps (4 ms dead band), slews real drift at 1% of tempo (3% for a residual over 20 ms) and, after a hitch over 50 ms, re-anchors by **whole sixteenths** so the grid keeps its phase; the wake anchors on its first frame. Bed notes are scheduled from the rAF loop 120 ms ahead and sound 15 ms after their grid point, which centres Diana's notes (they arrive a frame after their event); a note whose grid point just went by sounds at once, never in the past. Gentle pace (0.8×) slows the transport to 85.6 BPM, so everything stays aligned. The simulation is never held for the audio (after a pause, `ctx.resume()` settles in the background and the clock slews the residual).
+- **Pause freezes everything** with a 15 ms fade on each side (no click). Every pause path suspends the AudioContext and the soundtrack; the score's clock and transport hold with the frozen simulation and nothing is scheduled until Continue, which resumes in place. Sound off creates no context and no nodes (the conductor still follows, so switching sound on mid-run joins the song where it is). Sound is on unless the player turned it off.
 
 ### Palette and signal flow
 
@@ -164,27 +164,30 @@ cue -> sfx bus -> compressor -> master -> safety clipper -> out    (+ 2.4 s room
 bed voice -> bed bus -> tape wow (H) -> lowpass (H) ------> score bus
 player voice ---------------------------------------------> score bus
 voices -> 5.5 s space reverb (30 ms pre-delay, 120 ms bloom) + octave shimmer loop -> score bus
-score bus -> tape delay (tape-stop) -> tape lowpass -> tape gain -> score out (0.55) -> master
-rewind notes -> master        soundtrack element -> music gain -> master (title, door)
+score bus -> tape delay (tape-stop) -> tape lowpass -> tape gain -> presence (+3.5 dB @ 3.8 kHz) -> score out (0.55) -> master
+rewind notes -> master        soundtrack element -> music gain (0.32) -> master (title, door)
+master -> output (+7.7 dB) -> limiter (-3 dBFS, ratio 20) -> safety clipper -> out
 ```
 
-The shimmer is an octave-up granular shifter (two delay lines driven by looping ramp and window buffers) feeding back into the space reverb at 0.4 (0.15 below H 0.7). Phones get a 4 s space reverb. The score uses at most 28 voices beside the 20 cue voices.
+The shimmer is an octave-up granular shifter (two delay lines driven by looping ramp and window buffers) feeding back into the space reverb at 0.4 (0.15 below H 0.7). Phones get a 4 s space reverb. The score uses at most 28 voices beside the 20 cue voices; to keep CPU down the shaker is one persistent voice (an envelope per sixteenth), sky pads are grouped oscillator buses under one envelope and a choir chord shares one pair of formant filters, so a whole main run creates about 6.4k nodes (10.2k before). Each pad tone's two saws sit on opposite sides, the second 7–15 ms later; pads are re-voiced at every bar line with a 1.6 s crossfade, so a held chord never decays.
+
+**The soundtrack's bookends.** On the title it starts on the plain element where the browser allows it (itch's click-to-play iframe does), otherwise with the first gesture that does not wake; waking fades it under the sky. It is preloaded, and one bar after the door it fades in on a downbeat at its full section (bar 26 of the file), 3 dB up to match the door's bloom.
 
 ### The mix (measured)
 
-Offline renders through the full chain (Chrome `OfflineAudioContext`, 48 kHz, clipper bypassed to see true peaks; WAVs kept outside the repo), against the soundtrack through its old in-level path as reference (−29.0 LUFS, peak 0.204):
+Offline renders through the full chain as shipped (Chrome `OfflineAudioContext`, 48 kHz, safety clipper on; WAVs kept outside the repo), against the soundtrack through its own path as reference (−16.5 LUFS, peak 0.806). The audio critic measured the first mix at −27.5 LUFS against the soundtrack file's −15; the output now gains 7.7 dB into a limiter.
 
 | Render | LUFS | Peak |
 | --- | --- | --- |
-| Perfect run, bars 1–12 (cues + score) | −28.3 | 0.475 |
-| The same, score only | −29.9 | 0.186 |
-| Sloppy run, bars 1–12 (broken constellation, late hops, a fall) | −28.5 | 0.401 |
-| Gentle music, same sloppy run | −28.5 | 0.393 |
-| Fall and tape-stop (9 s) | −29.6 | 0.355 |
-| Perfect run, Movement III | −27.4 | 0.378 |
-| Perfect door / mastery door with Earth | −25.7 / −26.1 | 0.268 / 0.305 |
+| Perfect run, bars 1–12 (cues + score) | −16.7 | 0.820 |
+| The same, score only | −17.3 | 0.772 |
+| Sloppy run, bars 1–12 (broken constellation, late hops, a fall) | −17.2 | 0.828 |
+| Gentle music, same sloppy run | −17.0 | 0.832 |
+| Fall and tape-stop (9 s) | −19.5 | 0.804 |
+| Perfect run, Movement III | −15.7 | 0.834 |
+| Perfect door / mastery door with Earth | −14.6 / −14.9 | 0.838 / 0.822 |
 
-Stems (score only): stars −32.6, sky −34.2, steps −34.8, pulse −36.3, strings −36.5, choir −39.0, Signal −40.2, Earth −40.4, glass −40.7 LUFS. No render peaks above 0.48, so the safety clipper (transparent below 0.6, never above 0.89) never engages.
+Stems (score only): stars −20.7, sky −21.1, steps −24.6, pulse −26.4, strings −27.6, Signal −27.8, glass −28.1, Earth −28.2, choir −28.7 LUFS. Nothing exceeds 0.84. A sloppy run now leaves the bed 16–21 cents flat for several bars after each fall (heard in the A/B on the soundboard).
 
 ### Body cues
 
@@ -213,7 +216,7 @@ Every cue gets ±1 dB, ±3 cents (pads up to 8), fresh noise positions and crack
 | `win` | win | The closing chord blooms with bells; the Earth chord's G♯ with three Great Stars; the motif's cadence when the song is complete |
 | `ui-hover` / `ui-select` / `ui-resume` | menu buttons | A paper tick, a wooden A5 tock, two ticks rising F♯5→A5 |
 
-**Soundboard (dev only, not in the ZIP):** `npm run dev`, then open http://127.0.0.1:4173/soundboard.html. *Runs* renders the real model and pilots offline and plays them: perfect bars 1–12, the same sloppy (broken constellation, late hops, a fall), the same with Gentle music, the fall and tape-stop on its own, Movement III, the perfect door and the mastery door with Earth, and the score without bodies. *Stems* renders each layer alone from a run. *Score voices* plays each voice over the chord chosen in the toolbar. Below are the body cues and short sequences, a soundtrack toggle, pause and a peak meter. `window.__soundboard.renderRun({ kind: "main" | "sloppy" | "gentle" | "upper", from, seconds, only, cues })`, `render(cue)` and `renderWithMusic(cue)` return PCM for QA.
+**Soundboard (dev only, not in the ZIP):** `npm run dev`, then open http://127.0.0.1:4173/soundboard.html. *Runs* renders the real model and pilots offline and plays them: perfect bars 1–12, the same sloppy (broken constellation, late hops, a fall), the same with Gentle music, the fall and tape-stop on its own, Movement III, the perfect door and the mastery door with Earth, and the score without bodies. *Stems* renders each layer alone from a run. *Score voices* plays each voice over the chord chosen in the toolbar. The toolbar's *Tuning H* slider and *Hear H* play the bed at any tuning value under Diana's in-tune notes; *A/B* plays the perfect and sloppy bars 1–12 sample-locked and switches between them live; every render shows its BS.1770 loudness and peak. Below are the body cues and short sequences, a soundtrack toggle, pause and a peak meter. `window.__soundboard.renderRun({ kind: "main" | "sloppy" | "gentle" | "upper", from, seconds, only, cues })`, `render(cue)` and `renderWithMusic(cue)` return PCM for QA.
 
 ## Architecture
 
@@ -264,7 +267,7 @@ A fall sets `status: 'dead'` for 0.7 s, then `'respawning'` for 0.4 s, then `'ru
 
 ## Validation evidence (2026-11-09, Node 22.14.0)
 
-`npm test`: **78/78 pass** (about 8 s): 52 model / UI tests, 15 audio and engine tests (`tests/audio.test.mjs`) and 11 score tests (`tests/score.test.mjs`). Every route wins at 30, 60, 120 and 240 Hz sampling with zero deaths. At 120 Hz:
+`npm test`: **80/80 pass** (about 9 s): 53 model / UI tests (including the step-up sweep), 16 audio and engine tests (`tests/audio.test.mjs`) and 11 score tests (`tests/score.test.mjs`). Every route wins at 30, 60, 120 and 240 Hz sampling with zero deaths. At 120 Hz:
 
 | Route | Time | Stars (of 90) | Upper stars | Great Stars | Constellations | Beacons | Jumps / flights / dives / super | Smashes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
