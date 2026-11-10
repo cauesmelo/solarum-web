@@ -40,7 +40,7 @@ export const RULES = Object.freeze({
   playerHeight: 58,
   coyote: 0.12,
   jumpBuffer: 0.14,
-  // Ledge forgiveness: arriving up to 25 px below a top surface right at its
+  // Ledge forgiveness: arriving up to 30 px below a top surface right at its
   // lip (the first 40 px) while falling or barely rising pops Diana onto it,
   // so a near miss never reads as sinking through the drawn island edge.
   // One step-up rule (RESEARCH_LEVELS F2), hidden margin like Canabalt's
@@ -53,11 +53,15 @@ export const RULES = Object.freeze({
   // dash nudge is 6 px on an 11 px body; 24 px is 41% of Diana's 58). Never
   // onto a collapsing top, within smashGrace after a smash, or onto a
   // platform authored `noPop`. It replaces the old single-substep lip catch.
-  lipDepth: 25,
+  // RESEARCH_PROGRESSION 7, no visible lip sink: the drawn toe reaches about
+  // 30 px under the feet's line at an apex, so 30 px on the span and at the
+  // lip (was 20 / 25) and 4 px of overlap (was 10) step her up before the
+  // art can be seen sinking through a top she visibly reached.
+  lipDepth: 30,
   lipReach: 40,
-  stepUpDepth: 20,
+  stepUpDepth: 30,
   flightStepDepth: 24,
-  stepUpOverlap: 10,
+  stepUpOverlap: 4,
   smashGrace: 0.1,
   // A dive through a lid lowers the fall allowance (and the camera) by this
   // much: a well may be deeper than the 265 px a walk-off survives, so only
