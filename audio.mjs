@@ -1357,7 +1357,7 @@ const AIR = { wind: 0.088, glide: 0.052 };
 export const EVENT_NAMES = Object.freeze([
   "wake", "jump", "double-jump", "super-jump", "dash", "dive", "smash", "cascade", "tile-drop", "land", "lip-catch",
   "star", "chain-note", "constellation", "chain-fade", "refill", "great-star", "great-banked", "checkpoint",
-  "movement", "death", "respawn", "wind-catch", "win", "get", "wind-refund", "moment",
+  "movement", "death", "respawn", "wind-catch", "win", "get", "wind-refund", "moment", "relic", "refill-star",
 ]);
 /** Returns [{ cue, params, music }]. A cue the engine must count (star steps,
  * cascade tiles, the chain's size) is resolved by the engine. */
@@ -1383,7 +1383,13 @@ export function cuesForEvent(e) {
     case "chain-fade": return [{ cue: "chain-fade" }];
     // A beacon or a completed constellation already voices the refill inside
     // its own cue; a second sound there would only blur it.
-    case "refill": return e.source === "beacon" || e.source === "constellation" ? [] : [{ cue: "refill" }];
+    // (A cape star's refill is voiced by its own refill-star event.)
+    case "refill": return e.source === "beacon" || e.source === "constellation" || e.source === "cape-star" ? [] : [{ cue: "refill" }];
+    // RESEARCH_REFILLS: a refill star that acts glints (the cape's A6 glint
+    // for both until the leaf gets its glass tick); a relic's pickup adds the
+    // glint under the GET's bloom.
+    case "refill-star": return [{ cue: "refill" }];
+    case "relic": return [{ cue: "refill" }];
     case "great-star": return [{ cue: "great-star" }];
     case "great-banked": return [{ cue: "great-banked" }];
     case "checkpoint": return [{ cue: "beacon" }];
