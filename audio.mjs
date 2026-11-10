@@ -1192,7 +1192,7 @@ const AIR = { wind: 0.088, glide: 0.052 };
 export const EVENT_NAMES = Object.freeze([
   "wake", "jump", "double-jump", "super-jump", "dash", "dive", "smash", "cascade", "tile-drop", "land", "lip-catch",
   "star", "chain-note", "constellation", "chain-fade", "refill", "great-star", "great-banked", "checkpoint",
-  "movement", "death", "respawn", "wind-catch", "win",
+  "movement", "death", "respawn", "wind-catch", "win", "get", "wind-refund",
 ]);
 /** Returns [{ cue, params, music }]. A cue the engine must count (star steps,
  * cascade tiles, the chain's size) is resolved by the engine. */
@@ -1226,6 +1226,10 @@ export function cuesForEvent(e) {
     case "death": return [{ cue: "fall", music: "darken" }];
     case "respawn": return [{ cue: "respawn", music: "brighten" }];
     case "wind-catch": return [{ cue: "wind-catch" }];
+    // A GET (a new verb) blooms like a Great Star; the wind's refund is the
+    // cape's refill glint (RESEARCH_PROGRESSION 2.2, 3.2).
+    case "get": return [{ cue: "great-banked" }];
+    case "wind-refund": return [{ cue: "refill" }];
     case "win": return [{ cue: "win", params: { earth: !!e.earth } }];
     default: return [];
   }
