@@ -92,11 +92,8 @@ test("constellations complete on an eighth, beacons sit on half bars, flights mo
   }
   // A full flight adds 0.5 s x 227.1 px/s = 113.55 px = 3 x 37.85 px of run.
   assert.ok(Math.abs(RULES.dashSpeed * RULES.dashDuration - 3 * 270 * SIXTEENTH) < 0.01);
-  // The beat cascade's pitch is one wave-beat: 207 px.
-  for (const n of [LEVEL_ID.door]) {
-    const tiles = createLevel(n).platforms.filter((q) => q.cascade).sort((a, b) => a.x - b.x);
-    for (let i = 1; i < tiles.length; i++) assert.ok(Math.abs(tiles[i].x - tiles[i - 1].x - 207) < 1);
-  }
+  // (The chapter's six-tile cascade at a 207 px pitch went with revision
+  // six's Far Door; VII and VIII's roads are re-solved cells, tested above.)
 });
 
 /* ---------- quantiser ---------- */
@@ -427,12 +424,13 @@ test("the conductor is deterministic and each level's bed respects its layer pla
   assert.equal(bar(gift, "pulse", 5), 2);
   assert.equal(bar(gift, "pulse", 11), 0, "II rests over the long void");
   assert.equal(gift.notes.filter((v) => v.voice === "shaker" || v.voice === "marimba").length, 0);
-  // L1: no drums at all. The interim Far Door: four on the floor.
+  // L1: no drums at all. VIII (restraint): no groove and no shaker; the
+  // falling roads' knocks are the world's and her touch-downs are hers.
   assert.equal(l1.notes.filter((v) => v.voice === "pulse" || v.voice === "shaker").length, 0);
-  assert.equal(bar(l4, "pulse", 5), 4);
-  assert.equal(bar(l4, "marimba", 5), 8);
+  assert.equal(l4.notes.filter((v) => v.event === "tick" && (v.voice === "pulse" || v.voice === "marimba" || v.voice === "shaker")).length, 0, "VIII has no groove");
+  assert.ok(l4.notes.filter((v) => v.layer === "steps" && v.voice === "marimba").length >= 10, "her bounces on the tiles are hers");
   // Each level its own space (RESEARCH_LEVELS 6): 5.5 s, 5.5, 3.5, 2.5.
   const order = [1, 2, LEVEL_ID["still-water"], LEVEL_ID["way-down"], LEVEL_ID.breaking, LEVEL_ID["borrowed-wind"], LEVEL_ID["falling-road"], LEVEL_ID.door];
   assert.deepEqual(order.map((n) => SCORES[n].space.seconds), [5.5, 5.5, 5, 4.5, 3.5, 3.5, 3, 2.5]);
-  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 18, 20, 22, 20]);
+  assert.deepEqual(order.map((n) => SCORES[n].maxFlat), [12, 14, 15, 16, 18, 20, 22, 24]);
 });

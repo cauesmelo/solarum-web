@@ -670,11 +670,12 @@ function scoreRun({ route = "main", gentle = false, pauseAt = null, enabled = tr
   return { ...r, s, pauses, stats: r.engine.stats() };
 }
 test("the score plays a whole run on the audio clock: never in the past, caps and voice budget hold, the song completes", () => {
-  // The busiest score (the interim Far Door: four on the floor, the ostinato).
+  // The densest score by Diana's own notes (VIII: every verb, two falling
+  // roads, the wind's strings; no groove under the owner's restraint).
   const run = scoreRun({ level: LEVEL_ID.door });
   assert.equal(run.s.status, "won");
   const sc = run.stats.score;
-  assert.ok(sc.scheduled > 500, `${sc.scheduled} score notes scheduled`);
+  assert.ok(sc.scheduled > 300, `${sc.scheduled} score notes scheduled`);
   assert.ok(sc.peakVoices <= 28, `${sc.peakVoices} score voices at once`);
   assert.ok(run.stats.peakVoices <= 20);
   assert.ok(sc.maxQuantizeMs <= 140, `${sc.maxQuantizeMs} ms`);
@@ -683,7 +684,8 @@ test("the score plays a whole run on the audio clock: never in the past, caps an
   assert.equal(sc.H, 1);
   assert.equal(sc.detuneCents, 0);
   assert.equal(sc.tapeStops, 0);
-  for (const voice of ["pad", "signal", "pulse", "bass", "glass", "kalimba", "choir", "harmonica", "vowel", "chime", "marimba"]) assert.ok(sc.played[voice] > 0, `${voice} played`);
+  // (No "pulse": VIII has no groove; its roads' knocks are the marimba.)
+  for (const voice of ["pad", "signal", "bass", "glass", "kalimba", "choir", "harmonica", "vowel", "chime", "marimba"]) assert.ok(sc.played[voice] > 0, `${voice} played`);
   assert.ok(run.stats.decoded.includes("space"), "the space reverb was generated");
   // The door: the soundtrack is due two bars later (a timer in the browser).
   assert.equal(sc.door.complete, true);

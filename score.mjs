@@ -209,17 +209,25 @@ const ROAD_SECTIONS = [
   { id: "close", from: 24, to: 24, pulse: false, cycle: [C.Bm] },
   { id: "coda", from: 25, to: Infinity },
 ];
-const L4_CYCLE = [C["Bm/F#"], C["G/F#"], C["Em/F#"], [C["F#sus4"], C["F#"]]];
-// L4's twist (the voids at 128): the pedal climbs, G/F# Em/F# then F#sus4 F#.
-const L4_SECTIONS = [
-  { id: "wake", from: 1, to: 2, cycle: [C["Bm/F#"]] },
-  { id: "storm", from: 3, to: 6, cycle: L4_CYCLE },
-  { id: "wave", from: 7, to: 12, shaker: true, cycle: L4_CYCLE },
-  { id: "voids", from: 13, to: 18, shaker: true, cycle: [C["G/F#"], C["Em/F#"], [C["F#sus4"], C["F#"]], C["Bm/F#"]] },
-  { id: "finale", from: 19, to: 22, shaker: true, cycle: L4_CYCLE },
-  { id: "stair", from: 23, to: 23, shaker: true, cycle: [[C["G/F#"], C["F#"]]] },
-  { id: "close", from: 24, to: 25, cycle: [[C["F#sus4"], C["F#"]], [C.Bm, C.Bm]] },
-  { id: "coda", from: 26, to: Infinity },
+// VIII · The Far Door (RESEARCH_PROGRESSION 4.3: B Aeolian over an F# pedal,
+// revision six's IV harmony). Restraint (the owner: the background was
+// overwhelming): the tension is the pedal's harmony, the falling roads'
+// knocks (the world's) and the density of Diana's own notes. Revision six's
+// four on the floor (a felt kick on every beat and an eighth-note
+// ostinato) is left out: no groove at all, and no shaker.
+const FAR_CYCLE = [C["Bm/F#"], C["G/F#"], C["Em/F#"], [C["F#sus4"], C["F#"]]];
+const FAR_SECTIONS = [
+  { id: "wake", from: 1, to: 2, pulse: false, cycle: [C["Bm/F#"]] },
+  { id: "school", from: 3, to: 3, pulse: false, cycle: [C["G/F#"]] },
+  { id: "storm", from: 4, to: 5, pulse: false, cycle: [C["Em/F#"], [C["F#sus4"], C["F#"]]] },
+  { id: "wind", from: 6, to: 7, pulse: false, cycle: [C["Bm/F#"], C["G/F#"]] },
+  { id: "falling", from: 8, to: 10, pulse: false, cycle: [C["Em/F#"], [C["F#sus4"], C["F#"]], C["Bm/F#"]] },
+  { id: "gauntlet", from: 11, to: 14, pulse: false, cycle: FAR_CYCLE },
+  { id: "road", from: 15, to: 16, pulse: false, cycle: [C["G/F#"], [C["F#sus4"], C["F#"]]] },
+  { id: "stair", from: 17, to: 20, pulse: false, cycle: FAR_CYCLE },
+  { id: "last", from: 21, to: 24, pulse: false, cycle: FAR_CYCLE },
+  { id: "close", from: 25, to: 25, pulse: false, cycle: [C.Bm] },
+  { id: "coda", from: 26, to: Infinity, pulse: false },
 ];
 /**
  * One conductor preset per level (RESEARCH_LEVELS 6): its map (sections in
@@ -452,21 +460,32 @@ const PRESETS = {
   },
   door: {
     bpm: 128, bars: 26, pickup: 0,
-    // agitated, tense: a felt kick on every beat, sixteenth ticks and an
-    // eighth-note F# ostinato; after a fall the ostinato rests until the
-    // next constellation or beacon.
-    groove: "four", maxFlat: 20, space: { seconds: 2.5, shimmer: 0.25 }, tapeStop: 0.45, rewind: true, dropOnFall: true,
-    sections: L4_SECTIONS,
-    chordAt: mapOf(L4_SECTIONS, C.Dadd9),
-    signalBars: [1, 3, 7, 11, 19], closeFrom: 24,
+    // VIII · The Far Door, tense but fair: the densest and brightest of the
+    // campaign by Diana's own notes, not by the bed (FAR_SECTIONS: no
+    // groove plays; "four" names revision six's, which the restraint dropped).
+    groove: "four", maxFlat: 24, space: { seconds: 2.5, shimmer: 0.25 }, tapeStop: 0.45, rewind: true, dropOnFall: true,
+    sections: FAR_SECTIONS,
+    chordAt: mapOf(FAR_SECTIONS, C["Bm/F#"]),
+    // The wake, out of the wind (bar 6), the gauntlet (bar 11) and the
+    // rising stair (bar 17); the theme closes from bar 24.
+    signalBars: [1, 6, 11, 17], closeFrom: 24,
     phrases: {
-      // the well (bar 6, G/F#): D5 B4 A4 G4 B4.
-      "well-song": [74, 71, 69, 67, 71],
-      // the voids (as in L3, refitted below) and the rising stair.
-      "split-song": [78, 76, 73, 71, 69],
-      "stair-song": [71, 73, 76, 78, 83, 85],
-      // the finale (bar 15, Bm/F#): F#5 E5 D5 B4.
-      "finale-song": [78, 76, 74, 71],
+      // bars 2-3 (Bm/F# | G/F#): up the school's super jump, D5 | E5 F#5 A5.
+      "school-song": [74, 76, 78, 81],
+      // bars 6-7 (Bm/F# | G/F#): up the column, F#5 A5 B5 | D6.
+      "rise-song": [78, 81, 83, 86],
+      // bars 9-10 (F# | Bm/F#): down the falling road, C#6 B5 | F#5 D5.
+      "cascade-song": [85, 83, 78, 74],
+      // bar 12 (G/F#): the cracked launch, B4 D5 E5 G5.
+      "launch-song": [71, 74, 76, 79],
+      // bars 16-17 (F#sus4 F# | Bm/F#): the star road, B5 C#6 E6 | F#6 D6.
+      "road-song": [83, 85, 88, 90, 86],
+      // bars 18-19 (G/F# | Em/F#): the rising stair, B4 | D5 E5 G5 A5.
+      "stair-song": [71, 74, 76, 79, 81],
+      // bars 19-20 (Em/F# | F#sus4): to the summit, B5 | C#6 E6 F#6.
+      "summit-song": [83, 85, 88, 90],
+      // bars 23-25 (Em/F# | F#sus4 F# | Bm): home, B5 | F#5 E5 C#5 | B4.
+      "home-song": [83, 78, 76, 73, 71],
     },
   },
 };
