@@ -430,7 +430,7 @@ export function nominalRun(n, route = "main") {
  * before it. Success: no fall before the next beacon (or the door), and the
  * shifted press did the same thing (a jump stays a jump, not a double) and
  * led to the same next touch-down. `hold`: ticks until the jump is released. */
-export function replayShifted(n, nom, i, delta, { hold = Infinity, skip = false } = {}) {
+export function replayShifted(n, nom, i, delta, { hold = Infinity, skip = false, strict = true } = {}) {
   const { plan, steps } = nom;
   const base = i > 0 ? steps[i - 1].snap : null;
   const s = base ? clone(base.s) : start(createGame(2021, { level: n }));
@@ -447,7 +447,7 @@ export function replayShifted(n, nom, i, delta, { hold = Infinity, skip = false 
     seen = s.eventSerial;
   for (let guard = 0; guard < 120 * 40; guard++) {
     if (s.status === "dead") return { ok: false, why: "fell", x: s.player.x };
-    if (s.status === "won" || s.player.x >= horizonX) return { ok: skip || kind === steps[i].kind, why: kind };
+    if (s.status === "won" || s.player.x >= horizonX) return { ok: skip || !strict || kind === steps[i].kind, why: kind };
     if (releaseAt !== null && tick >= releaseAt) ((releaseAt = null), releaseJump(s));
     while (j < plan.length) {
       const [x, a, w] = plan[j];
@@ -484,7 +484,7 @@ export function replayShifted(n, nom, i, delta, { hold = Infinity, skip = false 
             if (e.name === "jump" || e.name === "double-jump") kind = e.name;
           } else if (e.name === "land") {
             land = e.platform;
-            if (land !== steps[i].land || kind !== steps[i].kind) return { ok: false, why: `${kind} onto ${land}` };
+            if (strict && (land !== steps[i].land || kind !== steps[i].kind)) return { ok: false, why: `${kind} onto ${land}` };
           }
         }
   }
@@ -524,6 +524,15 @@ export function timingWindow(n, nom, i, { maxMs = 400, hold } = {}) {
     hi = d;
   }
   return { i, step: nom.plan[i], required, works: true, lo, hi, earlyMs: -realMs(n, lo), lateMs: realMs(n, hi), widthMs: realMs(n, hi - lo + 1), loEnd, hiEnd };
+}
+/** D3 recovery: how much later than the strict window's end a ground press
+ * can come and still survive to the next beacon by whatever it becomes
+ * (past coyote it is the double jump), real ms; capped at `maxMs`. */
+export function lateRecovery(n, nom, w, { maxMs = 400 } = {}) {
+  const max = Math.ceil(ticksOf(n, maxMs / 1000));
+  let hi = w.hi;
+  for (let d = w.hi + 1; d <= max && replayShifted(n, nom, w.i, d, { strict: false }).ok; d++) hi = d;
+  return realMs(n, hi - w.hi);
 }
 /** The shortest hold (real ms) a held jump on the route needs, and for taps
  * the longest hold that still works (a person cannot release in 0 ms). */

@@ -8,6 +8,13 @@ This revision (2026-11-09, "ink and starlight") implements the approved research
 
 **Revision six (2026-11-10, "four levels")** implements the approved movement and progression brief ([RESEARCH_LEVELS.md](./RESEARCH_LEVELS.md)): the climb hitbox fix (feet-anchored airborne frames, one bounded step-up rule, a fixed 1/120 s step) and four levels that each add one idea and run a little faster, each with its own musical feeling: **I · Waking** (96 BPM, floating and calm, basics only), **II · Borrowed Wind** (107, cape, wind and dive), **III · The Breaking Constellation** (118, cracked stone and the cascade) and **IV · The Far Door** (128, the super jump and everything, tense but fair). See [The four levels](#the-four-levels).
 
+**Movement audit (2026-11-10)** ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)) measured every movement criterion per level, then made three fixes:
+- Diana's toe is drawn on her feet on the very frame the pose changes; at 144–240 Hz it used to dip through tops she only flew past.
+- A press just before touch-down is the ground jump, not a wasted double.
+- Every input acts on its own timestamp, so the outcome is identical at any frame rate or hitch.
+
+Routes, art, animation timing and the music grid are unchanged.
+
 It is still a 2D side-scrolling autorunner with the original Diana / cape / signal / Earth story; no endless assembler, new character art or genre pivot.
 
 ## Run independently
@@ -38,7 +45,7 @@ Reach the far door. Stars never gate anything.
 | Pause / resume | P or Esc | II button | II button |
 | Back to last light / restart level | R / Shift+R | Pause card | Pause card |
 
-Diana runs 151.4 px per beat in every level: 242 / 270 / 298 / 323 px/s of real time at 96 / 107 / 118 / 128 BPM. The simulation always runs in 107 BPM units and a level plays it at clock = BPM / 107 (like Gentle pace), so every arc, gap and cell is the same in px and sixteenths, while coyote (0.12 s), the landing buffer (0.14 s), respawn and telegraphs stay constant in real seconds. A jump pressed while she is falling apart is kept and spent the moment she is back. The cape, glide and dive arrive in II; I ignores those buttons.
+Diana runs 151.4 px per beat in every level: 242 / 270 / 298 / 323 px/s of real time at 96 / 107 / 118 / 128 BPM. The simulation always runs in 107 BPM units and a level plays it at clock = BPM / 107 (like Gentle pace), so every arc, gap and cell is the same in px and sixteenths, while coyote (0.12 s), the landing buffer (0.14 s), respawn and telegraphs stay constant in real seconds. A jump pressed while she is falling apart is kept and spent the moment she is back (released by then, it is a tap). A press just before touch-down is the ground jump on the landing tick even with the double jump still in hand. Every key, touch or click acts on the 1/120 s tick its own timestamp falls in, whatever the frame rate or a hitch ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)). The cape, glide and dive arrive in II; I ignores those buttons.
 
 ### The rules a player learns
 
@@ -224,13 +231,15 @@ Every cue gets ±1 dB, ±3 cents (pads up to 8), fresh noise positions and crack
 | `score-path.mjs` | Generated path clock: world x → sixteenth of the main route, its anchors and a source hash (`npm run score:bake`) |
 | `audio.mjs` | Sound: body cue recipes and score voice recipes (pure data), event → cue map, the Web Audio engine (cues, score buses, space reverb and shimmer, tape-stop, scheduler, soundtrack bookends), offline renders |
 | `game.js` | Canvas drawing, HUD / cards, input, sound wiring (events and a per-frame score update), browser QA adapter |
+| `frame-clock.mjs` | Frame and input-event timestamps → real seconds to simulate (inputs act at their own time; gaps clamp at 100 ms) |
 | `soundboard.html`, `soundboard.js` | Dev-only board: runs, stems, score voices, body cues, offline render hooks (excluded from the ZIP) |
 | `scripts/bake-score.mjs` | Bakes each level's main pilot into `score-path.mjs` and prints any anchor beyond its tolerance (all of them with `--verbose`) with the px nudge that would fix it |
+| `scripts/movement-audit.mjs`, `scripts/browser-movement.mjs` | The movement audit's measurements and report ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)), and its Chrome checks with real keys |
 | `scripts/arcs.mjs` | Authoring: flies a move (hold, tap, double:N, j@0,d@3,… with the real model and a level's physics) and prints its height on every sixteenth, to solve rhythm cells |
 | `index.html`, `style.css`, `embed.*` | Game surface and UI; green preview / iframe / fullscreen layout |
 | `assets/manifest.json` | Source paths, slices, pivots, clip timing, portal bounds, SFX and an on-screen vs archive `usage` record |
 | `scripts/extract-assets.py` | Reproducible, byte-for-byte extraction from `../refs/solarum/solarum-master.zip` |
-| `tests/model.test.mjs`, `tests/audio.test.mjs`, `tests/score.test.mjs`, `tests/routes.mjs`, `tests/music-run.mjs`, `tests/glyphs.mjs`, `tests/png.mjs` | Tests, route pilots, the route driver with fault injection (score tests and soundboard renders), glyph follower, PNG alpha inspector |
+| `tests/model.test.mjs`, `tests/movement-audit.test.mjs`, `tests/audio.test.mjs`, `tests/score.test.mjs`, `tests/routes.mjs`, `tests/music-run.mjs`, `tests/glyphs.mjs`, `tests/png.mjs` | Tests, route pilots, the route driver with fault injection (score tests and soundboard renders), glyph follower, PNG alpha inspector |
 
 The simulation uses world px and seconds with substeps of at most 1/120 s, and has no DOM, image, sound, storage or wall-clock dependency. Events (`s.events`, monotonic `eventSerial`) drive sound and particles in the renderer.
 
@@ -266,7 +275,7 @@ For the root checks: press **D** in level II (`__game.startLevel(2)`, then Space
 
 ## Validation evidence (2026-11-10, Node 22.14.0)
 
-`npm test`: **87/87 pass** (about 20 s): 59 model / UI tests (every level's routes at 30/60/120/240 Hz with zero deaths, the step-up sweep, F3 clearance, crisp input and identical arcs at every rate in every level, glyph windows, camera at each level's speed), 16 audio and engine tests and 11 score tests (every level). At 120 Hz (time in real seconds):
+`npm test`: **105/105 pass** (about 22 s): 62 model / UI tests (every level's routes at 30/60/120/240 Hz with zero deaths, the step-up sweep, F3 clearance, crisp input and identical arcs at every rate in every level, glyph windows, camera at each level's speed), 16 movement-audit tests ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)), 16 audio and engine tests and 11 score tests (every level). At 120 Hz (time in real seconds):
 
 | Route | Time | Stars | Great Stars | Constellations | Beacons | Jumps / flights / dives / super | Smashes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -281,6 +290,8 @@ For the root checks: press **D** in level II (`__game.startLevel(2)`, then Space
 
 Every star of every level is collected by some pilot and none sits inside an island; removing I's double jump, II's cape or IV's super jump fails exactly at the challenge that teaches it; removing one star of II's void-song or III's split-song leaves the cape spent over the void; the main routes never touch an optional platform; beacon spacing, runways, authoring limits, no blind landings (the landing is in view at the input that commits to it), telegraphs, lookahead, HUD band, death line, respawn ≤ 1.2 s real, star net and portal hold in every level.
 
+**Movement audit (2026-11-10).** Every rubric item of `common/docs/MOVEMENT_CRITERIA.md` measured per level: 5 FAIL before, 0 after, 7 reasoned WARNs. A from-below sweep of 970,596 approaches onto every platform type of every level never shows Diana looking landed and falling, and never lands her when clearly short. The pre-audit eased foot offset showed 839 / 1,171 such cases at 144 / 240 Hz. Every required press has a window of at least 529 / 350 / 332 / 293 ms (I–IV). Coyote is 111–118 ms and the buffer 133–139 ms in every level. A person's timestamped presses replay bit-identically at 30/60/120/240 Hz and under 0–100 ms hitches. Chrome with real keys (`scripts/browser-movement.mjs`, 9/9): the drawn toe is within 0.91 px of the feet over 693 body frames; a press during an 80 ms hitch lands on its own tick; releases count behind the pause card and on blur; every main route wins and the screenshot moments are alive. The rebuilt ZIP (44 files) in a 960×640 sandboxed iframe jumps on a real Space key and wins all four main routes with no errors.
+
 **Grid (bake).** All main-route anchors within 35 ms (real) of their grid at 60, 120 and 240 Hz: I 69 anchors (worst 20.8 ms at 120 Hz), II 91 (19.2), III 101 (13.7), IV 102 (29.4). Walking, jumping or double jumping off the broken well's lid dies; only the dive lands (tested).
 
 **The score (tests).** Path clock fresh (hash of level, model and pilot); all 171 main-route anchors within 35 ms of their grid at 60, 120 and 240 Hz (worst 16.5 ms at 120 Hz), within the sampling at 30 Hz; constellations complete on eighths, beacons on half bars, flights move exactly 3/16, the cascade pitch is 207 px and every tile drops on a beat; the quantiser never waits past its cap (swept, and in real runs); every free note over five runs (main, upper, ability, safe, sloppy) is in its chord's safe set and G♯ sounds only as Great-Star dust; authored phrases fit their chords; a clean run stays at H = 1 and 0 cents, a sloppy run detunes only after its first error, never beyond 20 cents, and is back in tune by the door; Gentle never detunes and fades instead; a fall tape-stops with up to eight reversed notes and restarts on the beacon's half bar at the moment control returns; a perfect run fills all 62 intended notes and five constellations and plays every main layer, a sloppy one does not; a full-run scheduler simulation under 8–50 ms jitter and a 200 ms hitch holds the grid within 2 ms, recovers within a bar and schedules nothing in the past; through the real engine on a strict Web Audio mock a whole run schedules over 500 notes with no source started before the clock, at most 28 score voices, a completed song, and pause freezes scheduling, nodes and the transport.
@@ -293,7 +304,7 @@ Earlier browser evidence (layout at 960×640 and 390×844, touch targets, reduce
 
 ## itch.io export
 
-`npm run build:itch` writes `dist/solarum-itch.zip` (43 files, 9.26 MiB; the soundboard, tests, scripts and the archived WAVs are left out), `dist/itch/` and `dist/build-report.json`. `index.html` is at the root and every path is relative; `.mjs` runtime modules become `.js`. Use an HTML game page, 960×640 embed, click-to-play and fullscreen. See [ITCH_IO.md](./ITCH_IO.md). Nothing has been uploaded.
+`npm run build:itch` writes `dist/solarum-itch.zip` (44 files, 9.28 MiB; the soundboard, tests, scripts and the archived WAVs are left out), `dist/itch/` and `dist/build-report.json`. `index.html` is at the root and every path is relative; `.mjs` runtime modules become `.js`. Use an HTML game page, 960×640 embed, click-to-play and fullscreen. See [ITCH_IO.md](./ITCH_IO.md). Nothing has been uploaded.
 
 ## Asset provenance and credits
 
@@ -303,6 +314,14 @@ Original credits: Cauê Melo, Daniel Calônico, Lucas Santos and Rafael Lima; th
 
 ## Known limits
 
+- **Movement WARNs** ([MOVEMENT_AUDIT.md](./MOVEMENT_AUDIT.md)):
+  - I's floaty apex (0.54 s).
+  - The 0 ms tap floor (0.24 of a full jump; real taps land at 0.45–0.56).
+  - The symmetric arc and uncapped fall in II–IV, on which every cell is solved.
+  - The apex hang in I only.
+  - The fixed ±16 px support box against the swinging stride, and the stride's float.
+  - No lasting double-jump cue on Diana.
+  - Landings of the chained flights (II's glide bridge, the finales) come into view 0.35–1.04 s before the committing press, although the gap itself is in view at least 1.77 s ahead.
 - **Still shorter than the brief.** I 65 s, II 50.5 s, III 46.8 s, IV 46.9 s: about 3.5 minutes on the main routes against the brief's 4.8 (and the 60-80 s asked for II-IV). Not built: III's flight across a missing cascade tile, IV's "wind, dive, wind" and narrow land-and-go bounces.
 - II's dive out of the wind is required for plain play; holding the cape in that column and flying after it can still reach the far shore (an expert alternative).
 - The four score presets are synthesised from the existing voices (no new instruments): L1's "breath" is the pad's bar-line re-voicing, L3's call and response is the tresillo marimba under the Signal, and the per-level payoffs (the Signal answering at I's door, the tempo exhaling into the recording at IV's) are the existing door cadence and recording. None has had a human listen.
