@@ -6,6 +6,7 @@
     "height": 640,
     "clickToPlay": true,
     "fullscreenButton": true,
-    "mobileFriendly": "Test physical devices before enabling"
+    "mobileFriendly": true,
+    "orientation": "landscape"
   }
 }

@@ -21,6 +21,10 @@ const excluded = new Set(['package.json', 'package-lock.json', 'serve.mjs', 'pac
 // The original Unity WAVs stay in the source folder for provenance; every
 // effect is now synthesised by audio.mjs, so the game never loads them.
 const excludedPrefixes = ['assets/sfx/'];
+// v1.0: the ZIP carries the game and its player-facing documents only (README,
+// CHANGELOG and any licence file). The design briefs, research, audits and
+// ITCH_IO.md stay in the repository; players never read them.
+const rootFile = (name) => /\.(html|css|js|mjs|json)$/i.test(name) || /^(README|CHANGELOG)\.md$/i.test(name) || /licen[cs]e/i.test(name);
 async function runtimeFiles(folder, prefix = '') {
   const out = [];
   for (const entry of (await readdir(folder, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -28,7 +32,7 @@ async function runtimeFiles(folder, prefix = '') {
     const name = prefix + entry.name;
     if (entry.isDirectory()) {
       if (prefix || ['assets', 'vendor'].includes(entry.name)) out.push(...await runtimeFiles(path.join(folder, entry.name), name + '/'));
-    } else if (!excluded.has(name) && !excludedPrefixes.some((p) => name.startsWith(p)) && (prefix || /\.(html|css|js|mjs|json|md|txt)$/i.test(name))) out.push(name);
+    } else if (!excluded.has(name) && !excludedPrefixes.some((p) => name.startsWith(p)) && (prefix || rootFile(name))) out.push(name);
   }
   return out;
 }
