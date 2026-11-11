@@ -4,6 +4,15 @@ Player-facing changes in Solarum. Versions follow `package.json`; the title scre
 
 ## [Unreleased]
 
+### Falling and respawning (from the owner's gameplay video)
+
+- **A fall now happens out of sight, and a stone you can see catches you.** Diana used to shatter in the middle of the screen, over the Moon's limb, while still fully visible; in level VIII she could shatter 40-80 px above the home ledge she was gliding onto, because it lies 299 px under the stone she left (the death line is 265). She now keeps falling until she has left the view, and a stone her fall meets on the way still catches her; only then do the star shards, the fall sound and the dark begin. Where the old death line was already under the screen nothing changes.
+- **The respawn is never blank.** At every respawn in the later levels the whole view used to go black for about seven frames. The iris now closes round the beacon's light and opens again with no blank frame, at the same speed on every level. Reduced motion fades the dark in and out.
+- **Esc during a fall is no longer lost:** the pause card opens as soon as Diana can be controlled.
+- **"Need a hand? Assists are in the pause menu." shows once** per level and session (after five falls in a row at one beacon), not after every respawn; never after Back to last light and never when an assist is already on.
+- **VIII's rising stair has a sign:** a double-jump glyph (up, up) over the gap at the first step, where a cape press in the jump's rise flies under the bowl.
+- Cascade tiles shake for their full warning on every level (the grey shake was 16% short on levels above 107 BPM).
+
 ### Keyboard only
 
 - **Solarum is played with the keyboard only.** The mouse and touch screens do nothing: a click or a tap on the game changes nothing (it only gives the page keyboard focus, so keys work at once after you click into the itch.io frame), and the pointer is hidden over the game. The touch buttons, the on-screen pause, sound and fullscreen buttons and the "tap" wording are gone.

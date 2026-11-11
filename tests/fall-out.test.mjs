@@ -1,16 +1,18 @@
 /** The owner's video (2026-11-10): Diana "dies in the middle of the map; she
- * does not fall into the pit". The doom line (anchorY + fallLimit) sits
- * anywhere from 55% to 99% of the screen height under the damped camera, so
+ * does not fall into the pit". The doom line (anchorY + fallLimit) sits at
+ * 74% to 110% of the screen height (median 91%) under the damped camera, so
  * the fall used to be declared (shards, fall sound, iris) while she was still
  * in plain view, over the Moon's limb. These tests pin the repaired rule
  * (geometry.mjs fallOutLine, model.mjs `doomed`): a fall counts only once her
  * drawn body is wholly under the bottom edge of the view, on every level and
- * every platform, through the real camera's easing, and the physics before it
- * are exactly the old rule's. */
+ * every platform, through the real camera's easing; a stone her fall meets in
+ * view still catches her (the owner's second and third falls died 40-80 px
+ * above the visible home ledge); and no key acts once she is past the old line. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, start, update, jump, dash, dive, releaseJump, RULES, snapshot } from "../model.mjs";
 import { LEVELS, createLevel, levelDef } from "../level.mjs";
+const TICK_ = 1 / 120;
 import { VIEW, FALL_OUT, fitStage, cameraTargetY, clampCameraY, stepCamera, fallOutLine } from "../geometry.mjs";
 
 const REAL_DT = 1 / 60;
@@ -115,35 +117,75 @@ test("the owner's video: VIII's rising stair, a jump and an early cape flight un
   assert.ok(oldLine < VIEW.height * 0.9, `the old death line was at ${Math.round((oldLine / VIEW.height) * 100)}% of the screen height`);
 });
 
-test("past the doom line nothing saves her: no platform, no press, no star; the old outcome, declared later", () => {
-  const s = start(createGame(2021, { level: 8 }));
-  s.platforms = [plat("a", 0, 300, 400), plat("deep", 380, 300 + RULES.fallLimit + 40, 2000)];
-  s.pickups = [{ id: "bait", x: 600, y: 300 + RULES.fallLimit + 90, collected: false, route: "low" }];
-  s.updrafts = [];
-  s.def = { ...s.def, checkpoints: [] };
-  Object.assign(s.player, { x: 380, y: 300, vy: 0, grounded: true, jumps: 0 });
-  s.anchorY = 300;
-  let doomedAt = null;
-  while (s.status === "running" && s.time < 6) {
-    update(s, 1 / 120);
-    if (s.doomed && !doomedAt) {
-      doomedAt = { y: s.player.y, vy: s.player.vy, time: s.time };
-      // What she presses now is a press while falling apart: queued for the respawn.
-      assert.equal(jump(s), false);
-      assert.equal(dash(s), false);
-      assert.equal(dive(s), false);
-      assert.equal(s.queuedJump, true);
-      releaseJump(s);
+test("past the doom line she no longer steers, but a stone her fall meets in view still catches her; one out of sight does not", () => {
+  const fixture = (deepGap) => {
+    const s = start(createGame(2021, { level: 8 }));
+    s.platforms = [plat("a", 0, 300, 400), plat("deep", 380, 300 + deepGap, 2000)];
+    s.pickups = [];
+    s.updrafts = [];
+    s.def = { ...s.def, checkpoints: [] };
+    Object.assign(s.player, { x: 380, y: 300, vy: 0, grounded: true, jumps: 0 });
+    s.anchorY = 300;
+    return s;
+  };
+  const run = (s) => {
+    let doomedAt = null;
+    while (s.status === "running" && s.time < 8 && !(s.player.grounded && doomedAt)) {
+      update(s, 1 / 120);
+      if (s.doomed && !doomedAt) {
+        doomedAt = { y: s.player.y, vy: s.player.vy };
+        // What she presses now is a press while falling apart: queued for the respawn.
+        assert.equal(jump(s), false);
+        assert.equal(dash(s), false);
+        assert.equal(dive(s), false);
+        assert.equal(s.queuedJump, true);
+        releaseJump(s);
+      }
     }
+    return doomedAt;
+  };
+  // A stone 60 px under the old line (325 px under her last ground), in the view: she lands on it.
+  const near = fixture(RULES.fallLimit + 60);
+  const d1 = run(near);
+  assert.ok(d1 && d1.y > 300 + RULES.fallLimit && d1.y < 300 + RULES.fallLimit + 5, "doomed on the old rule's line");
+  assert.equal(near.status, "running");
+  assert.equal(near.deaths, 0, "no fall: the stone was in view under her");
+  assert.equal(near.ground?.id, "deep");
+  assert.equal(near.doomed, false, "landing ends the doom");
+  // A stone far beyond the view: out of sight before she reaches it, so she is lost (a fall, counted once).
+  const far = fixture(900);
+  run(far);
+  assert.equal(far.status, "dead");
+  assert.equal(far.deaths, 1);
+  assert.ok(far.respawn.fromY < 300 + 900, "declared before the stone");
+  assert.ok(far.respawn.fromY > 300 + RULES.fallLimit + 100, "and under the view, not on the old line");
+});
+
+test("the owner's second and third falls: gliding off the summit's second stone toward the home ledge 299 px below lands on it instead of dying 34 px above it", () => {
+  // The video's attempts B and C: she flew over the dive stair's first stone
+  // toward the home ledge (d-stone-2), a visible 299 px under summit-2: 34 px
+  // beyond the 265 px death line, so she shattered above ground she could see.
+  const s0 = createGame(2021, { level: 8 });
+  const P = Object.fromEntries(s0.platforms.map((q) => [q.id, q]));
+  const from = P["summit-2"],
+    to = P["d-stone-2"];
+  assert.ok(to.y - from.y > RULES.fallLimit && to.y - from.y < RULES.fallLimit + 60, `${to.y - from.y} px: just under the old line`);
+  // Held glide until she lands; the glide key stops counting past the doom line.
+  const s = start(createGame(2021, { level: 8 }));
+  Object.assign(s.player, { x: from.x + from.width - 60, y: from.y, vy: 0, grounded: true, jumps: 0 });
+  s.anchorY = from.y;
+  s.capeCharge = 1;
+  s.capeCharges = 1;
+  let jumped = false;
+  for (let i = 0; i < 120 * 6 && s.status === "running"; i++) {
+    if (!jumped && s.player.x >= from.x + from.width - 6) (jump(s), (jumped = true));
+    update(s, TICK_, { glide: jumped });
+    if (jumped && s.player.grounded) break;
   }
-  assert.ok(doomedAt && doomedAt.y > 300 + RULES.fallLimit && doomedAt.y < 300 + RULES.fallLimit + 5, "doomed on the old rule's line");
-  assert.equal(s.status, "dead", "she fell through the stone under the line instead of landing on it");
-  assert.equal(s.deaths, 1);
-  assert.equal(s.pickups[0].collected, false, "a star below the line is not hers");
-  assert.ok(s.respawn.fromY > 300 + RULES.fallLimit + 90, "the fall was declared under the view, not on the line");
-  const frozen = s.time;
-  update(s, 0.5);
-  assert.ok(s.time <= frozen + 1e-9 || s.status !== "dead", "the clock stood still while she fell out of sight");
+  assert.equal(s.status, "running");
+  assert.equal(s.deaths, 0);
+  // (A long glide sails on past the home ledge to the last road's first tile: she is saved either way.)
+  assert.ok(["d-stone-2", "f0"].includes(s.ground?.id), `landed on ${s.ground?.id}`);
 });
 
 test("where the old line is already below the view the fall counts at once, as before", () => {

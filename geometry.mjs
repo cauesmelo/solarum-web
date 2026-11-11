@@ -129,9 +129,12 @@ export function cameraTargetY(anchorY, fallTime = 0) {
  * plus `margin` px for the camera's lag after a rise (its lerp is 0.35 s, so a
  * 267 px super-jump landing leaves under 15 px of lag 0.9 s later, the
  * soonest a walk-off can reach the line). Between the two lines she is doomed
- * (model.mjs `doomed`): nothing she presses and nothing below her changes the
- * outcome, so physics, routes and fairness are exactly the old rule's; only
- * the moment the fall is declared moves down, out of sight. The vertical view
+ * (model.mjs `doomed`): no key acts any more (the old rule's fairness: she
+ * has lost the fall), but a stone her fall meets while it is still in view
+ * catches her. That second half is the owner's second and third falls: both
+ * were 34-80 px ABOVE the visible home ledge, which lies 299 px under the
+ * stone she left, 34 px past the 265 px line, so she shattered over ground she
+ * could see. Eleven stone pairs in levels IV-VIII sit between the two lines. The vertical view
  * is VIEW.height in every viewport (wide, letterboxed or portrait only change
  * the logical width), so no aspect can show more than this. */
 export const FALL_OUT = Object.freeze({ spriteUp: 112, margin: 48 });

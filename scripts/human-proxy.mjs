@@ -145,6 +145,7 @@ export function playAsHuman(n, proxy = "first-timer", seed = 1, { route = "main"
     wasStatus = s.status,
     noise = [],
     commit = [],
+    doomX = null,
     predicted = null;
   const entered = new Map();
   const falls = [];
@@ -182,9 +183,14 @@ export function playAsHuman(n, proxy = "first-timer", seed = 1, { route = "main"
   for (let tick = 0; tick < 120 * 400; tick++) {
     if (s.status !== wasStatus) {
       if (s.status === "dead") {
-        falls.push({ x: s.player.x, attempt });
+        // The fall is declared once she is out of the view (model.mjs `doomed`:
+        // up to ~130 px of run past the old 265 px line), but where it was
+        // decided, and what the person saw there, is the doom line's x.
+        const at = doomX ?? s.player.x;
+        falls.push({ x: at, attempt });
         // A fall teaches what was in view there.
-        knownX = Math.max(knownX, s.player.x + view.lookahead);
+        knownX = Math.max(knownX, at + view.lookahead);
+        doomX = null;
       }
       wasStatus = s.status;
     }
@@ -300,6 +306,8 @@ export function playAsHuman(n, proxy = "first-timer", seed = 1, { route = "main"
     // does not let go because Diana shattered).
     for (const k of Object.keys(held)) if (held[k] != null && held[k] < s.time + TICK && s.status !== "running") release(k);
     update(s, TICK, { glide: held.cape != null });
+    if (s.doomed) doomX ??= s.player.x;
+    else if (s.status !== "dead") doomX = null;
   }
   const cps = [{ id: "start", x: d.level.startX }, ...d.checkpoints].sort((a, b) => a.x - b.x);
   const spotOf = (x) => cps.filter((q) => q.x <= x).at(-1)?.id ?? "start";

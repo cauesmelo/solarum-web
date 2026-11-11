@@ -160,8 +160,9 @@ export function createGame(seed = 2021, options = {}) {
     airTime: 0,
     fallTime: 0,
     // Past the doom line (anchorY + fallLimit) and still in plain view of the
-    // camera: nothing saves her any more, and the fall is declared only once
-    // she has dropped out of the view (geometry.mjs fallOutLine).
+    // camera: she no longer steers; only a stone under her fall can save her,
+    // and the fall is declared once she has dropped out of the view
+    // (geometry.mjs fallOutLine).
     doomed: false,
     anchorY: LEVEL.startY,
     lastStable: { x: LEVEL.startX, y: LEVEL.startY },
@@ -627,6 +628,7 @@ function windAt(s, x, y) {
 }
 function landOn(s, q, wasGrounded, hard) {
   const p = s.player;
+  s.doomed = false;
   s.ground = q;
   if (q.type === "crumble" && q.triggeredAt === null) q.triggeredAt = s.time;
   if (q.cascade) {
@@ -805,21 +807,6 @@ function tickRespawn(s, dt) {
     }
   }
 }
-/** The doomed fall (see `doomed`): the run goes on and gravity pulls, but no
- * platform, star, press or wind acts on her and the world's clock stands
- * still, as it does for the shatter that follows. The fall is declared when
- * her drawn body is wholly under the view's bottom edge. */
-function fallOut(s, dt) {
-  const p = s.player;
-  advanceAnimation(s, dt);
-  p.x += s.speed * dt;
-  p.vy += s.physics.gravity * dt;
-  if (s.physics.maxFall && !p.diving) p.vy = Math.min(s.physics.maxFall, p.vy);
-  p.y += p.vy * dt;
-  s.fallTime += dt;
-  s.airTime += dt;
-  if (p.y > fallOutLine(s.anchorY, s.fallTime)) die(s);
-}
 function tick(s, dt, controls) {
   if (s.status === "won") {
     advanceAnimation(s, dt);
@@ -830,7 +817,9 @@ function tick(s, dt, controls) {
     return;
   }
   if (s.status !== "running") return;
-  if (s.doomed) return fallOut(s, dt);
+  // Past the doom line she no longer steers: a key is not read (and jump(),
+  // dash() and dive() refuse), so the fall only meets what lies under it.
+  if (s.doomed) controls = {};
   advanceAnimation(s, dt);
   const p = s.player;
   s.time += dt;
@@ -850,7 +839,7 @@ function tick(s, dt, controls) {
   // The predicted touch-down did not come (see jump()): the double jump now.
   if (s.bufferedDouble && s.jumpBuffer <= 0) {
     s.bufferedDouble = false;
-    if (!p.grounded && p.jumps < maxJumps(s)) leap(s, false, s.jumpBufferReleased);
+    if (!p.grounded && !s.doomed && p.jumps < maxJumps(s)) leap(s, false, s.jumpBufferReleased);
   }
   const previousY = p.y,
     wasGrounded = p.grounded;
@@ -1055,13 +1044,14 @@ function tick(s, dt, controls) {
     event(s, "checkpoint", { id: mark.id, index: s.def.checkpoints.indexOf(mark) });
   }
   if (p.y > s.anchorY + s.physics.fallLimit) {
-    // Past the point of no return. Where the camera still shows her (a high
-    // anchor puts the line mid-screen) she keeps falling until she is out of
-    // sight; where it is already below the view the fall counts at once.
+    // Past the point of no return: no key acts from here. Where the camera
+    // still shows her (a high anchor puts the line mid-screen) she keeps
+    // falling, and a stone her fall meets in view still catches her (landOn
+    // ends the doom: the owner's video died 34 px above a visible stone);
+    // the fall counts once she is out of sight. Where the old line is already
+    // under the view it counts at once, as before.
     s.doomed = true;
     s.dashRemaining = 0;
-    p.gliding = false;
-    p.vy = Math.max(0, p.vy);
     if (p.y > fallOutLine(s.anchorY, s.fallTime)) die(s);
   } else if (p.x >= s.def.level.finishX && p.grounded) {
     p.x = s.def.level.finishX;
