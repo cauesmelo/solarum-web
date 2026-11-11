@@ -2588,6 +2588,11 @@ const FAR_DOOR = {
     { id: "p-super", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", optional: true, x: ex(27), y: EY.floor - 235, from: ex(28) - 10, to: ex(34, 1), inputX: ex(28) + 8 },
     { id: "p-storm", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: ex(66, 1), y: EY.step2 - 235, from: ex(67, 1), to: ex(74, 2), inputX: ex(68, 1) + 8 },
     { id: "p-road", glyph: ["up", "then", "right", "then", "up"], action: "super-jump", x: ex(ROAD_K - 2, 5), y: EY.gate - 235, from: ex(ROAD_K - 1, 5), to: ex(ROAD_K + 6, 6), inputX: ex(ROAD_K, 5) + 8 },
+    // The rising stair's first step (owner's video: the cape was pressed in the
+    // jump's rise and flew 50-65 px under the bowl). One ledge-tip sign says
+    // what the step is: jump, and jump again. The second step's double has
+    // none (the first one has been done by then).
+    { id: "p-stair", glyph: ["up", "up"], action: "double-jump", x: ex(284.5, ...SF.far), y: EY.far2 - 250, from: ex(284, ...SF.far) - 30, to: ex(292, ...SF.far), inputX: ex(284, ...SF.far) + 8 },
   ],
   stars: E_STARS,
   routes: {
