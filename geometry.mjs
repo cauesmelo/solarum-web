@@ -116,6 +116,26 @@ export function cameraTargetY(anchorY, fallTime = 0) {
       : 0;
   return base + look;
 }
+/** Where a fall may count (the owner's video, 2026-11-10: Diana "died in the
+ * middle of the map"). The doom line, anchorY + fallLimit (265 px), is where
+ * nothing can save her any more; but with the damped camera (follow 0.65 and
+ * a look-down of up to 120 px) it sits anywhere from 55% to 99% of the screen
+ * height, so she used to shatter in plain view, over the Moon's limb. The fall
+ * counts only once her drawn body (spriteUp px above her feet: the leaf tips
+ * reach 83-91 px in the air poses and 109 in the takeoff's first frame) is
+ * wholly under the bottom edge of the view the camera can have at that moment,
+ * plus `margin` px for the camera's lag after a rise (its lerp is 0.35 s, so a
+ * 267 px super-jump landing leaves under 15 px of lag 0.9 s later, the
+ * soonest a walk-off can reach the line). Between the two lines she is doomed
+ * (model.mjs `doomed`): nothing she presses and nothing below her changes the
+ * outcome, so physics, routes and fairness are exactly the old rule's; only
+ * the moment the fall is declared moves down, out of sight. The vertical view
+ * is VIEW.height in every viewport (wide, letterboxed or portrait only change
+ * the logical width), so no aspect can show more than this. */
+export const FALL_OUT = Object.freeze({ spriteUp: 112, margin: 48 });
+export function fallOutLine(anchorY, fallTime = 0) {
+  return cameraTargetY(anchorY, fallTime) + VIEW.height + FALL_OUT.spriteUp + FALL_OUT.margin;
+}
 /** Hard limit applied after easing: Diana's head never enters the top band. */
 export function clampCameraY(cameraY, playerY) {
   return Math.min(cameraY, playerY - VIEW.bodyHeight - VIEW.headroom);

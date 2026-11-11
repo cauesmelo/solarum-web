@@ -30,6 +30,8 @@ import {
   cameraTargetY,
   clampCameraY,
   visibleBand,
+  fallOutLine,
+  FALL_OUT,
 } from "../geometry.mjs";
 import { playRoute, chooseAction, createRouteMemory } from "./routes.mjs";
 import { visibleBounds } from "./png.mjs";
@@ -46,6 +48,9 @@ const t = (x, from, n = 2) => (x - from) / 270 / levelDef(n).clock;
  * of revision six's Far Door, which VIII replaced. game() is that fixture;
  * game(n) is level n as built. */
 const RULE_DEF = Object.freeze({ ...levelDef(LEVEL_ID.door), verbs: { double: true, cape: true, glide: true, dive: true, super: true }, gets: [], capeRule: undefined });
+/** The y at which a fall is declared for this state (geometry.mjs fallOutLine:
+ * the doom line, anchorY + fallLimit, is only where nothing can save her). */
+const deathY = (s) => Math.max(s.anchorY + s.physics.fallLimit, fallOutLine(s.anchorY, s.fallTime)) + 1;
 const game = (n = null, o = {}) => createGame(2021, n == null ? { def: RULE_DEF, ...o } : { level: n, ...o });
 
 function adapter(s, block) {
@@ -207,7 +212,9 @@ test("removing a level's new action fails exactly at the challenge that teaches 
   assert.equal(noSuper.checkpoint.id, "storm");
   playRoute(adapter(noSuper, "super"), { route: "main" });
   assert.equal(noSuper.status, "dead");
-  assert.ok(noSuper.player.x > gx(68) && noSuper.player.x < gx(84), `L4 no super: ${noSuper.player.x}`);
+  // (The fall is declared once she is out of the view: up to 0.45 s of run
+  // past the doom line, 120 px at 270 px/s, in the storm void.)
+  assert.ok(noSuper.player.x > gx(68) && noSuper.player.x < gx(84) + 120, `L4 no super: ${noSuper.player.x}`);
 });
 test("missing a required midair constellation leaves the cape spent over the void", () => {
   for (const [n, star, beacon, lo, hi] of [
@@ -297,23 +304,29 @@ test("the campaign: built stages in order, then the interim levels; each faster,
   for (const d of [levelDef(LEVEL_ID.breaking), levelDef(LEVEL_ID["borrowed-wind"]), levelDef(LEVEL_ID["falling-road"]), viii]) assert.ok(Math.abs(levelPhysics(d).crumbleAfter - 5 * (15 / 107)) < 1e-12, `${d.numeral}: cracks break 5/16 after touch-down`);
 });
 test("L1's float: a held jump hangs at the top and falls no faster than 560 px/s real", () => {
-  const s = start(game(1));
-  s.platforms = [{ id: "floor", x: -1000, y: 540, width: 1240, phase: 0, route: "low", crumbleAfter: null, triggeredAt: null, collapseAt: null, collapsed: false, cascade: null }];
-  Object.assign(s.player, { x: 220, y: 540, grounded: true });
-  jump(s);
-  let apexTime = 0,
-    vmax = 0;
-  for (let i = 0; i < 240; i++) {
-    update(s, 1 / 120);
-    if (Math.abs(s.player.vy) < s.physics.apexHang.below) apexTime += 1 / 120;
-    vmax = Math.max(vmax, s.player.vy);
-  }
-  const plain = start(game(1));
-  plain.physics = { ...plain.physics, apexHang: null };
-  const tHang = apexTime / LEVELS[0].clock;
-  // Without the hang the slow band lasts 2 x 78 / 1304 = 0.12 s sim.
-  assert.ok(tHang > 0.2, `hang ${tHang.toFixed(3)} s real`);
-  assert.ok(vmax * LEVELS[0].clock <= 560 + 1e-6, `fall ${vmax * LEVELS[0].clock}`);
+  // The slow band around the apex (|vy| under the hang's threshold), measured
+  // on the jump alone: with the hang and without it. (This used to count
+  // ticks until 2 s, which included the respawn's idle ones and passed on a
+  // 0.2 s bar the real band never had: 0.193 s real against 0.101 without.)
+  const band = (hang) => {
+    const s = start(game(1));
+    s.platforms = [{ id: "floor", x: -1000, y: 540, width: 1240, phase: 0, route: "low", crumbleAfter: null, triggeredAt: null, collapseAt: null, collapsed: false, cascade: null }];
+    if (!hang) s.physics = { ...s.physics, apexHang: null };
+    Object.assign(s.player, { x: 220, y: 540, grounded: true });
+    jump(s);
+    let apex = 0,
+      vmax = 0;
+    for (let i = 0; i < 144 && s.status === "running"; i++) {
+      update(s, 1 / 120);
+      if (Math.abs(s.player.vy) < levelDef(1).physics.apexHang.below) apex += 1 / 120;
+      vmax = Math.max(vmax, s.player.vy);
+    }
+    return { real: apex / LEVELS[0].clock, vmax };
+  };
+  const hung = band(true),
+    plain = band(false);
+  assert.ok(hung.real - plain.real >= 0.08 && hung.real - plain.real <= 0.12, `hang adds ${(hung.real - plain.real).toFixed(3)} s real`);
+  assert.ok(hung.vmax * LEVELS[0].clock <= 560 + 1e-6, `fall ${hung.vmax * LEVELS[0].clock}`);
   // Releasing early cancels the hang (a tap is a tap).
   const tap = start(game(1));
   jump(tap);
@@ -663,7 +676,7 @@ test("a Great Star counts once Diana lands; a fall before that returns it to the
   s.anchorY = g.y;
   update(s, 1 / 120);
   assert.deepEqual(s.greatPending, ["great-1"]);
-  s.player.y = s.anchorY + RULES.fallLimit + 1;
+  s.player.y = deathY(s);
   update(s, 1 / 120);
   assert.equal(s.status, "dead");
   update(s, 1.2);
@@ -918,9 +931,15 @@ test("the vertical camera keeps apexes out of the HUD band and the death line ne
       const apex = q.y - maxRise,
         top = clampCameraY(cameraTargetY(q.y), apex);
       assert.ok(apex - VIEW.bodyHeight - top >= VIEW.topBand, `L${n} ${q.id}`);
-      const bottom = visibleBand(q.y).bottom,
-        death = q.y + RULES.fallLimit;
-      assert.ok(death >= bottom - 120 && death <= bottom + 100, `L${n} ${q.id} death ${death} vs view ${bottom}`);
+      // The doom line (nothing can save her below it) may lie inside the view,
+      // but a fall counts only once her drawn body is wholly under the
+      // bottom edge of even the lowest settled view (the camera looking
+      // down); tests/fall-out.test.mjs plays it through the real camera.
+      const lowest = cameraTargetY(q.y, 9) + VIEW.height,
+        doom = q.y + RULES.fallLimit,
+        out = fallOutLine(q.y, 9);
+      assert.ok(doom >= visibleBand(q.y).bottom - 400, `L${n} ${q.id} doom ${doom} vs view ${visibleBand(q.y).bottom}`);
+      assert.ok(out - FALL_OUT.spriteUp >= lowest + FALL_OUT.margin - 1e-9, `L${n} ${q.id} out ${out} vs lowest view ${lowest}`);
     }
     for (const star of all.pickups) {
       const under = all.platforms
@@ -943,6 +962,7 @@ test("a fall returns control at the beacon within 1.2 s (real) and keeps a buffe
     update(s, 0.02);
     assert.equal(s.checkpoint?.id, cp.id, `L${d.id}`);
     Object.assign(s.player, { x: cp.x + 300, y: cp.y + 400, grounded: false });
+    s.player.y = Math.max(s.player.y, deathY(s));
     update(s, 1 / 120);
     assert.equal(s.status, "dead");
     assert.equal(s.deaths, 1);
@@ -985,7 +1005,7 @@ test("Star net returns Diana to her last ground once per beacon and restores wha
   pilotTo(s, "main", 220 + 37.85 * 196 + 113.55);
   assert.equal(s.status, "running");
   const stars = s.stars;
-  Object.assign(s.player, { y: s.anchorY + RULES.fallLimit + 5 });
+  Object.assign(s.player, { y: deathY(s) + 4 });
   update(s, 1 / 120);
   assert.equal(s.status, "dead");
   update(s, 1.4);

@@ -1,4 +1,5 @@
 import { createLevel, levelDef, sectionAt, movementAt } from "./level.mjs";
+import { fallOutLine } from "./geometry.mjs";
 /** Pure deterministic runner simulation. Units: world px, seconds, px/s and
  * px/s². player.y is the feet position and y grows downward. Nothing here
  * touches the DOM, images, audio, storage or wall-clock time. */
@@ -158,6 +159,10 @@ export function createGame(seed = 2021, options = {}) {
     jumpBufferReleased: false,
     airTime: 0,
     fallTime: 0,
+    // Past the doom line (anchorY + fallLimit) and still in plain view of the
+    // camera: nothing saves her any more, and the fall is declared only once
+    // she has dropped out of the view (geometry.mjs fallOutLine).
+    doomed: false,
     anchorY: LEVEL.startY,
     lastStable: { x: LEVEL.startX, y: LEVEL.startY },
     event: "",
@@ -245,7 +250,7 @@ const maxJumps = (s) => (s.verbs.double ? 2 : 1);
  * in Endless cape), a leaf star while the double jump is owned and Diana is
  * in the air with no air jump left. A dormant star is never consumed. */
 export function refillLit(s, q) {
-  if (q.taken || s.status !== "running") return false;
+  if (q.taken || s.status !== "running" || s.doomed) return false;
   if (q.kind === "cape") return !!s.verbs.cape && !s.assist.endlessCape && !capeReady(s);
   const p = s.player;
   return !!s.verbs.double && !p.grounded && s.coyote <= 0 && p.jumps >= maxJumps(s);
@@ -386,7 +391,8 @@ export function jump(s) {
   // Jump pressed while falling apart is remembered and spent the moment
   // control returns, so a hurried retry press is never swallowed (released
   // before then, it is spent as a tap, like any buffered tap).
-  if (s.status === "dead" || s.status === "respawning") {
+  // (A doomed Diana, falling out of sight, is falling apart already.)
+  if (s.status === "dead" || s.status === "respawning" || (s.status === "running" && s.doomed)) {
     s.queuedJump = true;
     s.queuedJumpReleased = false;
     return false;
@@ -496,7 +502,7 @@ function touchdownTicks(s, limit) {
 export function releaseJump(s) {
   // A release while falling apart turns the queued press into a tap; one
   // while paused still counts (the key may come up behind the pause card).
-  if (s.status === "dead" || s.status === "respawning") {
+  if (s.status === "dead" || s.status === "respawning" || s.doomed) {
     if (s.queuedJump) s.queuedJumpReleased = true;
     return;
   }
@@ -508,7 +514,7 @@ export function releaseJump(s) {
 export function dash(s) {
   // A level that has not given Diana her cape yet ignores the button.
   if (!s.verbs.cape) return false;
-  if (s.status !== "running" || s.player.grounded) return false;
+  if (s.status !== "running" || s.doomed || s.player.grounded) return false;
   // Inside solar wind the cape does not dash level (a level flight there can
   // run under the shore it is meant to reach); holding it glides upward.
   // A press that cannot fly yet (an empty bar, or inside a column) waits
@@ -541,7 +547,7 @@ export function dash(s) {
   return true;
 }
 export function dive(s) {
-  if (!s.verbs.dive || s.status !== "running") return false;
+  if (!s.verbs.dive || s.status !== "running" || s.doomed) return false;
   const p = s.player;
   if (p.grounded) {
     // Only drawn cracks are smashable. Ordinary ground ignores a grounded dive.
@@ -704,6 +710,7 @@ function breakChain(s, c) {
 }
 function die(s) {
   s.status = "dead";
+  s.doomed = false;
   s.deaths++;
   s.fallsHere++;
   s.respawn = {
@@ -798,6 +805,21 @@ function tickRespawn(s, dt) {
     }
   }
 }
+/** The doomed fall (see `doomed`): the run goes on and gravity pulls, but no
+ * platform, star, press or wind acts on her and the world's clock stands
+ * still, as it does for the shatter that follows. The fall is declared when
+ * her drawn body is wholly under the view's bottom edge. */
+function fallOut(s, dt) {
+  const p = s.player;
+  advanceAnimation(s, dt);
+  p.x += s.speed * dt;
+  p.vy += s.physics.gravity * dt;
+  if (s.physics.maxFall && !p.diving) p.vy = Math.min(s.physics.maxFall, p.vy);
+  p.y += p.vy * dt;
+  s.fallTime += dt;
+  s.airTime += dt;
+  if (p.y > fallOutLine(s.anchorY, s.fallTime)) die(s);
+}
 function tick(s, dt, controls) {
   if (s.status === "won") {
     advanceAnimation(s, dt);
@@ -808,6 +830,7 @@ function tick(s, dt, controls) {
     return;
   }
   if (s.status !== "running") return;
+  if (s.doomed) return fallOut(s, dt);
   advanceAnimation(s, dt);
   const p = s.player;
   s.time += dt;
@@ -1031,8 +1054,16 @@ function tick(s, dt, controls) {
     refillCape(s, "beacon");
     event(s, "checkpoint", { id: mark.id, index: s.def.checkpoints.indexOf(mark) });
   }
-  if (p.y > s.anchorY + s.physics.fallLimit) die(s);
-  else if (p.x >= s.def.level.finishX && p.grounded) {
+  if (p.y > s.anchorY + s.physics.fallLimit) {
+    // Past the point of no return. Where the camera still shows her (a high
+    // anchor puts the line mid-screen) she keeps falling until she is out of
+    // sight; where it is already below the view the fall counts at once.
+    s.doomed = true;
+    s.dashRemaining = 0;
+    p.gliding = false;
+    p.vy = Math.max(0, p.vy);
+    if (p.y > fallOutLine(s.anchorY, s.fallTime)) die(s);
+  } else if (p.x >= s.def.level.finishX && p.grounded) {
     p.x = s.def.level.finishX;
     s.status = "won";
     bankGreatStars(s);
@@ -1111,6 +1142,7 @@ export function snapshot(s) {
     superJumps: s.superJumps,
     anchorY: s.anchorY,
     fallTime: s.fallTime,
+    doomed: s.doomed,
     respawn: s.respawn ? { ...s.respawn } : null,
     assist: { ...s.assist },
     section: { ...s.section },
