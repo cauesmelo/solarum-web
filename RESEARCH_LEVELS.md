@@ -1,6 +1,6 @@
 # Solarum: movement feel and four-level progression brief
 
-Prepared 2026-11-09 for the Solarum squad (gameplay programmer, level designer, composer). This is a proposal and nothing in it is implemented. [README](./README.md) and [LEVEL_DESIGN](./LEVEL_DESIGN.md) describe the build, and [RESEARCH_MUSIC](./RESEARCH_MUSIC.md) describes the score system this brief extends. These constraints stay: a 2D autorunner, Diana with her cape, the signal and Earth, monochrome ink art, the approved animations, a simulation that stays authoritative, and an independent itch.io ZIP.
+Prepared 2026-11-09 for the Solarum squad (gameplay programmer, level designer, composer). This is a proposal and nothing in it is implemented. [DEVELOPMENT](./DEVELOPMENT.md) and [LEVEL_DESIGN](./LEVEL_DESIGN.md) describe the build, and [RESEARCH_MUSIC](./RESEARCH_MUSIC.md) describes the score system this brief extends. These constraints stay: a 2D autorunner, Diana with her cape, the signal and Earth, monochrome ink art, the approved animations, a simulation that stays authoritative, and an independent itch.io ZIP.
 
 Numbers marked *measured* come from scratch scripts (not committed) run against the real `model.mjs` and `assets/` with Node 22 and 1/120 s steps. Everything else is a target to bake and test.
 

@@ -1,6 +1,6 @@
 # Solarum: progression, cape charge and eight levels
 
-Prepared 2026-11-10 by the lead game and level designer for the Solarum implementation squad. This brief makes **decisions**. Where a choice had real alternatives, it says what was rejected and why. Nothing here is implemented yet. [README](./README.md) and [LEVEL_DESIGN](./LEVEL_DESIGN.md) describe the build; [RESEARCH_LEVELS](./RESEARCH_LEVELS.md) (movement and four levels), [RESEARCH_MUSIC](./RESEARCH_MUSIC.md) (the score) and [MOVEMENT_AUDIT](./MOVEMENT_AUDIT.md) stay in force except where this brief replaces them.
+Prepared 2026-11-10 by the lead game and level designer for the Solarum implementation squad. This brief makes **decisions**. Where a choice had real alternatives, it says what was rejected and why. Nothing here is implemented yet. [DEVELOPMENT](./DEVELOPMENT.md) and [LEVEL_DESIGN](./LEVEL_DESIGN.md) describe the build; [RESEARCH_LEVELS](./RESEARCH_LEVELS.md) (movement and four levels), [RESEARCH_MUSIC](./RESEARCH_MUSIC.md) (the score) and [MOVEMENT_AUDIT](./MOVEMENT_AUDIT.md) stay in force except where this brief replaces them.
 
 Fixed constraints:
 - Solarum stays a 2D side-scrolling autorunner. Diana, her cape, the stars, the signal and Earth stay; so do the monochrome hand-drawn art and the approved animations.

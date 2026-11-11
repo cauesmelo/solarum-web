@@ -1,6 +1,6 @@
 # Solarum: glyphs as background signage, and the automatic level transition
 
-Prepared 2026-11-10 by the studio's UX and motion designer for the Solarum implementer. This is a **spec**: nothing here is implemented yet. It makes decisions, gives the reason for each and says what was rejected. Where a decision changes something the [README](./README.md) describes as built, this spec replaces that part:
+Prepared 2026-11-10 by the studio's UX and motion designer for the Solarum implementer. This is a **spec**: nothing here is implemented yet. It makes decisions, gives the reason for each and says what was rejected. Where a decision changes something the [DEVELOPMENT](./DEVELOPMENT.md) describes as built, this spec replaces that part:
 - the World glyphs, "Glyphs never cover Diana", Victory and "Between levels" bullets of the UI section;
 - "Between levels" under The campaign;
 - the result-card item of [RESEARCH_PROGRESSION](./RESEARCH_PROGRESSION.md) §6.
@@ -629,7 +629,7 @@ Browser checks go in the game's `scripts/browser-*.mjs` and in the root QA (`com
 ## Sources
 
 - **Project:**
-  - [README](./README.md) (UI, Sound, campaign);
+  - [DEVELOPMENT](./DEVELOPMENT.md) (UI, Sound, campaign);
   - [RESEARCH_PROGRESSION](./RESEARCH_PROGRESSION.md) §4.4–4.5 and §7;
   - [RESEARCH_MUSIC](./RESEARCH_MUSIC.md);
   - `game.js` (`drawPrompts`, `showVictory`, `showMap`, `startLevel`, `wake`, `draw`, `drawSky`), `level.mjs` (`shownPrompts`, `CARD`, `readSave`/`writeSave`, `prompts`), `model.mjs` (`die`, `markPrompts`, `restoreCheckpoint`), `geometry.mjs` (`VIEW`, `fitStage`, `cameraTargetY`), `backdrop.mjs` (`LOOKS`, `bodyBox`, `earthBox`, the one-look cache), `moments.mjs`;
