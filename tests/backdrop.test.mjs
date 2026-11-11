@@ -132,3 +132,25 @@ test("each look draws; under reduced motion every accent is still; Earth's cresc
     assert.ok(sprites.length >= 2, "home's bright star is the original star sprite");
   }
 });
+
+test("the world is always drawn over the backdrop and under the HUD, the iris last (the Earth's crescent never covers a platform)", async () => {
+  // The owner's video showed VIII's fixed Earth crescent where a thin platform
+  // passes: in the real renderer the platform is in front (paper over blue,
+  // checked pixel by pixel in common/artifacts/revision-5/solarum-video/), but
+  // the order is the contract, so it is pinned here: sky -> body -> accent are
+  // all inside drawSky(), which draw() calls before a single platform; the
+  // beacons, stars and Diana follow; the iris is the last canvas layer. The
+  // DOM HUD is a separate layer over the canvas (style.css).
+  const src = await read("game.js");
+  const draw = src.slice(src.indexOf("function draw() {"), src.indexOf("/* ---------- HUD and cards ---------- */"));
+  const order = ["drawSky();", "drawUpdrafts();", "drawSigns();", "for (const q of state.platforms) drawPlatform(q);", "drawBeacons();", "drawConstellations();", "drawStars();", "drawPlayer();", "drawIris();"].map((k) => [k, draw.indexOf(k)]);
+  for (const [k, at] of order) assert.ok(at > 0, `draw() calls ${k}`);
+  for (let i = 1; i < order.length; i++) assert.ok(order[i][1] > order[i - 1][1], `${order[i][0]} comes after ${order[i - 1][0]}`);
+  const sky = src.slice(src.indexOf("function drawSky() {"), src.indexOf("function drawSky() {") + 6000);
+  assert.ok(sky.indexOf("backdrop.drawBody(ctx, look, view)") > 0 && sky.indexOf("backdrop.drawAccent(ctx, look, view)") > sky.indexOf("backdrop.drawBody(ctx, look, view)"), "the body and its accent are painted in drawSky");
+  assert.ok(!/drawBody|drawAccent/.test(draw.replace(/drawSky\(\);/, "")), "draw() paints no backdrop body after the sky");
+  // The renderer keeps no copy of the respawn's timings: they are the model's level physics.
+  assert.ok(!/RULES\.respawn/.test(src), "game.js reads respawn timings from physics, not RULES");
+  const css = await read("style.css");
+  assert.ok(/#hud|\.hud/.test(css), "the HUD is DOM over the canvas");
+});

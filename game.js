@@ -15,7 +15,6 @@ import {
   capeReady,
   refillLit,
   relicY as modelRelicY,
-  RULES,
 } from "./model.mjs";
 import { LEVELS, CARD, checkpointIndex } from "./level.mjs";
 import { transitionPlan, frameAt, countUp, readSave, writeSave, recordWin, journeyOf, tallyOf, endingLine, CREDITS } from "./transition.mjs";
@@ -30,11 +29,13 @@ import {
   cameraTargetY,
   clampCameraY,
   stepCamera,
+  respawnTimes,
+  irisAt,
 } from "./geometry.mjs";
 import { createAudioEngine, readSoundSetting, writeSoundSetting, readGentleSetting, writeGentleSetting, readVolumes, writeVolumes } from "./audio.mjs";
 import { createFrameClock } from "./frame-clock.mjs";
 import { emergenceAt, emergenceSeconds, resolveSet } from "./emergence.mjs";
-import { owns, spriteSetName, capeMeter, capeTint, doubleInHand } from "./hud.mjs";
+import { owns, spriteSetName, capeMeter, capeTint, doubleInHand, assistTipDue } from "./hud.mjs";
 import { createBackdrop, lookOf, skyDensity, cadentGap, bodyBox, bodyTop, earthBox, ringsCrop, HUD_BAND, LOOKS } from "./backdrop.mjs";
 import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt, SIXTEENTH_SIM, MOMENT_KINDS, scriptedMoments, fallAt, flashAt, asteroidAt, plumeAt, farPlace, eyeAt, eyeSeconds, eyeTimes, rideAt, slopeAt } from "./moments.mjs";
 import { ISLAND_LOOKS, islandShape, markable, paintMarks, paintParticles } from "./islands.mjs";
@@ -126,6 +127,8 @@ const held = { glide: false };
 const camera = { x: 0, y: 0, snap: true };
 const fx = []; // short-lived particles in world space
 const ui = {
+  // Level ids whose assist hint was already shown this session (hud.mjs assistTipDue).
+  assistTipShown: new Set(),
   // {text|id, at}: `at` is simulation time (state.time), never wall-clock.
   card: null,
   story: null,
@@ -158,6 +161,9 @@ const audio = createAudioEngine({ enabled: sound.on, gentle: sound.gentle, space
 /** Simulation seconds per real second: the level's clock (BPM / 107) times
  * Gentle pace, so the arcs stay identical and only time is scaled. */
 const simScale = () => pace * (state.clock ?? 1);
+/** Any assist on (Star net, Endless cape, Gentle pace, Gentle music): the
+ * pause menu's help is already in use, so the hint to find it is not shown. */
+const assistsOn = () => !!(state.assist.starNet || state.assist.endlessCape || pace < 1 || sound.gentle);
 sound.music.preload = "none";
 sound.music.loop = true;
 audio.attachMusic(sound.music); // level: MUSIC_LEVEL, matched to the score
@@ -632,7 +638,10 @@ function drawPlatform(q) {
     warn = Math.min(1, (state.time - q.triggeredAt) / q.crumbleAfter);
   if (q.collapseAt != null) {
     const lead = q.collapseAt - state.time;
-    if (lead < RULES.cascadeShake) warn = 1 - lead / RULES.cascadeShake;
+    // (The level's own shake, in simulation seconds: RULES' 0.35 is sim time at
+    // clock 1 and under-warned every level above 107 BPM by up to 16%.)
+    const shake = state.physics.cascadeShake;
+    if (lead < shake) warn = 1 - lead / shake;
   }
   const jitter = warn > 0 && !reduced ? Math.sin(clock * 70 + q.phase) * 1.6 * warn : 0;
   const shape = islandPath(q, x + jitter * 0.6, w, thick, Math.abs(jitter) * 0.5);
@@ -1251,7 +1260,7 @@ function drawPlayer() {
     sprite(f.sheet, f.frame, p.x, p.y - 30 + sinceWake * 60, 0.42, 1 - sinceWake / 0.16);
   }
   if (state.status === "respawning") {
-    const t = state.respawn ? state.respawn.t - RULES.respawnShatter - RULES.respawnIris : 1;
+    const t = state.respawn ? state.respawn.t - respawnTimes(state.physics).cut : 1;
     if (t < 0.14) {
       const f = frameForClip(manifest, "sprout", clock * 3);
       sprite(f.sheet, f.frame, p.x, p.y - 30, 0.42);
@@ -1288,7 +1297,7 @@ function drawPlayer() {
 function drawShards() {
   const r = state.respawn;
   if (!r) return;
-  const t = Math.min(1, r.t / RULES.respawnShatter);
+  const t = Math.min(1, r.t / respawnTimes(state.physics).close);
   const ease = t * t * (3 - 2 * t);
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2,
@@ -2391,28 +2400,22 @@ function drawSoilMarks() {
 }
 function drawIris() {
   const r = state.respawn;
-  if (!r || reduced) {
-    if (r && reduced && state.status === "dead" && r.t > RULES.respawnShatter) {
-      ctx.fillStyle = INK;
-      ctx.fillRect(0, 0, W, H);
-    }
-    return;
-  }
-  const close = RULES.respawnShatter,
-    cut = close + RULES.respawnIris,
-    open = cut + RULES.respawnPop;
-  let radius = null;
-  if (state.status === "dead" && r.t > close) radius = (1 - (r.t - close) / RULES.respawnIris) * W;
-  else if (state.status === "respawning") radius = Math.min(1, (r.t - cut) / (open - cut) / 0.6) * W;
-  if (radius == null) return;
-  const cx = r.toX + 18 - camera.x,
-    cy = r.toY - 40 - camera.y;
+  if (!r) return;
+  const dark = irisAt(state.status, r.t, state.physics, W, reduced);
+  if (!dark) return;
   ctx.save();
   ctx.fillStyle = INK;
-  ctx.beginPath();
-  ctx.rect(0, 0, W, H);
-  ctx.arc(cx, cy, Math.max(0, radius), 0, Math.PI * 2, true);
-  ctx.fill("evenodd");
+  if (dark.alpha != null) {
+    // Reduced motion: no moving edge; the dark comes up and goes again as a
+    // slow cross-fade.
+    ctx.globalAlpha = dark.alpha;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.arc(r.toX + 18 - camera.x, r.toY - 40 - camera.y, dark.radius, 0, Math.PI * 2, true);
+    ctx.fill("evenodd");
+  }
   ctx.restore();
 }
 
@@ -2496,7 +2499,7 @@ function updateCamera(dt) {
   if (state.status === "dead" && state.respawn) {
     // Rewind: the view rides the star shards back to the last light.
     const r = state.respawn,
-      t = Math.min(1, r.t / RULES.respawnShatter),
+      t = Math.min(1, r.t / respawnTimes(state.physics).close),
       e = reduced ? (t >= 1 ? 1 : 0) : t * t * (3 - 2 * t);
     const fromX = camera.deathX ?? camera.x,
       fromY = camera.deathY ?? camera.y;
@@ -2923,8 +2926,11 @@ function processEvents(quiet = false) {
         camera.snap = true;
         clearWords();
         // The one hint kept: after five falls at one beacon, where the assists
-        // are (it waits while an unlock banner holds the top of the view).
-        if (loud && state.fallsHere >= 5) {
+        // are. Once per level and session (hud.mjs assistTipDue), never after
+        // Back to last light and never with an assist on; it waits while an
+        // unlock banner holds the top of the view.
+        if (loud && assistTipDue({ fallsHere: state.fallsHere, level: state.level, shown: ui.assistTipShown, assistOn: assistsOn(), source: e.source })) {
+          ui.assistTipShown.add(state.level);
           if (banner) ui.tipWaiting = "Need a hand? Assists are in the pause menu.";
           else showTip("Need a hand? Assists are in the pause menu.");
         } else if (loud && WORDS.tips && state.fallsHere >= 3) {
@@ -2999,6 +3005,12 @@ function doDive() {
 function openPause() {
   // Mid-transition the beat freezes with the clock (§2.5).
   if (trans) return pauseTransition();
+  // Esc during a fall's dark (up to 1.5 s) used to vanish: it is kept and the
+  // pause opens the moment she can be controlled again.
+  if (state.status === "dead" || state.status === "respawning") {
+    ui.pauseQueued = true;
+    return;
+  }
   if (state.status !== "running") return;
   togglePause(state);
   held.glide = false;
@@ -4202,6 +4214,10 @@ function frame(now) {
     if (emergence && clock - emergence.at >= emergenceSeconds(reduced)) wake();
     // (An arriving level's events, its wake among them, wait for bar 1.)
     if (!trans?.swapped) processEvents();
+    if (ui.pauseQueued && state.status !== "dead" && state.status !== "respawning") {
+      ui.pauseQueued = false;
+      if (state.status === "running" && !trans) openPause();
+    }
     scriptedCues();
     stepTransition(real);
     warmAhead();

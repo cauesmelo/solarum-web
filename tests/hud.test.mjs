@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, start, update, jump, releaseJump, dash, snapshot } from "../model.mjs";
-import { owns, spriteSetName, capeMeter, capeTint, tintForCharge, TINT_STEPS, doubleInHand } from "../hud.mjs";
+import { owns, spriteSetName, capeMeter, capeTint, tintForCharge, TINT_STEPS, doubleInHand, assistTipDue, ASSIST_TIP_FALLS } from "../hud.mjs";
 import { ANCHORS, momentSeconds, riseAt, settleAt, helperApproach, helperAfter, rippleAt, necklaceAt } from "../moments.mjs";
 import { LEVELS, LEVEL_ID } from "../level.mjs";
 
@@ -165,4 +165,25 @@ test("GET moments: each lasts at most one bar at every tempo; the helper meets D
   assert.ok(r.done && r.dx === ANCHORS.glint.dx && r.dy === ANCHORS.glint.dy);
   assert.equal(settleAt(0).cape, 0);
   assert.equal(settleAt(0.6).cape, 1);
+});
+
+test("the assist hint is offered once per level and session, not after every respawn (the owner's video)", () => {
+  // The video: five falls at VIII's summit beacon, then "Need a hand? Assists
+  // are in the pause menu." came back after each of the next three respawns.
+  const shown = new Set();
+  const falls = [];
+  for (let fallsHere = 1; fallsHere <= 9; fallsHere++) {
+    const due = assistTipDue({ fallsHere, level: 8, shown, source: "beacon" });
+    if (due) shown.add(8);
+    falls.push(due);
+  }
+  assert.deepEqual(falls.map((d, i) => d && i + 1), [false, false, false, false, ASSIST_TIP_FALLS, false, false, false, false]);
+  assert.equal(ASSIST_TIP_FALLS, 5);
+  // Another level has its own first time; a beacon in between does not re-arm the same level.
+  assert.equal(assistTipDue({ fallsHere: 5, level: 7, shown }), true);
+  assert.equal(assistTipDue({ fallsHere: 6, level: 8, shown }), false);
+  // Never after the player's own Back to last light, and never with an assist on.
+  assert.equal(assistTipDue({ fallsHere: 9, level: 3, shown: new Set(), source: "retry" }), false);
+  assert.equal(assistTipDue({ fallsHere: 9, level: 3, shown: new Set(), assistOn: true }), false);
+  assert.equal(assistTipDue({ fallsHere: 9, level: 3, shown: undefined }), true, "no set yet: first time");
 });

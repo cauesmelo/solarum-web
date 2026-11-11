@@ -119,8 +119,10 @@ export function cameraTargetY(anchorY, fallTime = 0) {
 /** Where a fall may count (the owner's video, 2026-11-10: Diana "died in the
  * middle of the map"). The doom line, anchorY + fallLimit (265 px), is where
  * nothing can save her any more; but with the damped camera (follow 0.65 and
- * a look-down of up to 120 px) it sits anywhere from 55% to 99% of the screen
- * height, so she used to shatter in plain view, over the Moon's limb. The fall
+ * a look-down of up to 120 px) it sat at 74% to 110% of the screen height
+ * (median 91%, measured on the 245 platforms of the eight levels at the 0.59 s
+ * a 265 px fall takes), so she used to shatter in plain view, her head on
+ * screen on every platform and her feet on 89% of them, over the Moon's limb. The fall
  * counts only once her drawn body (spriteUp px above her feet: the leaf tips
  * reach 83-91 px in the air poses and 109 in the takeoff's first frame) is
  * wholly under the bottom edge of the view the camera can have at that moment,
@@ -135,6 +137,38 @@ export function cameraTargetY(anchorY, fallTime = 0) {
 export const FALL_OUT = Object.freeze({ spriteUp: 112, margin: 48 });
 export function fallOutLine(anchorY, fallTime = 0) {
   return cameraTargetY(anchorY, fallTime) + VIEW.height + FALL_OUT.spriteUp + FALL_OUT.margin;
+}
+/** The respawn's three phases in the model's own simulation seconds (the
+ * numbers tickRespawn() steps by). They are the level's physics, not RULES:
+ * the simulation runs at clock = BPM / 107 of real time, so a level above 107
+ * BPM stretches 0.45 + 0.25 s to 0.54 + 0.30 s of simulation (VIII: 1.196).
+ * The renderer used the unscaled RULES and so closed the iris, and finished
+ * the camera's ride back, 16% early: the model then waited out the difference
+ * with the view completely black (about 120 ms in VIII; the owner's video
+ * shows seven blank frames at every respawn). */
+export function respawnTimes(physics) {
+  const close = physics.respawnShatter,
+    cut = close + physics.respawnIris;
+  return { close, iris: physics.respawnIris, cut, open: cut + physics.respawnPop, pop: physics.respawnPop };
+}
+/** The iris never closes below this radius (px): the beacon's light stays lit
+ * through the swap, so the view goes dark but never blank. The model restores
+ * the beacon's world on the tick the iris is at its smallest (t = cut). */
+export const LANTERN = 26;
+/** The dark of a respawn at simulation time t of `status` (dead | respawning):
+ * { radius } of the lit circle round the beacon for the iris, or { alpha }
+ * of an even dark for reduced motion (a slow cross-fade, never a cut), or
+ * null while the view is fully open. `width` is the logical view width (the
+ * circle is always wide enough to leave nothing dark when open). */
+export function irisAt(status, t, physics, width, reduced = false) {
+  const T = respawnTimes(physics);
+  let u = null; // 0 = open to the whole view, 1 = the lantern alone
+  if (status === "dead" && t > T.close) u = Math.min(1, (t - T.close) / T.iris);
+  else if (status === "respawning") u = 1 - Math.min(1, (t - T.cut) / (T.pop * 0.6));
+  if (u == null || u <= 0) return null;
+  if (reduced) return { alpha: 0.94 * u };
+  const e = u * u * (3 - 2 * u);
+  return { radius: LANTERN + (1 - e) * (width - LANTERN) };
 }
 /** Hard limit applied after easing: Diana's head never enters the top band. */
 export function clampCameraY(cameraY, playerY) {

@@ -75,3 +75,16 @@ export function doubleInHand(s) {
   if (!owns(s, "double")) return false;
   return (s.player?.jumps ?? 0) < 2;
 }
+
+/** The one hint kept in play (owner, 2026-11-10: "Need a hand? Assists are in
+ * the pause menu." came back after every respawn in the video, once she had
+ * five falls at a beacon, and sat over the next attempt each time). It is
+ * offered ONCE per level and session, on the first automatic respawn after
+ * ASSIST_TIP_FALLS falls in a row at one beacon (`fallsHere` resets at the next
+ * beacon), never after the player's own Back to last light, and never when an
+ * assist is already on: a struggling player is told where help is, not
+ * nagged. `shown` is the set of level ids already told. */
+export const ASSIST_TIP_FALLS = 5;
+export function assistTipDue({ fallsHere, level, shown, assistOn = false, source = "beacon" }) {
+  return source !== "retry" && !assistOn && fallsHere >= ASSIST_TIP_FALLS && !shown?.has(level);
+}
